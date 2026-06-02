@@ -1,25 +1,63 @@
-# BracketFlow Agent Notes
+# BracketFlow Agent Guide
 
-## Proyecto
+## Que es BracketFlow
 
-BracketFlow vive en esta carpeta `app/` y se divide en:
+BracketFlow es un sistema real de gestion de torneos esports con foco inicial en Warzone. El MVP actual cubre torneos, jugadores, equipos, ruleta 2v2 y 3v3, rondas Battle Royale, resultados por kills y placement, y leaderboard acumulado.
 
-- `backend/`: FastAPI + SQLite + SQLAlchemy
-- `frontend/`: Next.js App Router + TypeScript
+## Stack actual
 
-## Reglas operativas
+- Backend: Python, FastAPI, SQLite, SQLAlchemy, Pydantic
+- Frontend: Next.js, TypeScript, App Router
+- Base de datos local de desarrollo: `backend/bracketflow.db`
 
-- No mover la estructura `backend/` y `frontend/`
-- No introducir Docker, auth, pagos ni IA salvo pedido explicito
-- Mantener compatibilidad con el bracket clasico
-- Para Battle Royale, priorizar cambios minimos y verificables
+## Estructura del proyecto
 
-## Backend
+- `backend/`: API, modelos, schemas, CRUD y persistencia SQLite
+- `frontend/`: interfaz Next.js, cliente API y UX del MVP
+- `docs/agents/`: reglas operativas por rol para agentes y asistentes
 
-- Entry point: `backend/app/main.py`
-- DB local: `backend/bracketflow.db`
-- Si cambia el schema y no hay migraciones, parar backend y borrar `backend/bracketflow.db`
-- Correr con:
+## Reglas generales para cualquier agente
+
+- Mantener el stack actual.
+- Mantener la compatibilidad con el bracket clasico y los modos activos.
+- Preferir cambios pequenos, verificables y alineados al MVP.
+- Extender codigo existente antes de introducir nuevas capas o abstracciones.
+- Usar la API real existente cuando ya haya endpoint para la necesidad.
+- Definir criterio de exito antes de aceptar cambios funcionales.
+- Hacer cambios de backend primero cuando la funcionalidad dependa de datos o contratos.
+- Hacer cambios de frontend despues de confirmar contratos y comportamiento backend.
+- Cerrar siempre con validacion y QA manual al final.
+
+## Que no se debe hacer
+
+- No mover ni reestructurar `backend/` y `frontend/`.
+- No cambiar el stack.
+- No agregar Docker.
+- No agregar autenticacion.
+- No agregar pagos.
+- No agregar IA salvo pedido explicito.
+- No crear seeders.
+- No crear mocks persistentes.
+- No agregar demo data.
+- No agregar botones demo.
+- No reemplazar datos reales por datos ficticios si la API existe.
+- No ejecutar `npm audit fix --force`.
+- No introducir redisenos grandes sin necesidad funcional.
+
+## Politica estricta de datos
+
+- El repo debe trabajar con datos reales ingresados manualmente o con datos creados por el flujo normal de la aplicacion.
+- Estan prohibidos demo data, seeders, fixtures permanentes, mocks persistentes y accesos UI de demostracion.
+- Si para probar algo hace falta informacion, debe ingresarse por el flujo real del sistema o documentarse el faltante sin inventar datos.
+
+## Politica SQLite en desarrollo local
+
+- La base local actual es `backend/bracketflow.db`.
+- No hay migraciones formales todavia.
+- Si cambia el schema en desarrollo local, debe avisarse explicitamente que puede ser necesario detener el backend y borrar `backend/bracketflow.db` para regenerar la base.
+- Nunca asumir regeneracion silenciosa de la base; siempre documentar el impacto.
+
+## Como correr backend
 
 ```powershell
 cd backend
@@ -27,62 +65,52 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
-### Dominio actual
-
-- `Tournament`
-- `Team`
-- `Player`
-- `TeamMember`
-- `Match`
-- `TeamResult`
-
-### Modos activos
-
-- `single_elimination`
-- `battle_royale_points`
-- `roulette_2v2`
-- `roulette_3v3`
-
-### Validaciones utiles
-
-```powershell
-cd backend
-python -m compileall app
-```
-
-## Frontend
-
-- Pantalla principal: `frontend/app/page.tsx`
-- Cliente API: `frontend/lib/api.ts`
-- Estilos globales: `frontend/app/globals.css`
-- Correr con:
+## Como correr frontend
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-### Validacion util
+## Como validar cambios
+
+Backend:
+
+```powershell
+cd backend
+python -m compileall app
+```
+
+Frontend:
 
 ```powershell
 cd frontend
 npm run lint
 ```
 
-## Estado funcional actual
+Validacion funcional minima:
 
-- Crear torneos con formato
-- Crear equipos manuales
-- Crear jugadores
-- Generar bracket clasico
-- Generar ruleta 2v2 y 3v3
-- Crear rondas battle royale
-- Registrar kills y placement
-- Ver leaderboard acumulado
-- Ver detalle de puntos por ronda
+- Backend online
+- Swagger responde
+- Frontend detecta backend
+- Flujo real de torneo sin datos demo
+- Leaderboard coherente con resultados cargados
 
-## Criterio de cambio
+## Flujo correcto de trabajo
 
-- Preferir extender modelos y endpoints existentes
-- Evitar rediseños grandes del frontend
-- No reemplazar datos reales por mocks si la API existe
+1. Confirmar alcance y criterio de exito.
+2. Revisar impacto en backend y contratos de datos.
+3. Cambiar backend primero si el flujo lo requiere.
+4. Cambiar frontend despues, consumiendo la API real.
+5. Ejecutar validaciones tecnicas minimas.
+6. Ejecutar QA manual del flujo completo al final.
+
+## Referencias operativas
+
+- `docs/agents/architect.md`
+- `docs/agents/backend.md`
+- `docs/agents/frontend.md`
+- `docs/agents/scoring.md`
+- `docs/agents/qa.md`
+- `docs/agents/stream-ux.md`
+- `docs/NEXT_STEPS.md`

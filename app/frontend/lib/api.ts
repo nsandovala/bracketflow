@@ -1,6 +1,6 @@
 const API_BASE_URL = "http://localhost:8000";
 
-type RequestOptions = RequestInit & {
+type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
 

@@ -159,6 +159,10 @@ label {
   font-size: 1.35rem;
 }
 
+.bf-panel-stage {
+  margin-bottom: 24px;
+}
+
 .bf-badge {
   display: inline-flex;
   align-items: center;
@@ -168,6 +172,18 @@ label {
   border-radius: 999px;
   background: rgba(34, 211, 238, 0.14);
   color: var(--accent);
+  font-weight: 700;
+}
+
+.bf-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 232, 249, 0.2);
+  background: rgba(34, 211, 238, 0.08);
+  color: #cffafe;
   font-weight: 700;
 }
 
@@ -246,9 +262,113 @@ label {
   gap: 12px;
 }
 
+.bf-guidance h2 {
+  margin: 0 0 10px;
+}
+
+.bf-guidance p:last-child {
+  margin: 0;
+  color: var(--muted);
+}
+
 .bf-stack {
   display: grid;
   gap: 16px;
+}
+
+.bf-stage-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.bf-stat,
+.bf-next-card,
+.bf-step {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.54);
+}
+
+.bf-stat {
+  padding: 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.bf-stat span,
+.bf-next-card p,
+.bf-step span {
+  color: var(--muted);
+}
+
+.bf-next-card {
+  padding: 18px;
+  margin-bottom: 20px;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(2, 6, 23, 0.7)),
+    rgba(2, 6, 23, 0.54);
+}
+
+.bf-next-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.15rem;
+}
+
+.bf-next-card p:last-child {
+  margin: 0;
+}
+
+.bf-step-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.bf-step {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  min-height: 118px;
+}
+
+.bf-step.is-active {
+  border-color: rgba(103, 232, 249, 0.34);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.14) inset;
+}
+
+.bf-step.is-done {
+  border-color: rgba(74, 222, 128, 0.32);
+}
+
+.bf-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.bf-step.is-active .bf-step-index {
+  background: rgba(34, 211, 238, 0.16);
+  color: #cffafe;
+}
+
+.bf-step.is-done .bf-step-index {
+  background: rgba(74, 222, 128, 0.14);
+  color: #bbf7d0;
+}
+
+.bf-step-copy {
+  display: grid;
+  gap: 8px;
 }
 
 .bf-button-row {
@@ -397,6 +517,7 @@ label {
 @media (max-width: 920px) {
   .bf-grid,
   .bf-grid-detail,
+  .bf-stage-summary,
   .bf-match,
   .bf-inline-grid,
   .bf-round-table {
