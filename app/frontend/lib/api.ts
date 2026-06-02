@@ -91,6 +91,21 @@ export type TeamResult = {
   total_points: number;
 };
 
+export type TeamResultDetail = {
+  id: number;
+  tournament_id: number;
+  match_id: number;
+  round: number;
+  match_status: string;
+  team_id: number;
+  team_name: string;
+  kills: number;
+  placement: number;
+  kill_points: number;
+  placement_points: number;
+  total_points: number;
+};
+
 export type BracketGenerationResult = {
   matches_created: number;
   status: string;
@@ -207,4 +222,8 @@ export function saveMatchResult(
 
 export function getLeaderboard(tournamentId: number) {
   return request<LeaderboardEntry[]>(`/tournaments/${tournamentId}/leaderboard`);
+}
+
+export function getTournamentResults(tournamentId: number) {
+  return request<TeamResultDetail[]>(`/tournaments/${tournamentId}/results`);
 }

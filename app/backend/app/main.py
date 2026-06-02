@@ -211,6 +211,19 @@ def upsert_match_result(
     return crud.upsert_team_result(db, tournament, match, payload)
 
 
+@app.get(
+    "/tournaments/{tournament_id}/results",
+    response_model=list[schemas.TeamResultDetail],
+)
+def list_tournament_results(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> list[schemas.TeamResultDetail]:
+    tournament = get_tournament_or_404(db, tournament_id)
+    ensure_battle_royale_tournament(tournament)
+    return crud.get_team_result_details_by_tournament(db, tournament_id)
+
+
 @app.get("/tournaments/{tournament_id}/matches", response_model=list[schemas.Match])
 def list_matches(
     tournament_id: int,

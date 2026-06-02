@@ -44,6 +44,13 @@ select {
   font: inherit;
 }
 
+label {
+  display: grid;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
 .bf-shell {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
@@ -295,7 +302,8 @@ select {
 
 .bf-team-card,
 .bf-result-card,
-.bf-score-row {
+.bf-score-row,
+.bf-round-card {
   display: grid;
   gap: 14px;
 }
@@ -361,11 +369,37 @@ select {
   color: #cbd5e1;
 }
 
+.bf-round-table {
+  display: grid;
+  grid-template-columns: 1.3fr repeat(5, minmax(0, 1fr));
+  gap: 10px 12px;
+  align-items: center;
+}
+
+.bf-round-head {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.bf-round-row {
+  display: contents;
+}
+
+.bf-round-row span,
+.bf-round-row strong {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(8, 15, 28, 0.72);
+}
+
 @media (max-width: 920px) {
   .bf-grid,
   .bf-grid-detail,
   .bf-match,
-  .bf-inline-grid {
+  .bf-inline-grid,
+  .bf-round-table {
     grid-template-columns: 1fr;
   }
 

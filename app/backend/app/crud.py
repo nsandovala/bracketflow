@@ -371,6 +371,37 @@ def get_team_results_by_tournament(
     )
 
 
+def get_team_result_details_by_tournament(
+    db: Session, tournament_id: int
+) -> list[schemas.TeamResultDetail]:
+    rows = (
+        db.query(models.TeamResult, models.Team.name, models.Match.round, models.Match.status)
+        .join(models.Team, models.Team.id == models.TeamResult.team_id)
+        .join(models.Match, models.Match.id == models.TeamResult.match_id)
+        .filter(models.TeamResult.tournament_id == tournament_id)
+        .order_by(models.Match.round.asc(), models.Team.name.asc())
+        .all()
+    )
+
+    return [
+        schemas.TeamResultDetail(
+            id=result.id,
+            tournament_id=result.tournament_id,
+            match_id=result.match_id,
+            round=round_number,
+            match_status=match_status,
+            team_id=result.team_id,
+            team_name=team_name,
+            kills=result.kills,
+            placement=result.placement,
+            kill_points=result.kill_points,
+            placement_points=result.placement_points,
+            total_points=result.total_points,
+        )
+        for result, team_name, round_number, match_status in rows
+    ]
+
+
 def get_leaderboard(
     db: Session, tournament_id: int
 ) -> list[schemas.LeaderboardEntry]:

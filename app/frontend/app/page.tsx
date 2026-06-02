@@ -7,6 +7,7 @@ import {
   Match,
   Player,
   Team,
+  TeamResultDetail,
   Tournament,
   TournamentFormat,
   createBattleRoyaleMatch,
@@ -19,6 +20,7 @@ import {
   getLeaderboard,
   getMatches,
   getPlayers,
+  getTournamentResults,
   getTeams,
   getTournament,
   getTournaments,
@@ -71,6 +73,7 @@ export default function Home() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [tournamentResults, setTournamentResults] = useState<TeamResultDetail[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
   const [tournamentForm, setTournamentForm] = useState(initialTournamentForm);
   const [teamName, setTeamName] = useState("");
@@ -92,6 +95,7 @@ export default function Home() {
       setTeams([]);
       setMatches([]);
       setLeaderboard([]);
+      setTournamentResults([]);
       setSelectedMatchId(null);
     }
   }
@@ -103,15 +107,16 @@ export default function Home() {
       getTeams(tournamentId),
       getMatches(tournamentId),
     ]);
-    const nextLeaderboard = isBattleRoyaleFormat(tournament.format)
-      ? await getLeaderboard(tournamentId)
-      : [];
+    const [nextLeaderboard, nextTournamentResults] = isBattleRoyaleFormat(tournament.format)
+      ? await Promise.all([getLeaderboard(tournamentId), getTournamentResults(tournamentId)])
+      : [[], []];
 
     setSelectedTournament(tournament);
     setPlayers(nextPlayers);
     setTeams(nextTeams);
     setMatches(nextMatches);
     setLeaderboard(nextLeaderboard);
+    setTournamentResults(nextTournamentResults);
 
     const battleRoyaleMatches = nextMatches.filter(
       (match) => match.team_a_id === null && match.team_b_id === null
@@ -342,6 +347,18 @@ export default function Home() {
   );
   const battleRoyaleEnabled =
     selectedTournament !== null && isBattleRoyaleFormat(selectedTournament.format);
+  const roundResults = tournamentResults.reduce<Record<number, TeamResultDetail[]>>(
+    (groups, result) => {
+      const bucket = groups[result.round] ?? [];
+      bucket.push(result);
+      groups[result.round] = bucket;
+      return groups;
+    },
+    {}
+  );
+  const sortedRounds = Object.keys(roundResults)
+    .map(Number)
+    .sort((left, right) => left - right);
 
   return (
     <main className="bf-shell">
@@ -764,6 +781,50 @@ export default function Home() {
             <p className="bf-empty">El leaderboard aparece para formatos battle royale.</p>
           )}
         </article>
+      </section>
+
+      <section className="bf-panel">
+        <div className="bf-panel-header">
+          <div>
+            <p className="bf-eyebrow">Rounds</p>
+            <h2>Detalle por ronda</h2>
+          </div>
+        </div>
+        {battleRoyaleEnabled ? (
+          <div className="bf-list">
+            {sortedRounds.length === 0 ? (
+              <p className="bf-empty">Todavia no hay resultados detallados por ronda.</p>
+            ) : null}
+            {sortedRounds.map((round) => (
+              <div key={round} className="bf-round-card">
+                <div className="bf-row">
+                  <strong>Ronda {round}</strong>
+                  <span>{roundResults[round][0]?.match_status ?? "pending"}</span>
+                </div>
+                <div className="bf-round-table">
+                  <div className="bf-round-head">Equipo</div>
+                  <div className="bf-round-head">Kills</div>
+                  <div className="bf-round-head">Placement</div>
+                  <div className="bf-round-head">Kill pts</div>
+                  <div className="bf-round-head">Place pts</div>
+                  <div className="bf-round-head">Total</div>
+                  {roundResults[round].map((result) => (
+                    <div key={result.id} className="bf-round-row">
+                      <strong>{result.team_name}</strong>
+                      <span>{result.kills}</span>
+                      <span>{result.placement}</span>
+                      <span>{result.kill_points}</span>
+                      <span>{result.placement_points}</span>
+                      <span>{result.total_points}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="bf-empty">El detalle por ronda aparece para formatos battle royale.</p>
+        )}
       </section>
 
       <section className="bf-panel">

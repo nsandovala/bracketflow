@@ -91,6 +91,21 @@ class TeamResult(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TeamResultDetail(BaseModel):
+    id: int
+    tournament_id: int
+    match_id: int
+    round: int
+    match_status: str
+    team_id: int
+    team_name: str
+    kills: int
+    placement: int
+    kill_points: int
+    placement_points: int
+    total_points: int
+
+
 class BracketGenerationResult(BaseModel):
     matches_created: int
     status: str
