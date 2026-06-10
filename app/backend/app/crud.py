@@ -6,23 +6,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from . import models, schemas
 
-PLACEMENT_POINTS = {
-    1: 15,
-    2: 12,
-    3: 9,
-    4: 7,
-    5: 5,
-    6: 4,
-    7: 3,
-    8: 2,
-    9: 1,
-    10: 1,
-}
-KILL_POINTS_PER_KILL = {
-    "wsow_like": 1,
-}
 BR_FORMATS = {"battle_royale_points", "roulette_2v2", "roulette_3v3"}
 ROULETTE_FORMATS = {"roulette_2v2", "roulette_3v3"}
+WORLD_SERIES_FORMATS = {"battle_royale_points"}
 
 
 def normalize_team_size(format_name: str, requested_team_size: int) -> int:
@@ -291,12 +277,61 @@ def create_battle_royale_match(
     return db_match
 
 
-def calculate_points(scoring_profile: str, kills: int, placement: int) -> tuple[int, int, int]:
-    kill_points_per_kill = KILL_POINTS_PER_KILL.get(scoring_profile, 1)
-    kill_points = kills * kill_points_per_kill
-    placement_points = PLACEMENT_POINTS.get(placement, 0)
-    total_points = kill_points + placement_points
-    return kill_points, placement_points, total_points
+def round_points(value: float) -> float:
+    return round(value + 1e-9, 1)
+
+
+def get_placement_multiplier(placement: int, team_count: int) -> float:
+    if team_count <= 1:
+        return 1.0
+    return 2.0 - ((placement - 1) / (team_count - 1))
+
+
+def get_tournament_team_count(db: Session, tournament_id: int) -> int:
+    return db.query(models.Team).filter(models.Team.tournament_id == tournament_id).count()
+
+
+def calculate_points(
+    format_name: str,
+    team_count: int,
+    kills: int,
+    placement: int,
+) -> tuple[float, float, float]:
+    if format_name in ROULETTE_FORMATS:
+        total_points = float(kills)
+        return float(kills), 0.0, total_points
+
+    if format_name in WORLD_SERIES_FORMATS:
+        multiplier = get_placement_multiplier(placement, team_count)
+        total_points = round_points(kills * multiplier)
+        return float(kills), multiplier, total_points
+
+    total_points = float(kills)
+    return float(kills), 0.0, total_points
+
+
+def build_team_result_schema(
+    result: models.TeamResult,
+    format_name: str,
+    team_count: int,
+) -> schemas.TeamResult:
+    kill_points, placement_points, total_points = calculate_points(
+        format_name,
+        team_count,
+        result.kills,
+        result.placement,
+    )
+    return schemas.TeamResult(
+        id=result.id,
+        tournament_id=result.tournament_id,
+        match_id=result.match_id,
+        team_id=result.team_id,
+        kills=result.kills,
+        placement=result.placement,
+        kill_points=kill_points,
+        placement_points=placement_points,
+        total_points=total_points,
+    )
 
 
 def upsert_team_result(
@@ -304,7 +339,15 @@ def upsert_team_result(
     tournament: models.Tournament,
     match: models.Match,
     payload: schemas.TeamResultUpsert,
-) -> models.TeamResult:
+) -> schemas.TeamResult:
+    team_count = get_tournament_team_count(db, tournament.id)
+    kill_points, placement_points, total_points = calculate_points(
+        tournament.format,
+        team_count,
+        payload.kills,
+        payload.placement,
+    )
+
     db_result = (
         db.query(models.TeamResult)
         .filter(
@@ -312,12 +355,6 @@ def upsert_team_result(
             models.TeamResult.team_id == payload.team_id,
         )
         .first()
-    )
-
-    kill_points, placement_points, total_points = calculate_points(
-        tournament.scoring_profile,
-        payload.kills,
-        payload.placement,
     )
 
     if db_result is None:
@@ -341,11 +378,7 @@ def upsert_team_result(
 
     db.flush()
 
-    tournament_team_count = (
-        db.query(models.Team)
-        .filter(models.Team.tournament_id == tournament.id)
-        .count()
-    )
+    tournament_team_count = get_tournament_team_count(db, tournament.id)
     result_count = (
         db.query(models.TeamResult)
         .filter(models.TeamResult.match_id == match.id)
@@ -356,7 +389,7 @@ def upsert_team_result(
     db.commit()
     db.refresh(db_result)
     db.refresh(match)
-    return db_result
+    return build_team_result_schema(db_result, tournament.format, team_count)
 
 
 def get_team_results_by_tournament(
@@ -372,57 +405,79 @@ def get_team_results_by_tournament(
 
 
 def get_team_result_details_by_tournament(
-    db: Session, tournament_id: int
+    db: Session,
+    tournament: models.Tournament,
 ) -> list[schemas.TeamResultDetail]:
+    team_count = get_tournament_team_count(db, tournament.id)
     rows = (
         db.query(models.TeamResult, models.Team.name, models.Match.round, models.Match.status)
         .join(models.Team, models.Team.id == models.TeamResult.team_id)
         .join(models.Match, models.Match.id == models.TeamResult.match_id)
-        .filter(models.TeamResult.tournament_id == tournament_id)
+        .filter(models.TeamResult.tournament_id == tournament.id)
         .order_by(models.Match.round.asc(), models.Team.name.asc())
         .all()
     )
 
-    return [
-        schemas.TeamResultDetail(
-            id=result.id,
-            tournament_id=result.tournament_id,
-            match_id=result.match_id,
-            round=round_number,
-            match_status=match_status,
-            team_id=result.team_id,
-            team_name=team_name,
-            kills=result.kills,
-            placement=result.placement,
-            kill_points=result.kill_points,
-            placement_points=result.placement_points,
-            total_points=result.total_points,
+    details: list[schemas.TeamResultDetail] = []
+    for result, team_name, round_number, match_status in rows:
+        kill_points, placement_points, total_points = calculate_points(
+            tournament.format,
+            team_count,
+            result.kills,
+            result.placement,
         )
-        for result, team_name, round_number, match_status in rows
-    ]
+        details.append(
+            schemas.TeamResultDetail(
+                id=result.id,
+                tournament_id=result.tournament_id,
+                match_id=result.match_id,
+                round=round_number,
+                match_status=match_status,
+                team_id=result.team_id,
+                team_name=team_name,
+                kills=result.kills,
+                placement=result.placement,
+                kill_points=kill_points,
+                placement_points=placement_points,
+                total_points=total_points,
+            )
+        )
+    return details
 
 
 def get_leaderboard(
-    db: Session, tournament_id: int
+    db: Session,
+    tournament: models.Tournament,
 ) -> list[schemas.LeaderboardEntry]:
-    teams = get_teams_by_tournament(db, tournament_id)
-    results = get_team_results_by_tournament(db, tournament_id)
+    team_count = get_tournament_team_count(db, tournament.id)
+    teams = get_teams_by_tournament(db, tournament.id)
+    results = get_team_results_by_tournament(db, tournament.id)
 
-    summary_by_team: dict[int, dict[str, int | set[int] | None]] = defaultdict(
+    summary_by_team: dict[int, dict[str, float | int | set[int] | None]] = defaultdict(
         lambda: {
             "kills": 0,
-            "placement_points": 0,
-            "total_points": 0,
+            "placement_total": 0,
+            "results_count": 0,
+            "total_points": 0.0,
+            "max_kills_in_map": 0,
             "best_placement": None,
             "matches_played": set(),
         }
     )
 
     for result in results:
+        _, _, result_total_points = calculate_points(
+            tournament.format,
+            team_count,
+            result.kills,
+            result.placement,
+        )
         summary = summary_by_team[result.team_id]
         summary["kills"] = int(summary["kills"]) + result.kills
-        summary["placement_points"] = int(summary["placement_points"]) + result.placement_points
-        summary["total_points"] = int(summary["total_points"]) + result.total_points
+        summary["placement_total"] = int(summary["placement_total"]) + result.placement
+        summary["results_count"] = int(summary["results_count"]) + 1
+        summary["total_points"] = round_points(float(summary["total_points"]) + result_total_points)
+        summary["max_kills_in_map"] = max(int(summary["max_kills_in_map"]), result.kills)
         summary["matches_played"].add(result.match_id)
         best_placement = summary["best_placement"]
         if best_placement is None or result.placement < int(best_placement):
@@ -431,15 +486,21 @@ def get_leaderboard(
     leaderboard: list[schemas.LeaderboardEntry] = []
     for team in teams:
         summary = summary_by_team[team.id]
-        matches_played = len(summary["matches_played"])
+        kills = int(summary["kills"])
+        total_points = round_points(float(summary["total_points"]))
+        effective_multiplier = round(total_points / kills, 2) if kills > 0 else 0.0
         leaderboard.append(
             schemas.LeaderboardEntry(
                 team_id=team.id,
                 team_name=team.name,
-                matches_played=matches_played,
-                kills=int(summary["kills"]),
-                placement_points=int(summary["placement_points"]),
-                total_points=int(summary["total_points"]),
+                matches_played=len(summary["matches_played"]),
+                kills=kills,
+                placement_points=(
+                    effective_multiplier
+                    if tournament.format in WORLD_SERIES_FORMATS and kills > 0
+                    else 0.0
+                ),
+                total_points=total_points,
                 best_placement=(
                     int(summary["best_placement"])
                     if summary["best_placement"] is not None
@@ -448,11 +509,20 @@ def get_leaderboard(
             )
         )
 
-    leaderboard.sort(
-        key=lambda entry: (
-            -entry.total_points,
-            -entry.kills,
-            entry.best_placement if entry.best_placement is not None else 9999,
+    if tournament.format in WORLD_SERIES_FORMATS:
+        leaderboard.sort(
+            key=lambda entry: (
+                -entry.total_points,
+                -entry.kills,
+                (
+                    float(summary_by_team[entry.team_id]["placement_total"])
+                    / max(int(summary_by_team[entry.team_id]["results_count"]), 1)
+                ),
+                -int(summary_by_team[entry.team_id]["max_kills_in_map"]),
+                entry.best_placement if entry.best_placement is not None else 9999,
+                entry.team_name.casefold(),
+            )
         )
-    )
+    else:
+        leaderboard.sort(key=lambda entry: (-entry.kills, entry.team_name.casefold()))
     return leaderboard

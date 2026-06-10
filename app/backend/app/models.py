@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -110,9 +110,9 @@ class TeamResult(Base):
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False, index=True)
     kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     placement: Mapped[int] = mapped_column(Integer, nullable=False)
-    kill_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    placement_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    total_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kill_points: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    placement_points: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    total_points: Mapped[float] = mapped_column(Float, nullable=False, default=0)
 
     tournament: Mapped["Tournament"] = relationship(
         "Tournament", back_populates="team_results"

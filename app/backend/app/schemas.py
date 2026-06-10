@@ -84,9 +84,9 @@ class TeamResult(BaseModel):
     team_id: int
     kills: int
     placement: int
-    kill_points: int
-    placement_points: int
-    total_points: int
+    kill_points: float
+    placement_points: float
+    total_points: float
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -101,9 +101,9 @@ class TeamResultDetail(BaseModel):
     team_name: str
     kills: int
     placement: int
-    kill_points: int
-    placement_points: int
-    total_points: int
+    kill_points: float
+    placement_points: float
+    total_points: float
 
 
 class BracketGenerationResult(BaseModel):
@@ -128,6 +128,6 @@ class LeaderboardEntry(BaseModel):
     team_name: str
     matches_played: int
     kills: int
-    placement_points: int
-    total_points: int
+    placement_points: float
+    total_points: float
     best_placement: int | None

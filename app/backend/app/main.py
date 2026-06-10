@@ -221,7 +221,7 @@ def list_tournament_results(
 ) -> list[schemas.TeamResultDetail]:
     tournament = get_tournament_or_404(db, tournament_id)
     ensure_battle_royale_tournament(tournament)
-    return crud.get_team_result_details_by_tournament(db, tournament_id)
+    return crud.get_team_result_details_by_tournament(db, tournament)
 
 
 @app.get("/tournaments/{tournament_id}/matches", response_model=list[schemas.Match])
@@ -243,4 +243,4 @@ def get_leaderboard(
 ) -> list[schemas.LeaderboardEntry]:
     tournament = get_tournament_or_404(db, tournament_id)
     ensure_battle_royale_tournament(tournament)
-    return crud.get_leaderboard(db, tournament_id)
+    return crud.get_leaderboard(db, tournament)
