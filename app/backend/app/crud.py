@@ -307,10 +307,26 @@ def round_points(value: float) -> float:
     return round(value + 1e-9, 1)
 
 
-def get_placement_multiplier(placement: int, team_count: int) -> float:
-    if team_count <= 1:
-        return 1.0
-    return 2.0 - ((placement - 1) / (team_count - 1))
+# Tabla oficial WSOW (sin cambios desde 2021).
+# Fuente: si.com/esports/call-of-duty/world-series-of-warzone-global-finals-scoring-system-explained-
+# 1 punto por kill x multiplicador por banda de placement.
+WSOW_PLACEMENT_BANDS: list[tuple[int, float]] = [
+    (1, 2.0),    # 1°
+    (5, 1.8),    # 2°-5°
+    (10, 1.6),   # 6°-10°
+    (20, 1.4),   # 11°-20°
+    (35, 1.2),   # 21°-35°
+]
+WSOW_MIN_MULTIPLIER = 1.0  # 36°+ — clamp: jamás 0 ni negativo
+
+
+def get_placement_multiplier(placement: int) -> float:
+    if placement < 1:
+        raise ValueError("placement must be >= 1")
+    for max_place, multiplier in WSOW_PLACEMENT_BANDS:
+        if placement <= max_place:
+            return multiplier
+    return WSOW_MIN_MULTIPLIER
 
 
 def get_tournament_team_count(db: Session, tournament_id: int) -> int:
@@ -319,7 +335,6 @@ def get_tournament_team_count(db: Session, tournament_id: int) -> int:
 
 def calculate_points(
     format_name: str,
-    team_count: int,
     kills: int,
     placement: int,
 ) -> tuple[float, float, float]:
@@ -328,7 +343,7 @@ def calculate_points(
         return float(kills), 0.0, total_points
 
     if format_name in WORLD_SERIES_FORMATS:
-        multiplier = get_placement_multiplier(placement, team_count)
+        multiplier = get_placement_multiplier(placement)
         total_points = round_points(kills * multiplier)
         return float(kills), multiplier, total_points
 
@@ -339,11 +354,9 @@ def calculate_points(
 def build_team_result_schema(
     result: models.TeamResult,
     format_name: str,
-    team_count: int,
 ) -> schemas.TeamResult:
     kill_points, placement_points, total_points = calculate_points(
         format_name,
-        team_count,
         result.kills,
         result.placement,
     )
@@ -366,10 +379,8 @@ def upsert_team_result(
     match: models.Match,
     payload: schemas.TeamResultUpsert,
 ) -> schemas.TeamResult:
-    team_count = get_tournament_team_count(db, tournament.id)
     kill_points, placement_points, total_points = calculate_points(
         tournament.format,
-        team_count,
         payload.kills,
         payload.placement,
     )
@@ -415,7 +426,7 @@ def upsert_team_result(
     db.commit()
     db.refresh(db_result)
     db.refresh(match)
-    return build_team_result_schema(db_result, tournament.format, team_count)
+    return build_team_result_schema(db_result, tournament.format)
 
 
 def get_team_results_by_tournament(
@@ -434,7 +445,6 @@ def get_team_result_details_by_tournament(
     db: Session,
     tournament: models.Tournament,
 ) -> list[schemas.TeamResultDetail]:
-    team_count = get_tournament_team_count(db, tournament.id)
     rows = (
         db.query(models.TeamResult, models.Team.name, models.Match.round, models.Match.status)
         .join(models.Team, models.Team.id == models.TeamResult.team_id)
@@ -448,7 +458,6 @@ def get_team_result_details_by_tournament(
     for result, team_name, round_number, match_status in rows:
         kill_points, placement_points, total_points = calculate_points(
             tournament.format,
-            team_count,
             result.kills,
             result.placement,
         )
@@ -475,7 +484,6 @@ def get_leaderboard(
     db: Session,
     tournament: models.Tournament,
 ) -> list[schemas.LeaderboardEntry]:
-    team_count = get_tournament_team_count(db, tournament.id)
     teams = get_teams_by_tournament(db, tournament.id)
     results = get_team_results_by_tournament(db, tournament.id)
 
@@ -494,7 +502,6 @@ def get_leaderboard(
     for result in results:
         _, _, result_total_points = calculate_points(
             tournament.format,
-            team_count,
             result.kills,
             result.placement,
         )

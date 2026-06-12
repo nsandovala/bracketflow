@@ -217,10 +217,30 @@ export function formatPoints(totalPoints: number, format: TournamentFormat) {
   return isWorldSeriesFormat(format) ? totalPoints.toFixed(1) : String(Math.round(totalPoints));
 }
 
+// Tabla oficial WSOW por bandas — DEBE mantenerse sincronizada con
+// backend/app/crud.py (WSOW_PLACEMENT_BANDS / get_placement_multiplier).
+// 1 punto por kill x multiplicador por banda de placement.
+const WSOW_PLACEMENT_BANDS: ReadonlyArray<readonly [number, number]> = [
+  [1, 2.0], // 1°
+  [5, 1.8], // 2°-5°
+  [10, 1.6], // 6°-10°
+  [20, 1.4], // 11°-20°
+  [35, 1.2], // 21°-35°
+];
+const WSOW_MIN_MULTIPLIER = 1.0; // 36°+ — clamp: jamas 0 ni negativo
+
+export function getPlacementMultiplier(placement: number): number {
+  for (const [maxPlace, multiplier] of WSOW_PLACEMENT_BANDS) {
+    if (placement <= maxPlace) {
+      return multiplier;
+    }
+  }
+  return WSOW_MIN_MULTIPLIER;
+}
+
 export function estimateWorldSeriesPoints(
   killsValue: string,
-  placementValue: string,
-  teamCount: number
+  placementValue: string
 ) {
   const kills = Number(killsValue);
   const placement = Number(placementValue);
@@ -229,10 +249,6 @@ export function estimateWorldSeriesPoints(
     return null;
   }
 
-  if (teamCount <= 1) {
-    return kills.toFixed(1);
-  }
-
-  const multiplier = 2 - (placement - 1) / (teamCount - 1);
+  const multiplier = getPlacementMultiplier(placement);
   return (Math.round(kills * multiplier * 10) / 10).toFixed(1);
 }

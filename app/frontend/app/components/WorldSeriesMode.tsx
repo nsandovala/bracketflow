@@ -199,7 +199,7 @@ export default function WorldSeriesMode({
                 resultDrafts[key]?.placement ?? (saved ? String(saved.placement) : "");
               const estimatedTotal =
                 saved?.total_points.toFixed(1) ??
-                estimateWorldSeriesPoints(killsValue, placementValue, teams.length);
+                estimateWorldSeriesPoints(killsValue, placementValue);
 
               return (
                 <div key={team.id} className="bf-result-row bf-result-row-world">

@@ -219,7 +219,7 @@ export default function WorldSeriesOperator({
                     };
                     const estimatedTotal =
                       savedResult?.total_points.toFixed(1) ??
-                      estimateWorldSeriesPoints(draft.kills, draft.placement, totalTeams);
+                      estimateWorldSeriesPoints(draft.kills, draft.placement);
 
                     return (
                       <TeamResultForm
