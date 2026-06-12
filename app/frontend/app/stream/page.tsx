@@ -1,9 +1,9 @@
 "use client";
 
-import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
-import WorldSeriesStreamView from "../components/WorldSeriesStreamView";
-import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+
+import WorldSeriesStreamView from "../components/WorldSeriesStreamView";
 
 function parseTournamentId(value: string | null) {
   if (!value) {
@@ -15,22 +15,30 @@ function parseTournamentId(value: string | null) {
 
 function StreamPageClient() {
   const searchParams = useSearchParams();
-  const preferredTournamentId = parseTournamentId(searchParams.get("tournamentId"));
-  const { selectedTournament, sortedStandings, latestReportedRound } =
-    useWorldSeriesPractice(preferredTournamentId);
+  const tournamentId = parseTournamentId(searchParams.get("tournamentId"));
+  const obs = searchParams.get("obs") === "1";
+  const transparent = searchParams.get("bg") === "transparent";
+  const brand = searchParams.get("brand");
 
   return (
     <WorldSeriesStreamView
-      tournament={selectedTournament}
-      afterGameNumber={latestReportedRound}
-      standings={sortedStandings}
+      tournamentId={tournamentId}
+      obs={obs}
+      transparent={transparent}
+      brand={brand}
     />
   );
 }
 
 export default function StreamPage() {
   return (
-    <Suspense fallback={<main className="bf-stream-page"><p className="bf-stream-empty">Cargando stream view...</p></main>}>
+    <Suspense
+      fallback={
+        <main className="bf-stream-page">
+          <div className="bf-stream-stage" />
+        </main>
+      }
+    >
       <StreamPageClient />
     </Suspense>
   );

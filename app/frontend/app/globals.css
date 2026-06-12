@@ -121,19 +121,7 @@ a:focus-visible {
   width: min(1380px, calc(100% - 40px));
 }
 
-.bf-stream-page {
-  min-height: 100vh;
-  padding: 38px 24px 52px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-}
-
-.bf-stream-frame {
-  width: min(1400px, 100%);
-  display: grid;
-  gap: 28px;
-}
+/* Stream View (linea Amon): estilos al final del archivo. */
 
 .bf-app-topbar {
   display: flex;
@@ -720,56 +708,6 @@ a:focus-visible {
   color: var(--bf-text);
 }
 
-.bf-stream-header {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: 18px 0;
-  text-align: center;
-}
-
-.bf-stream-board {
-  display: grid;
-  gap: 14px;
-}
-
-.bf-stream-card {
-  padding: 20px 22px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 30%),
-    rgba(11, 18, 32, 0.74);
-  border: 1px solid rgba(97, 242, 163, 0.12);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.34),
-    0 0 24px rgba(97, 242, 163, 0.06);
-}
-
-.bf-stream-team-copy strong {
-  font-family: var(--font-rajdhani), sans-serif;
-  font-size: 1.5rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.bf-stream-points {
-  font-size: clamp(2rem, 4vw, 3.25rem);
-  color: var(--bf-accent);
-}
-
-.bf-stream-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 16px;
-  font-size: 0.94rem;
-}
-
-.bf-stream-empty {
-  margin: 0;
-  text-align: center;
-  color: var(--bf-muted);
-}
-
 @media (max-width: 1140px) {
   .bf-home-grid,
   .bf-operator-grid {
@@ -851,5 +789,474 @@ a:focus-visible {
   .bf-button {
     animation: none;
     transition: none;
+  }
+}
+
+/* ============================================================
+   Stream View — linea Amon (grafito mate + blanco nieve)
+   Broadcast-grade para OBS. El verde queda como unico acento
+   funcional (dot live + ▲ de subida). Solo afecta a /stream.
+   ============================================================ */
+
+.bf-stream-page {
+  --bf-st-ink: #0c0c0e;
+  --bf-st-ink-soft: #131316;
+  --bf-st-snow: #f5f5f7;
+  --bf-st-snow-dim: #b9b9c0;
+  --bf-st-muted: #76767e;
+  --bf-st-hairline: rgba(255, 255, 255, 0.08);
+  --bf-st-hairline-strong: rgba(255, 255, 255, 0.16);
+  --bf-st-glass: rgba(22, 22, 27, 0.62);
+  --bf-st-glass-strong: rgba(32, 32, 38, 0.72);
+  --bf-st-accent: #61f2a3;
+  --bf-st-down: #ff8a9b;
+  --bf-st-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--bf-st-snow);
+  font-family: var(--font-geist-sans), sans-serif;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(255, 255, 255, 0.04), transparent 40%),
+    linear-gradient(180deg, var(--bf-st-ink-soft), var(--bf-st-ink));
+}
+
+.bf-stream-page.bf-stream-transparent {
+  background: transparent;
+}
+
+.bf-stream-stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1920px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 5vh 5vw;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(16px, 2.4vh, 32px);
+}
+
+/* Particulas grafito (variante neutra). El campo verde global se apaga en /stream. */
+.bf-stream-particles {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bf-stream-particle {
+  position: absolute;
+  left: var(--particle-left);
+  top: var(--particle-top);
+  width: var(--particle-size);
+  height: var(--particle-size);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015) 50%, transparent 72%);
+  filter: blur(26px);
+  opacity: 0.5;
+  animation: bf-particle-float var(--particle-duration) ease-in-out var(--particle-delay) infinite alternate;
+}
+
+.bf-stream-active .bf-particles {
+  display: none;
+}
+
+/* ---- Header broadcast ---- */
+.bf-stream-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: clamp(12px, 1.8vh, 22px);
+  border-bottom: 1px solid var(--bf-st-hairline);
+}
+
+.bf-stream-brand {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 18px);
+  min-width: 0;
+}
+
+.bf-stream-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: clamp(44px, 3.4vw, 60px);
+  height: clamp(44px, 3.4vw, 60px);
+  border-radius: 16px;
+  border: 1px solid var(--bf-st-hairline-strong);
+  background: var(--bf-st-glass);
+  backdrop-filter: blur(16px);
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.05rem, 1.4vw, 1.4rem);
+  letter-spacing: 0.06em;
+  color: var(--bf-st-snow);
+}
+
+.bf-stream-brand-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.bf-stream-title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 2.4vw, 2.6rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bf-st-snow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-stream-game {
+  margin: 0;
+  font-size: clamp(0.68rem, 0.9vw, 0.85rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--bf-st-muted);
+}
+
+.bf-stream-status {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.2vw, 18px);
+  flex-shrink: 0;
+}
+
+.bf-stream-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: clamp(8px, 1vh, 11px) clamp(12px, 1vw, 16px);
+  border-radius: 14px;
+  border: 1px solid var(--bf-st-hairline);
+  background: var(--bf-st-glass);
+  backdrop-filter: blur(16px);
+}
+
+.bf-stream-badge span {
+  font-size: clamp(0.6rem, 0.7vw, 0.68rem);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bf-st-muted);
+}
+
+.bf-stream-badge strong {
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.05rem, 1.5vw, 1.5rem);
+  color: var(--bf-st-snow);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-stream-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: clamp(0.64rem, 0.78vw, 0.72rem);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bf-st-snow-dim);
+}
+
+.bf-stream-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--bf-st-accent);
+  animation: bf-stream-pulse 2s ease-out infinite;
+}
+
+.bf-stream-live.is-off {
+  color: var(--bf-st-muted);
+}
+
+.bf-stream-live.is-off .bf-stream-live-dot {
+  background: #c9a14a;
+  animation: none;
+}
+
+@keyframes bf-stream-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(97, 242, 163, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(97, 242, 163, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(97, 242, 163, 0);
+  }
+}
+
+/* ---- Board ---- */
+.bf-stream-board {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bf-stream-board.is-empty {
+  justify-content: center;
+  align-items: center;
+}
+
+.bf-stream-board.is-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.bf-stream-board.is-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.bf-stream-obs .bf-stream-board {
+  overflow: hidden;
+}
+
+.bf-stream-head,
+.bf-stream-row-inner {
+  display: grid;
+  grid-template-columns:
+    clamp(52px, 4.4vw, 76px) minmax(0, 1fr) clamp(96px, 9vw, 150px)
+    repeat(3, clamp(60px, 6vw, 92px));
+  align-items: center;
+  gap: clamp(10px, 1.4vw, 22px);
+}
+
+.bf-stream-head {
+  padding: 0 clamp(14px, 1.4vw, 22px) clamp(8px, 1.2vh, 14px);
+  color: var(--bf-st-muted);
+  font-size: clamp(0.58rem, 0.74vw, 0.72rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.bf-stream-head .bf-stream-num {
+  text-align: right;
+}
+
+.bf-stream-rows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(7px, 1vh, 12px);
+}
+
+.bf-stream-row {
+  position: relative;
+  will-change: transform;
+}
+
+.bf-stream-row-inner {
+  padding: clamp(10px, 1.3vh, 16px) clamp(14px, 1.4vw, 22px);
+  border-radius: 16px;
+  border: 1px solid var(--bf-st-hairline);
+  background: var(--bf-st-glass);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--bf-st-shadow);
+  opacity: 0;
+  animation: bf-stream-row-in 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--row-index, 0) * 45ms);
+}
+
+@keyframes bf-stream-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Top 3: jerarquia por elevacion / hairline mas luminoso (sin oro/plata/bronce). */
+.bf-stream-row[data-rank="1"] .bf-stream-row-inner {
+  border-color: var(--bf-st-hairline-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)),
+    var(--bf-st-glass-strong);
+}
+
+.bf-stream-row[data-rank="2"] .bf-stream-row-inner {
+  border-color: rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+    var(--bf-st-glass-strong);
+}
+
+.bf-stream-row[data-rank="3"] .bf-stream-row-inner {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.bf-stream-rk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bf-stream-rk-num {
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.1rem, 1.5vw, 1.6rem);
+  color: var(--bf-st-snow);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-stream-move {
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.bf-stream-move.is-up {
+  color: var(--bf-st-accent);
+  opacity: 1;
+}
+
+.bf-stream-move.is-down {
+  color: var(--bf-st-down);
+  opacity: 1;
+}
+
+.bf-stream-team {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.bf-stream-team-name {
+  font-size: clamp(0.95rem, 1.15vw, 1.3rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--bf-st-snow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-stream-roster {
+  font-size: clamp(0.66rem, 0.82vw, 0.84rem);
+  letter-spacing: 0.04em;
+  color: var(--bf-st-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-stream-pts {
+  text-align: right;
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 2.4vw, 2.6rem);
+  line-height: 1;
+  color: var(--bf-st-snow);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-stream-stat {
+  text-align: right;
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 600;
+  font-size: clamp(0.95rem, 1.2vw, 1.35rem);
+  color: var(--bf-st-snow-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Densidad alta (11-16 equipos): compacta padding/tipografia. */
+.bf-stream-board[data-density="dense"] .bf-stream-rows {
+  gap: clamp(5px, 0.7vh, 8px);
+}
+
+.bf-stream-board[data-density="dense"] .bf-stream-row-inner {
+  padding: clamp(7px, 1vh, 11px) clamp(12px, 1.2vw, 18px);
+}
+
+.bf-stream-board[data-density="dense"] .bf-stream-pts {
+  font-size: clamp(1.25rem, 1.9vw, 2rem);
+}
+
+.bf-stream-board[data-density="dense"] .bf-stream-team-name {
+  font-size: clamp(0.85rem, 1vw, 1.1rem);
+}
+
+/* ---- Footer strip ---- */
+.bf-stream-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: clamp(10px, 1.4vh, 18px);
+  border-top: 1px solid var(--bf-st-hairline);
+  font-size: clamp(0.62rem, 0.74vw, 0.72rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bf-st-muted);
+}
+
+.bf-stream-strip strong {
+  color: var(--bf-st-snow-dim);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.bf-stream-brand-slot {
+  color: var(--bf-st-snow-dim);
+  letter-spacing: 0.2em;
+}
+
+/* ---- Estado vacio / pre-show ---- */
+.bf-stream-empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 6vh 0;
+}
+
+.bf-stream-empty-kicker {
+  font-size: clamp(0.68rem, 0.84vw, 0.8rem);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--bf-st-muted);
+}
+
+.bf-stream-empty-title {
+  margin: 0;
+  font-family: var(--font-rajdhani), sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 3.4vw, 3.2rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bf-st-snow);
+}
+
+.bf-stream-empty-sub {
+  font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+  letter-spacing: 0.08em;
+  color: var(--bf-st-snow-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-stream-row-inner {
+    animation: none;
+    opacity: 1;
+  }
+  .bf-stream-particle,
+  .bf-stream-live-dot {
+    animation: none;
   }
 }

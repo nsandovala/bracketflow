@@ -9,13 +9,23 @@ const PARTICLES = [
   { left: "88%", top: "76%", size: "170px", delay: "1s", duration: "32s" },
 ];
 
-export default function BackgroundParticles() {
+type BackgroundParticlesProps = {
+  // "default" mantiene el campo verde global; "graphite" es la variante neutra
+  // (blanco humo, sin tinte) usada por el Stream View (linea Amon).
+  variant?: "default" | "graphite";
+};
+
+export default function BackgroundParticles({ variant = "default" }: BackgroundParticlesProps) {
+  const isGraphite = variant === "graphite";
+  const wrapperClass = isGraphite ? "bf-stream-particles" : "bf-particles";
+  const dotClass = isGraphite ? "bf-stream-particle" : "bf-particle";
+
   return (
-    <div className="bf-particles" aria-hidden="true">
+    <div className={wrapperClass} aria-hidden="true">
       {PARTICLES.map((particle) => (
         <span
           key={`${particle.left}-${particle.top}`}
-          className="bf-particle"
+          className={dotClass}
           style={
             {
               "--particle-left": particle.left,
