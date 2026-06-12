@@ -85,6 +85,10 @@ def get_players_by_tournament(db: Session, tournament_id: int) -> list[models.Pl
     )
 
 
+def get_player(db: Session, player_id: int) -> models.Player | None:
+    return db.query(models.Player).filter(models.Player.id == player_id).first()
+
+
 def create_player(
     db: Session, tournament_id: int, player: schemas.PlayerCreate
 ) -> models.Player:
@@ -93,6 +97,28 @@ def create_player(
     db.commit()
     db.refresh(db_player)
     return db_player
+
+
+def add_player_to_team(
+    db: Session,
+    team: models.Team,
+    player: models.Player,
+) -> models.Team:
+    existing_membership = (
+        db.query(models.TeamMember)
+        .join(models.Team, models.Team.id == models.TeamMember.team_id)
+        .filter(
+            models.TeamMember.player_id == player.id,
+            models.Team.tournament_id == team.tournament_id,
+        )
+        .first()
+    )
+    if existing_membership is not None:
+        raise ValueError("Player is already assigned to a team in this tournament")
+
+    db.add(models.TeamMember(team_id=team.id, player_id=player.id))
+    db.commit()
+    return get_team(db, team.id)
 
 
 def get_matches_by_tournament(db: Session, tournament_id: int) -> list[models.Match]:

@@ -41,6 +41,10 @@ class TeamMember(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TeamMemberCreate(BaseModel):
+    player_id: int
+
+
 class TeamCreate(BaseModel):
     name: str
 

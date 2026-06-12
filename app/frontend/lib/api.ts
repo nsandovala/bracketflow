@@ -163,6 +163,13 @@ export function createTeam(tournamentId: number, payload: { name: string }) {
   });
 }
 
+export function addTeamMember(teamId: number, payload: { player_id: number }) {
+  return request<Team>(`/teams/${teamId}/members`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export function getPlayers(tournamentId: number) {
   return request<Player[]>(`/tournaments/${tournamentId}/players`);
 }
