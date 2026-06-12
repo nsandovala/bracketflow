@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   LeaderboardEntry,
@@ -12,6 +12,9 @@ import {
   getTournamentResults,
   getTournaments,
 } from "../../lib/api";
+
+// Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
+export const STREAM_POLL_INTERVAL_MS = 7000;
 
 export type StreamStanding = LeaderboardEntry & {
   players: string[];
@@ -54,6 +57,21 @@ function buildStandings(leaderboard: LeaderboardEntry[], teams: Team[]): StreamS
   });
 }
 
+// Firma estable para comparar fetch nuevo vs actual y evitar re-render/parpadeo.
+function buildSignature(
+  tournament: Tournament | null,
+  standings: StreamStanding[],
+  afterGameNumber: number
+) {
+  const rows = standings
+    .map(
+      (entry) =>
+        `${entry.team_id}:${entry.total_points}:${entry.kills}:${entry.best_placement ?? "-"}:${entry.matches_played}:${entry.players.join(",")}`
+    )
+    .join("|");
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${afterGameNumber}:${rows}`;
+}
+
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
   if (preferredId !== null) {
     return preferredId;
@@ -65,7 +83,10 @@ async function resolveTournamentId(preferredId: number | null): Promise<number |
   return worldSeries[0]?.id ?? null;
 }
 
-export function useStreamLeaderboard(preferredTournamentId: number | null): StreamLeaderboardState {
+export function useStreamLeaderboard(
+  preferredTournamentId: number | null,
+  pollMs: number = STREAM_POLL_INTERVAL_MS
+): StreamLeaderboardState {
   const [state, setState] = useState<StreamLeaderboardState>({
     tournament: null,
     standings: [],
@@ -74,15 +95,23 @@ export function useStreamLeaderboard(preferredTournamentId: number | null): Stre
     hasLoadedOnce: false,
   });
 
+  // Firma del ultimo estado pintado: si el fetch nuevo coincide, no tocamos React.
+  const signatureRef = useRef<string>("");
+
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
     async function fetchOnce() {
       try {
         const tournamentId = await resolveTournamentId(preferredTournamentId);
         if (tournamentId === null) {
           if (!active) return;
-          setState((current) => ({ ...current, connected: true, hasLoadedOnce: true }));
+          setState((current) =>
+            current.connected && current.hasLoadedOnce && current.tournament === null
+              ? current
+              : { ...current, connected: true, hasLoadedOnce: true }
+          );
           return;
         }
 
@@ -98,26 +127,41 @@ export function useStreamLeaderboard(preferredTournamentId: number | null): Stre
         const standings = buildStandings(leaderboard, teams);
         const afterGameNumber =
           results.length === 0 ? 0 : Math.max(...results.map((result) => result.round));
+        const nextSignature = buildSignature(tournament, standings, afterGameNumber);
 
-        setState({
-          tournament,
-          standings,
-          afterGameNumber,
-          connected: true,
-          hasLoadedOnce: true,
+        // Solo re-render si cambio el contenido o si veniamos desconectados.
+        setState((current) => {
+          if (
+            nextSignature === signatureRef.current &&
+            current.connected &&
+            current.hasLoadedOnce
+          ) {
+            return current;
+          }
+          signatureRef.current = nextSignature;
+          return {
+            tournament,
+            standings,
+            afterGameNumber,
+            connected: true,
+            hasLoadedOnce: true,
+          };
         });
       } catch {
         if (!active) return;
+        // Backend caido: conservamos la ultima data valida, solo bajamos la bandera.
         setState((current) => (current.connected ? { ...current, connected: false } : current));
       }
     }
 
     void fetchOnce();
+    timer = setInterval(() => void fetchOnce(), pollMs);
 
     return () => {
       active = false;
+      if (timer) clearInterval(timer);
     };
-  }, [preferredTournamentId]);
+  }, [preferredTournamentId, pollMs]);
 
   return state;
 }
