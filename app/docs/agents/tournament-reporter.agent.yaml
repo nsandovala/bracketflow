@@ -1,0 +1,64 @@
+### docs/agents/tournament-reporter.agent.yaml
+### Contrato del agente. La máquina lo lee; los límites son vinculantes.
+
+agent: tournament-reporter
+version: "1.0"
+role: >
+  Generar un reporte post-torneo en JSON a partir de los datos reales del
+  backend de BracketFlow. Produce dos salidas dentro del mismo JSON: una
+  casual para redes/stream y una estructurada formal.
+philosophy: "Humanos dirigen, AI ejecuta dentro de límites explícitos."
+
+mode: read_only          # NUNCA muta estado. Solo GET.
+trigger:
+  type: manual           # el operador lo dispara cuando el torneo terminó
+  precondition: "El torneo tiene resultados cargados (leaderboard no vacío)."
+
+inputs:
+  source: "BracketFlow API (local)"
+  base_url: "http://127.0.0.1:8000"
+  param:
+    tournament_id: int    # requerido, lo entrega el operador
+  endpoints:              # los ÚNICOS que puede llamar, todos GET
+    - "GET /tournaments/{tournament_id}"
+    - "GET /tournaments/{tournament_id}/teams"
+    - "GET /tournaments/{tournament_id}/leaderboard"
+    - "GET /tournaments/{tournament_id}/results"
+
+# Campos que existen de verdad en las respuestas del backend.
+# El agente SOLO puede usar estos. Cualquier otro dato está prohibido.
+allowed_fields:
+  tournament: [id, name, game, format, status]
+  team: [id, name, source, members]            # members -> player.nickname
+  leaderboard_entry: [team_id, team_name, matches_played, kills,
+                      placement_points, total_points, best_placement]
+  result_detail: [round, match_status, team_id, team_name, kills,
+                  placement, kill_points, placement_points, total_points]
+
+output:
+  format: json
+  schema_ref: "docs/agents/tournament-report.schema (ver tournament-reporter.md)"
+  destinations:
+    - file: "reports/report-{tournament_id}.json"     # documento del reporte
+    - event: "~/.amon/events.jsonl"                    # opcional: tarjeta en overlay
+      payload: '{ "type": "tournament_report", "data": <json> }'
+  contains:
+    summary: "campeón, podio, MVP de kills, rondas jugadas, nº de equipos"
+    leaderboard: "ranking completo, derivado tal cual del endpoint"
+    rounds: "desglose por ronda desde /results"
+    outputs.social: "texto casual en español para redes/stream"
+    outputs.report: "texto formal en markdown"
+
+limits:                  # NO negociables
+  - "Solo lectura. Prohibido POST/PUT/DELETE/PATCH."
+  - "Prohibido inventar métricas fuera de allowed_fields."
+  - "Prohibido: 'API verified', 'print approved', pozos en dinero, bitrate,
+     anti-cheat, kills automáticas. Esos datos NO existen en el backend."
+  - "Si un campo no viene en la respuesta, se omite. No se rellena ni se estima."
+  - "Si el leaderboard viene vacío: reportar 'sin resultados', no fabricar nada."
+  - "No toca git. No hace commits. No modifica el repo."
+
+validation:
+  - "Todo número del reporte debe trazar a un campo de allowed_fields."
+  - "El campeón = primer elemento del leaderboard (ya viene ordenado por el backend)."
+  - "El JSON producido valida contra el schema antes de escribirse."
