@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
 :root {
   --bf-bg: #050816;
@@ -1258,5 +1259,793 @@ a:focus-visible {
   .bf-stream-particle,
   .bf-stream-live-dot {
     animation: none;
+  }
+}
+
+/* ============================================================
+   MUNDO OPERADOR — Shell (sidebar + topbar) + Dashboard home
+   Línea Amon (grafito + blanco nieve). Hereda de tokens.css.
+   El route group (operator) hace que este shell NUNCA envuelva
+   /stream (mundo broadcast). Dark-only por ahora.
+   ============================================================ */
+
+.bf-op-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  min-height: 100vh;
+  color: var(--amon-text);
+  font-family: var(--amon-font-sans);
+  /* Opaco para cubrir el campo de partículas verdes global. */
+  background:
+    radial-gradient(circle at 18% -8%, rgba(255, 255, 255, 0.035), transparent 38%),
+    linear-gradient(180deg, var(--amon-bg), var(--amon-bg-deep));
+}
+
+/* ---- Sidebar ---- */
+.bf-op-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--amon-space-5);
+  padding: var(--amon-space-5) var(--amon-space-4);
+  border-right: 1px solid var(--amon-line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 40%);
+  backdrop-filter: var(--amon-blur-sm);
+}
+
+.bf-op-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--amon-space-3);
+  padding: var(--amon-space-2);
+}
+
+.bf-op-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line-strong);
+  background:
+    linear-gradient(180deg, rgba(97, 242, 163, 0.14), rgba(97, 242, 163, 0.04)),
+    var(--amon-surface);
+  color: var(--amon-accent);
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+}
+
+.bf-op-brand-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bf-op-brand-name {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amon-text);
+}
+
+.bf-op-brand-tag {
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-op-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bf-op-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--amon-space-3);
+  padding: 10px 12px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid transparent;
+  color: var(--amon-text-dim);
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.bf-op-nav-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--amon-text);
+}
+
+.bf-op-nav-link.is-active {
+  background: var(--amon-accent-dim);
+  border-color: rgba(97, 242, 163, 0.22);
+  color: var(--amon-text);
+}
+
+.bf-op-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--amon-muted);
+}
+
+.bf-op-nav-link:hover .bf-op-nav-icon,
+.bf-op-nav-link.is-active .bf-op-nav-icon {
+  color: var(--amon-accent);
+}
+
+.bf-op-nav-label {
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.bf-op-foot {
+  margin-top: auto;
+  display: grid;
+  gap: var(--amon-space-3);
+}
+
+/* Toggle día/noche: visible pero dark-only. El claro llega en
+   una fase futura; el botón sólo deja constancia (ver código). */
+.bf-op-theme {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bf-op-theme-opt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--amon-muted);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.bf-op-theme-opt.is-on {
+  background: var(--amon-surface-2);
+  color: var(--amon-text);
+}
+
+.bf-op-theme-opt:disabled {
+  cursor: not-allowed;
+}
+
+.bf-op-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--amon-space-3);
+  padding: 10px 12px;
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-line);
+  background: var(--amon-glass);
+  backdrop-filter: var(--amon-blur-sm);
+}
+
+.bf-op-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(97, 242, 163, 0.3), rgba(97, 242, 163, 0.08));
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+}
+
+.bf-op-profile-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bf-op-profile-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--amon-text);
+}
+
+.bf-op-profile-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--amon-muted);
+}
+
+.bf-op-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--amon-accent);
+  flex-shrink: 0;
+}
+
+/* ---- Main + topbar ---- */
+.bf-op-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bf-op-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--amon-space-4);
+  padding: var(--amon-space-5) var(--amon-space-6);
+  border-bottom: 1px solid var(--amon-line);
+}
+
+.bf-op-greeting h1 {
+  margin: 0;
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+  letter-spacing: 0.02em;
+  color: var(--amon-text);
+}
+
+.bf-op-greeting p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--amon-muted);
+}
+
+.bf-op-topbar-side {
+  display: flex;
+  align-items: center;
+  gap: var(--amon-space-3);
+}
+
+.bf-op-livebadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(97, 242, 163, 0.2);
+  background: var(--amon-accent-dim);
+  color: var(--amon-text);
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bf-op-livebadge .bf-op-dot {
+  animation: bf-op-pulse 2s ease-out infinite;
+}
+
+.bf-op-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--amon-text-dim);
+  cursor: pointer;
+}
+
+@keyframes bf-op-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(97, 242, 163, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(97, 242, 163, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(97, 242, 163, 0);
+  }
+}
+
+.bf-op-content {
+  padding: var(--amon-space-6);
+}
+
+/* ---- "Próximamente" (placeholder dentro del shell) ---- */
+.bf-op-soon {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 8vh 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.bf-op-soon-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-line-strong);
+  background: var(--amon-surface);
+  color: var(--amon-accent);
+}
+
+.bf-op-soon h2 {
+  margin: 0;
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--amon-text);
+}
+
+.bf-op-soon p {
+  margin: 0;
+  color: var(--amon-muted);
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Dashboard home
+   ============================================================ */
+
+.bf-dash {
+  display: grid;
+  gap: var(--amon-space-5);
+}
+
+/* ---- Fila de stat-cards ---- */
+.bf-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--amon-space-4);
+}
+
+.bf-dash-stat {
+  display: grid;
+  gap: 10px;
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%),
+    var(--amon-surface);
+  box-shadow: var(--amon-shadow-sm);
+}
+
+.bf-dash-stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bf-dash-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--amon-accent);
+}
+
+.bf-dash-stat-label {
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-dash-stat-value {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--amon-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-dash-stat-sub {
+  font-size: 0.78rem;
+  color: var(--amon-faint);
+}
+
+/* ---- Grilla de paneles ---- */
+.bf-dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--amon-space-4);
+}
+
+.bf-dash-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--amon-space-4);
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-line);
+  background: var(--amon-glass);
+  backdrop-filter: var(--amon-blur-md);
+  box-shadow: var(--amon-shadow-sm);
+}
+
+.bf-dash-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--amon-space-3);
+}
+
+.bf-dash-panel-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-dash-panel-title {
+  margin: 4px 0 0;
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  color: var(--amon-text);
+}
+
+.bf-dash-panel-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ---- Mini tabla (top 3 / standings compacto) ---- */
+.bf-dash-table {
+  display: grid;
+  gap: 6px;
+}
+
+.bf-dash-thead,
+.bf-dash-trow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 64px 52px 52px 48px;
+  align-items: center;
+  gap: 10px;
+}
+
+.bf-dash-thead {
+  padding: 0 12px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-dash-trow {
+  padding: 10px 12px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.bf-dash-trow[data-rank="1"] {
+  border-color: var(--amon-line-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    rgba(255, 255, 255, 0.02);
+}
+
+.bf-dash-rank {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  color: var(--amon-accent);
+}
+
+.bf-dash-team {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.bf-dash-team-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--amon-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-dash-team-roster {
+  font-size: 0.72rem;
+  color: var(--amon-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-dash-num {
+  text-align: right;
+  font-family: var(--amon-font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--amon-text-dim);
+}
+
+.bf-dash-num.is-pts {
+  color: var(--amon-text);
+  font-weight: 700;
+}
+
+.bf-dash-numhead {
+  text-align: right;
+}
+
+/* ---- Cargar game (cards por equipo) ---- */
+.bf-dash-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.bf-dash-gamecard {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.bf-dash-gamecard.is-pending {
+  border-style: dashed;
+  opacity: 0.72;
+}
+
+.bf-dash-gamecard-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--amon-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-dash-gamecard-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bf-dash-gamecard-stat {
+  display: grid;
+  gap: 2px;
+}
+
+.bf-dash-gamecard-stat span {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amon-faint);
+}
+
+.bf-dash-gamecard-stat strong {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--amon-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Accesos rápidos ---- */
+.bf-dash-quick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bf-dash-quick-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--amon-text);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.bf-dash-quick-link:hover {
+  border-color: rgba(97, 242, 163, 0.24);
+  background: rgba(255, 255, 255, 0.045);
+  transform: translateY(-1px);
+}
+
+.bf-dash-quick-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--amon-accent);
+}
+
+.bf-dash-quick-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bf-dash-quick-copy strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bf-dash-quick-copy span {
+  font-size: 0.74rem;
+  color: var(--amon-muted);
+}
+
+/* ---- CTA / badge / empties ---- */
+.bf-dash-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(97, 242, 163, 0.22);
+  background: var(--amon-accent-dim);
+  color: var(--amon-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.bf-dash-cta:hover {
+  background: rgba(97, 242, 163, 0.22);
+  transform: translateY(-1px);
+}
+
+.bf-dash-cta-ghost {
+  background: rgba(255, 255, 255, 0.025);
+  border-color: var(--amon-line);
+}
+
+.bf-dash-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--amon-text-dim);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.bf-dash-badge.is-live {
+  border-color: rgba(97, 242, 163, 0.22);
+  background: var(--amon-accent-dim);
+  color: var(--amon-text);
+}
+
+.bf-dash-empty {
+  padding: 18px;
+  border-radius: var(--amon-radius-md);
+  border: 1px dashed var(--amon-line);
+  color: var(--amon-muted);
+  font-size: 0.88rem;
+}
+
+.bf-dash-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: var(--amon-space-4);
+  border-top: 1px solid var(--amon-line);
+  font-size: 0.74rem;
+  color: var(--amon-faint);
+  letter-spacing: 0.04em;
+}
+
+/* ---- Responsive (desktop primero) ---- */
+@media (max-width: 1180px) {
+  .bf-dash-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1080px) {
+  .bf-dash-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .bf-op-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .bf-op-sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    border-right: 0;
+    border-bottom: 1px solid var(--amon-line);
+  }
+
+  .bf-op-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex: 1 1 100%;
+  }
+
+  .bf-op-foot {
+    margin-top: 0;
+    flex: 1 1 100%;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+
+  .bf-op-content {
+    padding: var(--amon-space-4);
+  }
+
+  .bf-op-topbar {
+    padding: var(--amon-space-4);
+  }
+
+  .bf-dash-quick {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-op-livebadge .bf-op-dot,
+  .bf-op-nav-link,
+  .bf-dash-quick-link,
+  .bf-dash-cta {
+    animation: none;
+    transition: none;
   }
 }
