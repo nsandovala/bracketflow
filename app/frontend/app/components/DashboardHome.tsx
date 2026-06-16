@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
 import {
   IconArrowRight,
+  IconDashboard,
   IconPlus,
   IconStandings,
   IconStream,
@@ -66,38 +67,38 @@ export default function DashboardHome() {
       {/* ---- Fila de stat-cards ---- */}
       <section className="bf-dash-stats">
         <article className="bf-dash-stat">
-          <div className="bf-dash-stat-top">
-            <span className="bf-dash-stat-icon">
-              <IconTrophy size={18} />
-            </span>
-          </div>
-          <span className="bf-dash-stat-value">{stat(tournamentsCount)}</span>
-          <span className="bf-dash-stat-label">Torneos activos</span>
-          <span className="bf-dash-stat-sub">World Series Practice</span>
-        </article>
-
-        <article className="bf-dash-stat">
-          <div className="bf-dash-stat-top">
-            <span className="bf-dash-stat-icon">
-              <IconTeams size={18} />
-            </span>
-          </div>
-          <span className="bf-dash-stat-value">{stat(teamsCount)}</span>
-          <span className="bf-dash-stat-label">Equipos registrados</span>
-          <span className="bf-dash-stat-sub">
-            {selectedTournament ? selectedTournament.name : "Sin torneo activo"}
+          <span className="bf-dash-stat-icon">
+            <IconTrophy size={22} />
           </span>
+          <div className="bf-dash-stat-body">
+            <span className="bf-dash-stat-label">Torneos activos</span>
+            <span className="bf-dash-stat-value">{stat(tournamentsCount)}</span>
+            <span className="bf-dash-stat-sub">World Series Practice</span>
+          </div>
         </article>
 
         <article className="bf-dash-stat">
-          <div className="bf-dash-stat-top">
-            <span className="bf-dash-stat-icon">
-              <IconStream size={18} />
+          <span className="bf-dash-stat-icon">
+            <IconTeams size={22} />
+          </span>
+          <div className="bf-dash-stat-body">
+            <span className="bf-dash-stat-label">Equipos registrados</span>
+            <span className="bf-dash-stat-value">{stat(teamsCount)}</span>
+            <span className="bf-dash-stat-sub">
+              {selectedTournament ? selectedTournament.name : "Sin torneo activo"}
             </span>
           </div>
-          <span className="bf-dash-stat-value">{stat(gamesCount)}</span>
-          <span className="bf-dash-stat-label">Partidas jugadas</span>
-          <span className="bf-dash-stat-sub">Games cargados en esta práctica</span>
+        </article>
+
+        <article className="bf-dash-stat">
+          <span className="bf-dash-stat-icon">
+            <IconDashboard size={22} />
+          </span>
+          <div className="bf-dash-stat-body">
+            <span className="bf-dash-stat-label">Partidas jugadas</span>
+            <span className="bf-dash-stat-value">{stat(gamesCount)}</span>
+            <span className="bf-dash-stat-sub">Games cargados en esta práctica</span>
+          </div>
         </article>
       </section>
 
@@ -182,7 +183,9 @@ export default function DashboardHome() {
               </div>
               {compactStandings.map((entry, index) => (
                 <div key={entry.team_id} className="bf-dash-trow" data-rank={index + 1}>
-                  <span className="bf-dash-rank">{index + 1}</span>
+                  <span className="bf-dash-rank is-green">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
                   <span className="bf-dash-team">
                     <span className="bf-dash-team-name">{entry.team_name}</span>
                     <span className="bf-dash-team-roster">
@@ -202,7 +205,7 @@ export default function DashboardHome() {
             </p>
           )}
 
-          <Link href={`/standings${query}`} className="bf-dash-cta bf-dash-cta-ghost">
+          <Link href={`/standings${query}`} className="bf-dash-cta">
             Ver standings completos
             <IconArrowRight size={16} />
           </Link>
@@ -245,7 +248,9 @@ export default function DashboardHome() {
                     </span>
                     <span className="bf-dash-gamecard-stat">
                       <span>Total</span>
-                      <strong>{report ? report.total_points.toFixed(1) : DASH}</strong>
+                      <strong className={report ? "is-total" : ""}>
+                        {report ? report.total_points.toFixed(1) : DASH}
+                      </strong>
                     </span>
                   </div>
                 </div>

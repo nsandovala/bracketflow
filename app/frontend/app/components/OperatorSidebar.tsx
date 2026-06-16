@@ -72,10 +72,6 @@ export default function OperatorSidebar() {
           deshabilitado y sólo deja constancia de la intención de diseño.
         */}
         <div className="bf-op-theme" role="group" aria-label="Tema (dark-only por ahora)">
-          <button type="button" className="bf-op-theme-opt is-on" aria-pressed="true">
-            <IconMoon size={15} />
-            Noche
-          </button>
           <button
             type="button"
             className="bf-op-theme-opt"
@@ -83,8 +79,10 @@ export default function OperatorSidebar() {
             aria-pressed="false"
             title="Tema claro: próximamente"
           >
-            <IconSun size={15} />
-            Día
+            <IconSun size={16} />
+          </button>
+          <button type="button" className="bf-op-theme-opt is-on" aria-pressed="true">
+            <IconMoon size={16} />
           </button>
         </div>
 

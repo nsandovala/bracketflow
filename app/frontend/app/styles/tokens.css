@@ -16,8 +16,8 @@
 
 :root {
   /* ---- Superficie ---- */
-  --amon-bg: #0b0b0e;            /* fondo base grafito */
-  --amon-bg-deep: #08080a;       /* fondo más profundo (degradado) */
+  --amon-bg: #0a0e16;            /* fondo base azul-grafito (línea Amon v2) */
+  --amon-bg-deep: #0c1019;       /* fondo más profundo (degradado) */
   --amon-surface: #141418;       /* superficie elevada */
   --amon-surface-2: #1a1a1f;     /* superficie más elevada */
   --amon-glass: rgba(22, 22, 27, 0.62);        /* glass con blur */
@@ -66,4 +66,14 @@
   /* ---- Tipografía (mapea las fuentes ya cargadas en layout.tsx) ---- */
   --amon-font-display: var(--font-rajdhani), sans-serif; /* condensada: números/títulos */
   --amon-font-sans: var(--font-geist-sans), sans-serif;  /* texto general */
+
+  /* ---- Glass v2 (línea Amon v2 — artifact match) ---- */
+  --amon-glass-v2-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+  --amon-glass-v2-border: rgba(255, 255, 255, 0.075);
+  --amon-glass-v2-shadow: 0 12px 40px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --amon-glass-v2-blur: blur(18px);
+
+  /* ---- Nav activo (línea Amon v2) ---- */
+  --amon-nav-active-bg: linear-gradient(100deg, rgba(40, 90, 70, 0.28), rgba(30, 45, 60, 0.20));
+  --amon-nav-active-border: rgba(120, 230, 170, 0.20);
 }

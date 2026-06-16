@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 
+import DashboardParticles from "../components/DashboardParticles";
 import OperatorSidebar from "../components/OperatorSidebar";
 import { IconBell } from "../components/icons";
 
@@ -20,6 +21,10 @@ import { IconBell } from "../components/icons";
 export default function OperatorLayout({ children }: { children: ReactNode }) {
   return (
     <div className="bf-op-shell">
+      <div className="bf-op-particles" aria-hidden="true">
+        <DashboardParticles />
+      </div>
+
       <OperatorSidebar />
 
       <div className="bf-op-main">

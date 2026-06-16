@@ -1277,10 +1277,20 @@ a:focus-visible {
   min-height: 100vh;
   color: var(--amon-text);
   font-family: var(--amon-font-sans);
-  /* Opaco para cubrir el campo de partículas verdes global. */
+  /* Cubre el campo de partículas verdes global con gradiente ambiental Amon v2. */
   background:
-    radial-gradient(circle at 18% -8%, rgba(255, 255, 255, 0.035), transparent 38%),
+    radial-gradient(1200px 700px at 78% -8%, rgba(40, 70, 120, 0.35), transparent 60%),
+    radial-gradient(900px 600px at 12% 108%, rgba(60, 40, 110, 0.30), transparent 55%),
     linear-gradient(180deg, var(--amon-bg), var(--amon-bg-deep));
+}
+
+/* ---- Canvas de partículas dentro del shell ---- */
+.bf-op-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
 }
 
 /* ---- Sidebar ---- */
@@ -1289,6 +1299,7 @@ a:focus-visible {
   top: 0;
   align-self: start;
   height: 100vh;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: var(--amon-space-5);
@@ -1353,6 +1364,7 @@ a:focus-visible {
 }
 
 .bf-op-nav-link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--amon-space-3);
@@ -1372,9 +1384,21 @@ a:focus-visible {
 }
 
 .bf-op-nav-link.is-active {
-  background: var(--amon-accent-dim);
-  border-color: rgba(97, 242, 163, 0.22);
+  background: var(--amon-nav-active-bg);
+  border-color: var(--amon-nav-active-border);
   color: var(--amon-text);
+}
+
+.bf-op-nav-link.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  height: 56%;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #7fe9b0, #46c98a);
+  box-shadow: 0 0 12px rgba(110, 230, 170, 0.6);
 }
 
 .bf-op-nav-icon {
@@ -1491,6 +1515,8 @@ a:focus-visible {
 
 /* ---- Main + topbar ---- */
 .bf-op-main {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1629,53 +1655,63 @@ a:focus-visible {
 }
 
 .bf-dash-stat {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
   padding: var(--amon-space-5);
   border-radius: var(--amon-radius-lg);
-  border: 1px solid var(--amon-line);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%),
-    var(--amon-surface);
-  box-shadow: var(--amon-shadow-sm);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+  transition: border-color 160ms ease;
 }
 
-.bf-dash-stat-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.bf-dash-stat:hover {
+  border-color: rgba(255, 255, 255, 0.13);
 }
 
 .bf-dash-stat-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--amon-radius-md);
-  border: 1px solid var(--amon-line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--amon-accent);
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
+  border: 1px solid var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--amon-text-dim);
+}
+
+.bf-dash-stat-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
 }
 
 .bf-dash-stat-label {
-  font-size: 0.76rem;
-  letter-spacing: 0.1em;
+  font-size: 0.67rem;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--amon-muted);
+  font-weight: 600;
 }
 
 .bf-dash-stat-value {
   font-family: var(--amon-font-display);
-  font-weight: 700;
-  font-size: 2.4rem;
-  line-height: 1;
+  font-weight: 800;
+  font-size: 2.2rem;
+  line-height: 1.1;
   color: var(--amon-text);
   font-variant-numeric: tabular-nums;
+  margin: 2px 0;
 }
 
 .bf-dash-stat-sub {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--amon-faint);
 }
 
@@ -1692,10 +1728,11 @@ a:focus-visible {
   gap: var(--amon-space-4);
   padding: var(--amon-space-5);
   border-radius: var(--amon-radius-lg);
-  border: 1px solid var(--amon-line);
-  background: var(--amon-glass);
-  backdrop-filter: var(--amon-blur-md);
-  box-shadow: var(--amon-shadow-sm);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
 }
 
 .bf-dash-panel-head {
@@ -1754,8 +1791,14 @@ a:focus-visible {
 .bf-dash-trow {
   padding: 10px 12px;
   border-radius: var(--amon-radius-md);
-  border: 1px solid var(--amon-line);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(255, 255, 255, 0.025);
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.bf-dash-trow:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--amon-line-strong);
 }
 
 .bf-dash-trow[data-rank="1"] {
@@ -1768,7 +1811,14 @@ a:focus-visible {
 .bf-dash-rank {
   font-family: var(--amon-font-display);
   font-weight: 700;
+  font-size: 0.94rem;
+  color: var(--amon-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-dash-rank.is-green {
   color: var(--amon-accent);
+  font-size: 0.88rem;
 }
 
 .bf-dash-team {
@@ -1820,10 +1870,15 @@ a:focus-visible {
 .bf-dash-gamecard {
   display: grid;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 14px;
   border-radius: var(--amon-radius-md);
-  border: 1px solid var(--amon-line);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.025);
+  transition: border-color 150ms ease;
+}
+
+.bf-dash-gamecard:hover {
+  border-color: var(--amon-line-strong);
 }
 
 .bf-dash-gamecard.is-pending {
@@ -1862,8 +1917,12 @@ a:focus-visible {
   font-family: var(--amon-font-display);
   font-weight: 700;
   font-size: 1.05rem;
-  color: var(--amon-text);
+  color: var(--amon-text-dim);
   font-variant-numeric: tabular-nums;
+}
+
+.bf-dash-gamecard-stat strong.is-total {
+  color: var(--amon-accent);
 }
 
 /* ---- Accesos rápidos ---- */
@@ -1877,21 +1936,19 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 15px 16px;
   border-radius: var(--amon-radius-md);
-  border: 1px solid var(--amon-line);
-  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--amon-text);
   transition:
     border-color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+    background 160ms ease;
 }
 
 .bf-dash-quick-link:hover {
-  border-color: rgba(97, 242, 163, 0.24);
-  background: rgba(255, 255, 255, 0.045);
-  transform: translateY(-1px);
+  border-color: rgba(120, 230, 170, 0.18);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .bf-dash-quick-icon {
@@ -1899,7 +1956,12 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--amon-accent);
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: 1px solid var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--amon-text-dim);
 }
 
 .bf-dash-quick-copy {
@@ -1920,31 +1982,27 @@ a:focus-visible {
 
 /* ---- CTA / badge / empties ---- */
 .bf-dash-cta {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  padding: 9px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(97, 242, 163, 0.22);
-  background: var(--amon-accent-dim);
-  color: var(--amon-text);
-  font-size: 0.84rem;
-  font-weight: 600;
+  justify-content: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 13px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--amon-text-dim);
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
   transition:
     background 160ms ease,
-    transform 160ms ease;
+    border-color 160ms ease;
 }
 
 .bf-dash-cta:hover {
-  background: rgba(97, 242, 163, 0.22);
-  transform: translateY(-1px);
-}
-
-.bf-dash-cta-ghost {
-  background: rgba(255, 255, 255, 0.025);
-  border-color: var(--amon-line);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--amon-line-strong);
 }
 
 .bf-dash-badge {
@@ -1967,11 +2025,18 @@ a:focus-visible {
 }
 
 .bf-dash-empty {
-  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 18px;
   border-radius: var(--amon-radius-md);
-  border: 1px dashed var(--amon-line);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
   color: var(--amon-muted);
   font-size: 0.88rem;
+  text-align: center;
 }
 
 .bf-dash-footer {
@@ -2043,6 +2108,9 @@ a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .bf-op-livebadge .bf-op-dot,
   .bf-op-nav-link,
+  .bf-dash-stat,
+  .bf-dash-trow,
+  .bf-dash-gamecard,
   .bf-dash-quick-link,
   .bf-dash-cta {
     animation: none;
