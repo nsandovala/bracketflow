@@ -812,6 +812,8 @@ a:focus-visible {
   --bf-st-accent: #61f2a3;
   --bf-st-down: #ff8a9b;
   --bf-st-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  --bf-ov-accent-soft: #7fe9b0;
+  --bf-ov-top3-glass: linear-gradient(100deg, rgba(95, 227, 154, 0.10), rgba(10, 14, 22, 0.66));
 
   position: relative;
   min-height: 100vh;
@@ -1258,6 +1260,411 @@ a:focus-visible {
   }
   .bf-stream-particle,
   .bf-stream-live-dot {
+    animation: none;
+  }
+}
+
+/* ---- Overlay anchors (sidebar + lower-third) ---- */
+.bf-stream-overlay-mode {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bf-ov-sidebar-anchor {
+  position: absolute;
+  top: 40px;
+  right: 28px;
+  pointer-events: auto;
+}
+
+.bf-ov-lower-anchor {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+/* ---- Sidebar overlay ---- */
+.bf-ov-sidebar {
+  width: 340px;
+  font-family: var(--amon-font-display);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bf-ov-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(10, 14, 22, 0.82), rgba(10, 14, 22, 0.62));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4);
+}
+
+.bf-ov-sidebar-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  border: 1px solid rgba(120, 230, 170, 0.4);
+  background: rgba(95, 227, 154, 0.08);
+  display: grid;
+  place-items: center;
+  color: var(--bf-st-accent);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.bf-ov-sidebar-title {
+  color: #f4f7fb;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-ov-sidebar-subtitle {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+.bf-ov-sidebar-live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.bf-ov-sidebar-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bf-st-accent);
+  box-shadow: 0 0 8px var(--bf-st-accent);
+  animation: bf-stream-pulse 2s ease-out infinite;
+}
+
+.bf-ov-sidebar-live-label {
+  color: var(--bf-st-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.bf-ov-sidebar-col-hint {
+  display: flex;
+  padding: 0 16px;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  justify-content: space-between;
+}
+
+.bf-ov-sidebar-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-radius: 11px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 14, 22, 0.62);
+}
+
+.bf-ov-sidebar-row.is-top3 {
+  background: var(--bf-ov-top3-glass);
+  border-color: rgba(120, 230, 170, 0.22);
+}
+
+.bf-ov-sidebar-rank {
+  width: 26px;
+  font-weight: 800;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-ov-sidebar-row.is-top3 .bf-ov-sidebar-rank {
+  color: var(--bf-st-accent);
+}
+
+.bf-ov-sidebar-team {
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+}
+
+.bf-ov-sidebar-team-name {
+  color: #f4f7fb;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-ov-sidebar-roster {
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 9.5px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-ov-sidebar-delta {
+  width: 22px;
+  margin-right: 8px;
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 11px;
+  text-align: center;
+}
+
+.bf-ov-sidebar-delta.is-up {
+  color: var(--bf-st-accent);
+  font-weight: 700;
+}
+
+.bf-ov-sidebar-delta.is-down {
+  color: var(--bf-st-down);
+  font-weight: 700;
+}
+
+.bf-ov-sidebar-kills {
+  width: 28px;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-ov-sidebar-pts {
+  width: 52px;
+  text-align: right;
+  color: #f4f7fb;
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-ov-sidebar-row.is-top3 .bf-ov-sidebar-pts {
+  color: var(--bf-ov-accent-soft);
+}
+
+.bf-ov-sidebar-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 16px;
+  margin-top: 2px;
+}
+
+.bf-ov-sidebar-footer span {
+  color: rgba(255, 255, 255, 0.26);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ---- Overlay empty chip ---- */
+.bf-ov-empty-chip {
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: rgba(10, 14, 22, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: rgba(255, 255, 255, 0.42);
+  font-family: var(--amon-font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ---- Lower-third overlay ---- */
+.bf-ov-lower {
+  width: 960px;
+  font-family: var(--amon-font-display);
+}
+
+.bf-ov-lower-card {
+  display: flex;
+  align-items: stretch;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(10, 14, 22, 0.86), rgba(10, 14, 22, 0.72));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.46);
+}
+
+.bf-ov-lower-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 22px;
+  background: linear-gradient(135deg, rgba(95, 227, 154, 0.14), rgba(95, 227, 154, 0.02));
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 150px;
+}
+
+.bf-ov-lower-brand-live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bf-ov-lower-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bf-st-accent);
+  box-shadow: 0 0 8px var(--bf-st-accent);
+  animation: bf-stream-pulse 2s ease-out infinite;
+}
+
+.bf-ov-lower-live-label {
+  color: var(--bf-st-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.bf-ov-lower-brand-title {
+  color: #f4f7fb;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.bf-ov-lower-brand-sub {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.bf-ov-lower-teams {
+  display: flex;
+  flex: 1;
+}
+
+.bf-ov-lower-team {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  animation: bfOvFade 520ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bf-ov-lower-team:last-child {
+  border-right: none;
+}
+
+.bf-ov-lower-rank {
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-ov-lower-team.is-top3 .bf-ov-lower-rank {
+  color: var(--bf-st-accent);
+}
+
+.bf-ov-lower-team-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.bf-ov-lower-team-name {
+  color: #f4f7fb;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-ov-lower-team-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.bf-ov-lower-pts {
+  color: #f4f7fb;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-ov-lower-team.is-top3 .bf-ov-lower-pts {
+  color: var(--bf-ov-accent-soft);
+}
+
+.bf-ov-lower-kills {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
+}
+
+.bf-ov-lower-footer {
+  text-align: center;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.24);
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+@keyframes bfOvFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-ov-sidebar-live-dot,
+  .bf-ov-lower-live-dot {
+    animation: none;
+  }
+  .bf-ov-lower-team {
     animation: none;
   }
 }

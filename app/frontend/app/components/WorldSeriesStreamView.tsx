@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 
 import BackgroundParticles from "./BackgroundParticles";
+import StreamOverlayLowerThird from "./StreamOverlayLowerThird";
+import StreamOverlaySidebar from "./StreamOverlaySidebar";
 import StreamStandingsBoard from "./StreamStandingsBoard";
 import { useStreamLeaderboard } from "../lib/useStreamLeaderboard";
 
@@ -11,6 +13,7 @@ type WorldSeriesStreamViewProps = {
   obs: boolean;
   transparent: boolean;
   brand: string | null;
+  layout: "full" | "sidebar" | "lower";
 };
 
 export default function WorldSeriesStreamView({
@@ -18,12 +21,11 @@ export default function WorldSeriesStreamView({
   obs,
   transparent,
   brand,
+  layout,
 }: WorldSeriesStreamViewProps) {
   const { tournament, standings, afterGameNumber, connected } =
     useStreamLeaderboard(tournamentId);
 
-  // Marca <body> para apagar el campo de particulas verde global solo en /stream,
-  // y (en bg=transparent) deja html/body sin fondo para que OBS componga el overlay.
   useEffect(() => {
     const body = document.body;
     const html = document.documentElement;
@@ -45,6 +47,46 @@ export default function WorldSeriesStreamView({
     };
   }, [transparent]);
 
+  // Overlay modes (sidebar / lower) render a fixed transparent canvas with just the overlay chip.
+  if (layout === "sidebar" || layout === "lower") {
+    const pageClassName = [
+      "bf-stream-page",
+      "bf-stream-overlay-mode",
+      transparent ? "bf-stream-transparent" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return (
+      <main className={pageClassName}>
+        {layout === "sidebar" && (
+          <div className="bf-ov-sidebar-anchor">
+            <StreamOverlaySidebar
+              standings={standings}
+              tournamentName={tournament?.name ?? null}
+              tournamentGame={tournament?.game ?? null}
+              afterGameNumber={afterGameNumber}
+              connected={connected}
+              brand={brand}
+            />
+          </div>
+        )}
+        {layout === "lower" && (
+          <div className="bf-ov-lower-anchor">
+            <StreamOverlayLowerThird
+              standings={standings}
+              tournamentGame={tournament?.game ?? null}
+              afterGameNumber={afterGameNumber}
+              connected={connected}
+              brand={brand}
+            />
+          </div>
+        )}
+      </main>
+    );
+  }
+
+  // Default: full standings table (existing behavior, untouched).
   const pageClassName = [
     "bf-stream-page",
     obs ? "bf-stream-obs" : "",
