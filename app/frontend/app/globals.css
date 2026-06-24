@@ -2465,6 +2465,169 @@ a:focus-visible {
   letter-spacing: 0.04em;
 }
 
+/* ---- Standings dentro del shell operator ---- */
+.bf-shell-standings {
+  display: grid;
+  gap: var(--amon-space-5);
+}
+
+.bf-standings-toolbar,
+.bf-standings-panel {
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.bf-standings-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--amon-space-5);
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+}
+
+.bf-standings-kicker {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--amon-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.bf-standings-toolbar h2 {
+  margin: 0;
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.bf-standings-toolbar p {
+  margin: 5px 0 0;
+  color: var(--amon-muted);
+  font-size: 0.86rem;
+}
+
+.bf-standings-selector {
+  display: grid;
+  gap: 7px;
+  width: min(300px, 100%);
+  flex-shrink: 0;
+  color: var(--amon-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.bf-standings-selector select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 38px 0 14px;
+  border: 1px solid var(--amon-line-strong);
+  border-radius: var(--amon-radius-md);
+  background: rgba(10, 14, 22, 0.82);
+  color: var(--amon-text);
+  cursor: pointer;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.bf-standings-selector select:disabled {
+  color: var(--amon-faint);
+  cursor: not-allowed;
+}
+
+.bf-standings-panel {
+  overflow-x: auto;
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+}
+
+.bf-shell-standings .bf-standings-shell {
+  min-width: 900px;
+  gap: 7px;
+}
+
+.bf-shell-standings .bf-standings-head,
+.bf-shell-standings .bf-standings-row {
+  grid-template-columns: 58px minmax(150px, 1.1fr) minmax(210px, 1.5fr) 90px 72px 92px 68px;
+  gap: 12px;
+}
+
+.bf-shell-standings .bf-standings-head {
+  padding: 0 14px 8px;
+  color: var(--amon-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+}
+
+.bf-shell-standings .bf-standings-row {
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--amon-radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--amon-text-dim);
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.bf-shell-standings .bf-standings-row:hover {
+  border-color: var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.bf-shell-standings .bf-standings-row[data-rank="1"] {
+  border-color: rgba(95, 227, 154, 0.28);
+  background: linear-gradient(160deg, rgba(95, 227, 154, 0.065), rgba(95, 227, 154, 0.012));
+}
+
+.bf-shell-standings .bf-standings-row[data-rank="1"] .bf-standings-rank,
+.bf-shell-standings .bf-standings-row[data-rank="1"] .bf-standings-points {
+  color: var(--amon-accent);
+}
+
+.bf-shell-standings .bf-standings-rank,
+.bf-shell-standings .bf-standings-points,
+.bf-shell-standings .bf-standings-row > span:not(.bf-standings-roster) {
+  font-family: var(--amon-font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-shell-standings .bf-standings-rank {
+  color: var(--amon-text);
+}
+
+.bf-shell-standings .bf-standings-name {
+  color: var(--amon-text);
+  font-weight: 600;
+}
+
+.bf-shell-standings .bf-standings-roster {
+  overflow: hidden;
+  color: var(--amon-muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bf-shell-standings .bf-standings-points {
+  color: var(--amon-text);
+  font-size: 1.05rem;
+}
+
+.bf-shell-standings .bf-empty {
+  border-color: var(--amon-glass-v2-border);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--amon-muted);
+}
+
 /* ---- Franja de estado (1 línea) ---- */
 .bf-dash-statline {
   display: flex;
@@ -2643,6 +2806,15 @@ a:focus-visible {
   }
   .bf-dash-hero-actions {
     grid-template-columns: 1fr;
+  }
+
+  .bf-standings-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bf-standings-selector {
+    width: 100%;
   }
 }
 

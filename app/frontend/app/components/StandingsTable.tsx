@@ -22,7 +22,11 @@ export default function StandingsTable({ entries }: StandingsTableProps) {
       </div>
 
       {entries.map((entry, index) => (
-        <article key={entry.team_id} className="bf-standings-row">
+        <article
+          key={entry.team_id}
+          className="bf-standings-row"
+          data-rank={index + 1}
+        >
           <span className="bf-standings-rank">#{index + 1}</span>
           <strong className="bf-standings-name">{entry.team_name}</strong>
           <span className="bf-standings-roster">

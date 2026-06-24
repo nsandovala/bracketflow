@@ -34,9 +34,9 @@
   --amon-line-strong: rgba(255, 255, 255, 0.10);
 
   /* ---- Acento (verde BracketFlow, solo funcional) ---- */
-  --amon-accent: #61f2a3;
-  --amon-accent-dim: rgba(97, 242, 163, 0.16); /* fondos activos / badges */
-  --amon-accent-glow: rgba(97, 242, 163, 0.10);
+  --amon-accent: #5fe39a;
+  --amon-accent-dim: rgba(95, 227, 154, 0.16); /* fondos activos / badges */
+  --amon-accent-glow: rgba(95, 227, 154, 0.10);
 
   /* ---- Geometría · radios ---- */
   --amon-radius-sm: 10px;

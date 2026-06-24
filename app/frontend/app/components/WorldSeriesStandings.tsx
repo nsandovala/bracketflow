@@ -1,6 +1,3 @@
-import AppTopbar from "./AppTopbar";
-import GlassPanel from "./GlassPanel";
-import SectionHeader from "./SectionHeader";
 import StandingsTable from "./StandingsTable";
 
 import { Tournament } from "../../lib/api";
@@ -23,44 +20,38 @@ export default function WorldSeriesStandings({
   afterGameNumber,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
-  const tournamentQuery = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
-
   return (
-    <main className="bf-page">
-      <AppTopbar
-        title="STANDINGS"
-        subtitle={
-          selectedTournament
-            ? `${selectedTournament.name} / After Game ${afterGameNumber}`
-            : "Selecciona un torneo activo."
-        }
-        navLinks={[
-          { href: "/", label: "Hub" },
-          { href: `/operator${tournamentQuery}`, label: "Operator" },
-          { href: "/standings", label: "Standings" },
-          { href: `/stream${tournamentQuery}`, label: "Stream" },
-        ]}
-        backHref={selectedTournamentId ? `/operator${tournamentQuery}` : "/"}
-        tournamentSelector={{
-          tournaments,
-          selectedTournamentId,
-          onSelectTournament,
-        }}
-      />
+    <main className="bf-shell-standings">
+      <section className="bf-standings-toolbar">
+        <div>
+          <span className="bf-standings-kicker">Clasificación general</span>
+          <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
+          <p>
+            {afterGameNumber > 0
+              ? `Resultados acumulados después del Game ${afterGameNumber}.`
+              : "Los resultados aparecerán al reportar el primer game."}
+          </p>
+        </div>
 
-      <GlassPanel className="bf-main-panel">
-        <SectionHeader
-          eyebrow="Standings View"
-          title="STANDINGS"
-          subtitle={
-            selectedTournament
-              ? `${selectedTournament.name} / After Game ${afterGameNumber}`
-              : "Sin torneo activo"
-          }
-        />
+        <label className="bf-standings-selector">
+          <span>Torneo</span>
+          <select
+            value={selectedTournamentId ?? ""}
+            onChange={(event) => onSelectTournament(Number(event.target.value))}
+            disabled={tournaments.length === 0}
+          >
+            {tournaments.map((tournament) => (
+              <option key={tournament.id} value={tournament.id}>
+                {tournament.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
 
+      <section className="bf-standings-panel">
         <StandingsTable entries={standings} />
-      </GlassPanel>
+      </section>
     </main>
   );
 }

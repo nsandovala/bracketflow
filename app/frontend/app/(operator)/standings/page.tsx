@@ -3,8 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
-import WorldSeriesStandings from "../components/WorldSeriesStandings";
-import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
+import WorldSeriesStandings from "../../components/WorldSeriesStandings";
+import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
 
 function parseTournamentId(value: string | null) {
   if (!value) {
@@ -51,7 +51,7 @@ function StandingsPageClient() {
 
 export default function StandingsPage() {
   return (
-    <Suspense fallback={<main className="bf-page"><p className="bf-empty">Cargando standings...</p></main>}>
+    <Suspense fallback={<div className="bf-dash-empty">Cargando standings…</div>}>
       <StandingsPageClient />
     </Suspense>
   );
