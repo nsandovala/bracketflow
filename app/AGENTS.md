@@ -28,6 +28,23 @@ BracketFlow es un sistema real de gestion de torneos esports con foco inicial en
 - Hacer cambios de frontend despues de confirmar contratos y comportamiento backend.
 - Cerrar siempre con validacion y QA manual al final.
 
+## Foco actual del sprint
+
+- Unificar `dashboard`, `/operator` y `/standings` dentro del mismo shell visual de operator.
+- Hacer el topbar del shell contextual por vista, sin textos hardcodeados compartidos.
+- Cerrar un flujo WS Practice fluido y consistente, con calidad visual equivalente entre vistas.
+- Mantener el scoring WS ya existente para Battle Royale y extender Rebirth como modo o metadata solo si no cambia el calculo.
+- Priorizar consistencia de UX y cierre del flujo real antes de abrir nuevos frentes.
+
+## No foco del sprint actual
+
+- No implementar `Clerk` ni otra autenticacion en este sprint.
+- No implementar Match Point en este sprint.
+- No implementar monetizacion, creditos, RESPIN ni planes en este sprint.
+- No implementar bot de Discord en este sprint.
+- No crear agentes de automatizacion de stats, prints u overlays hasta fijar contratos y eventos.
+- Si surge una idea nueva de producto, documentarla en backlog antes de mezclarla con el trabajo del sprint.
+
 ## Que no se debe hacer
 
 - No mover ni reestructurar `backend/` y `frontend/`.
@@ -113,4 +130,6 @@ Validacion funcional minima:
 - `docs/agents/scoring.md`
 - `docs/agents/qa.md`
 - `docs/agents/stream-ux.md`
+- `docs/CODEX_CONTEXT.md`
 - `docs/NEXT_STEPS.md`
+- `docs/PARKING_LOT.md`

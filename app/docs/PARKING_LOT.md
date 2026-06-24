@@ -1,0 +1,69 @@
+# BracketFlow - Parking Lot
+
+> Capturado el 2026-06-23.
+> Este documento preserva ideas de producto, monetizacion y automatizacion.
+> No define el foco del sprint actual.
+
+## Norte MVP vigente
+
+- WS Practice fluido y unificado dentro del shell de operator.
+- WS en dos formatos de producto: Battle Royale y Rebirth ranked.
+- Calidad visual consistente entre dashboard, operator y standings.
+
+## Roulette team-builder
+
+- BracketFlow ya tiene una base backend para ruleta en `crud.generate_roulette_teams`.
+- Los formatos `roulette_2v2` y `roulette_3v3` ya existen.
+- Lo pendiente no es el motor principal sino la UI de rueda y el flujo de RESPIN.
+- Esta linea aplica especialmente al modo Rebirth estilo ranked.
+
+## RESPIN y creditos
+
+- Si un jugador o equipo no quiere el resultado de la ruleta, puede consumir un credito y regenerar equipos.
+- La implementacion propuesta es con creditos in-app, no con cobro directo por accion.
+- Cada RESPIN deberia gatillar una nueva ejecucion de `generate_roulette_teams` con otro seed.
+
+## Clerk y anti abuso
+
+- `Clerk` queda documentado como backlog inmediato, no como trabajo del sprint actual.
+- El objetivo es identidad verificada, ownership de torneos y control de quotas.
+- Email o telefono verificado deberian pesar mas que el simple conteo de cuentas.
+- Device fingerprint puede existir como capa adicional, no como unica defensa.
+
+## Modelo de planes
+
+- Free como muestra, con limite bajo de torneos.
+- Pro mensual con limite alto o torneos ilimitados.
+- La definicion exacta de tiers queda para un sprint de producto o monetizacion.
+
+## Discord bot
+
+- Posibles tareas: publicar standings, anunciar apertura de game, compartir links de operator o stream.
+- Queda abierta la decision entre bot cerrado para una comunidad puntual o instalable por terceros.
+- Si se retoma, debe apoyarse en contratos claros de API y eventos.
+
+## Rebirth
+
+- La hipotesis actual es que Rebirth usa el mismo scoring multiplicativo ya cubierto por `WSOW_PLACEMENT_BANDS`.
+- En el producto, BR vs Rebirth deberia resolverse como modo o metadata si el calculo no cambia.
+- Antes de cerrar esta parte, hay que verificar si existe alguna variante real por tamano de lobby.
+
+## Match Point
+
+- Aplica a torneos competitivos de BR y Rebirth.
+- Requiere configuracion por torneo, por ejemplo `matchpoint_threshold`.
+- Un equipo en match point gana el torneo al alcanzar el umbral y luego ganar una partida.
+- Esto impacta backend, estado de torneo, standings y stream.
+- Queda como siguiente bloque relevante despues de unificar operator.
+
+## Agentes de automatizacion
+
+- No se deben crear todavia.
+- Antes hay que fijar eventos, contratos de datos, formatos de salida y puntos de integracion.
+- Cuando la base del producto este estable, se puede abrir un sprint especifico para stats prints, overlays u outputs automaticos.
+
+## Riesgos o temas diferidos
+
+- Cobrar porcentaje sobre apuestas con dinero real queda fuera del alcance actual.
+- Ese tema requiere validacion legal antes de cualquier implementacion.
+- No debe mezclarse con el SaaS base hasta tener claridad regulatoria.
