@@ -400,7 +400,7 @@ export default function WorldSeriesOperator({
                           disabled={submitting}
                           onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
                         >
-                          {isSaved ? "Editar / reguardar" : "Guardar reporte"}
+                          {isSaved ? "Editar" : "Guardar reporte"}
                         </button>
                       </div>
                     </article>

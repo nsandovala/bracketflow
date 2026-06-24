@@ -2,27 +2,30 @@
 
 ## Sprint actual
 
-- Migrar `/operator` y `/standings` al shell (operator) — unificación.
-- Reemplazar el topbar fijo por un topbar contextual por vista.
-- Mantener la calidad visual del dashboard en todas las vistas operativas.
-- Cerrar el flujo WS Practice sin datos demo y con QA manual completo.
-- Extender WS a Rebirth como modo o metadata si el scoring permanece igual.
+- Shell unification: migrar `/operator` y `/standings` dentro del mismo shell de operator.
+- Topbar contextual por vista (hoy el topbar compacto vive en `/operator`; llevar a las demás vistas operativas).
+- Placeholders premium: Torneos / Equipos / Ajustes en el sidebar del shell.
+- Clerk / auth: saludo contextual en dashboard ("Bienvenido, [nombre]").
 
-## HECHO (este sprint)
+## HECHO (sprints anteriores)
 
-- `fix(operator): opr-amb z-index, nav+stats visibles` — el `.opr-amb` (position:fixed, z-index:0) tapaba la nav compacta y la tira de 3 stats. Fix: `z-index:-1` en `.bf-page-operator > .opr-amb` + `position:relative; z-index:1` en los hijos directos. Build/lint verde.
+- `fix(operator): opr-amb z-index, nav+stats visibles` — `.opr-amb` (position:fixed, z-index:0) tapaba nav compacta y tira de 3 stats. Fix: z-index:-1 + position:relative z-index:1 en hijos directos. Commit: `c49df7e`.
+- `ui(dashboard): operador-first layout + copy esport, kill redundancia` — Dashboard reescrito: franja de estado 1-línea + podio Top 3 + 4 acciones héroe grandes. Eliminadas tablas duplicadas y grid "Cargar game". Copy hub actualizado (hero, chip backend→EN VIVO, título Otros Modos limpio). Typo "reguardar"→"Editar" en Operator. Commit: pendiente.
 
 ## VERIFICAR
 
-- Abrir `/operator?tournamentId=1`: confirmar nav compacta arriba (BF + Hub/Operator/Standings/Stream + selector + backend) y tira de 3 stats visible bajo el command bar.
+- `/` (hub): hero nuevo sin "sin ruido visual", chip EN VIVO (verde), título "Formatos alternativos".
+- `/dashboard`: franja de estado + stat-cards + podio Top 3 + 4 acciones héroe grandes. Sin tabla duplicada ni grid de cards vacías.
+- `/operator` y `/standings`: intactos, sin regresión visual.
+- Build + lint verde.
 
 ## Orden recomendado
 
 1. Consolidar el shell visual y el layout compartido.
 2. Migrar `operator` y `standings` adentro del shell.
-3. Volver contextual el header o topbar según la vista activa.
-4. Verificar que frontend y backend siguen alineados en el flujo real.
-5. Ejecutar QA manual end-to-end con torneo real, resultados y leaderboard.
+3. Topbar contextual por vista activa.
+4. Verificar alineación frontend/backend en flujo real.
+5. QA manual end-to-end con torneo real, resultados y leaderboard.
 
 ## Siguiente bloque después del sprint
 

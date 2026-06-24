@@ -2465,6 +2465,162 @@ a:focus-visible {
   letter-spacing: 0.04em;
 }
 
+/* ---- Franja de estado (1 línea) ---- */
+.bf-dash-statline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 20px;
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+}
+
+.bf-dash-statline-name {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--amon-text);
+}
+
+.bf-dash-statline-sep {
+  color: var(--amon-faint);
+}
+
+.bf-dash-statline-leader {
+  font-size: 0.82rem;
+  color: var(--amon-muted);
+}
+
+.bf-dash-statline-leader strong {
+  color: var(--amon-text);
+  font-weight: 600;
+}
+
+/* ---- Podio Top 3 ---- */
+.bf-dash-podio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--amon-space-4);
+}
+
+.bf-dash-podio-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-dash-podio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--amon-space-4);
+}
+
+.bf-dash-podio-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+  transition: border-color 160ms ease;
+}
+
+.bf-dash-podio-card.is-champion {
+  border-color: rgba(97, 242, 163, 0.28);
+  background: linear-gradient(160deg, rgba(97, 242, 163, 0.06), rgba(97, 242, 163, 0.015));
+}
+
+.bf-dash-podio-card.is-champion .bf-dash-rank {
+  color: var(--amon-accent);
+  border-color: rgba(97, 242, 163, 0.28);
+}
+
+.bf-dash-podio-pts {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--amon-font-display);
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--amon-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-dash-podio-card.is-champion .bf-dash-podio-pts {
+  color: var(--amon-accent);
+}
+
+/* ---- 4 acciones héroe ---- */
+.bf-dash-hero-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--amon-space-4);
+}
+
+.bf-dash-hero-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: var(--amon-space-5) var(--amon-space-4);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+  text-align: center;
+  color: var(--amon-text);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.bf-dash-hero-action:hover {
+  border-color: rgba(97, 242, 163, 0.28);
+  background: linear-gradient(160deg, rgba(97, 242, 163, 0.07), rgba(97, 242, 163, 0.02));
+}
+
+.bf-dash-hero-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 1px solid var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--amon-text-dim);
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.bf-dash-hero-action:hover .bf-dash-hero-action-icon {
+  color: var(--amon-accent);
+  border-color: rgba(97, 242, 163, 0.28);
+}
+
+.bf-dash-hero-action strong {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+}
+
+.bf-dash-hero-action > span:last-child {
+  font-size: 0.75rem;
+  color: var(--amon-faint);
+}
+
 /* ---- Responsive (desktop primero) ---- */
 @media (max-width: 1180px) {
   .bf-dash-grid {
@@ -2474,6 +2630,18 @@ a:focus-visible {
 
 @media (max-width: 1080px) {
   .bf-dash-stats {
+    grid-template-columns: 1fr;
+  }
+  .bf-dash-hero-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .bf-dash-podio-grid {
+    grid-template-columns: 1fr;
+  }
+  .bf-dash-hero-actions {
     grid-template-columns: 1fr;
   }
 }

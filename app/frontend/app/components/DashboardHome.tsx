@@ -23,7 +23,6 @@ function parseTournamentId(value: string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-// Placeholder honesto cuando un dato aún no está disponible.
 const DASH = "—";
 
 export default function DashboardHome() {
@@ -40,30 +39,47 @@ export default function DashboardHome() {
     sortedStandings,
     latestReportedRound,
     currentGameNumber,
-    activeMatch,
-    activeMatchResults,
   } = useWorldSeriesPractice(preferredTournamentId);
 
   const query = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
 
-  // Stat-cards (todos los números vienen del backend del torneo activo).
   const stat = (value: number) => (loading ? DASH : String(value));
   const tournamentsCount = tournaments.length;
   const teamsCount = teams.length;
   const gamesCount = matches.length;
 
   const top3 = sortedStandings.slice(0, 3);
-  const compactStandings = sortedStandings.slice(0, 6);
-
-  // Panel "cargar game": un card por equipo con su reporte del game actual.
   const gameNumber = currentGameNumber || latestReportedRound;
-  const gameCards = teams.map((team) => {
-    const report = activeMatchResults.find((result) => result.team_id === team.id);
-    return { team, report };
-  });
 
   return (
     <div className="bf-dash">
+      {/* ---- Franja de estado (1 línea) ---- */}
+      <div className="bf-dash-statline">
+        <span className="bf-dash-statline-name">
+          {selectedTournament ? selectedTournament.name : "Sin torneo activo"}
+        </span>
+        {selectedTournament ? (
+          <>
+            <span className="bf-dash-statline-sep" aria-hidden="true">·</span>
+            <span className="bf-dash-badge">{selectedTournament.game}</span>
+            {gameNumber > 0 ? (
+              <span className="bf-dash-badge is-live">
+                <i className="bf-op-dot" />
+                Game {gameNumber}
+              </span>
+            ) : null}
+            {top3[0] ? (
+              <>
+                <span className="bf-dash-statline-sep" aria-hidden="true">·</span>
+                <span className="bf-dash-statline-leader">
+                  Líder: <strong>{top3[0].team_name}</strong>
+                </span>
+              </>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+
       {/* ---- Fila de stat-cards ---- */}
       <section className="bf-dash-stats">
         <article className="bf-dash-stat">
@@ -102,223 +118,68 @@ export default function DashboardHome() {
         </article>
       </section>
 
-      {/* ---- Torneo activo + Standings ---- */}
-      <section className="bf-dash-grid">
-        <article className="bf-dash-panel">
-          <div className="bf-dash-panel-head">
-            <div>
-              <span className="bf-dash-panel-kicker">Torneo activo</span>
-              <h2 className="bf-dash-panel-title">
-                {selectedTournament ? selectedTournament.name : "Sin torneo activo"}
-              </h2>
-            </div>
-            <div className="bf-dash-panel-meta">
-              {selectedTournament ? (
-                <>
-                  <span className="bf-dash-badge">{selectedTournament.game}</span>
-                  <span className="bf-dash-badge is-live">
-                    <i className="bf-op-dot" />
-                    After Game {latestReportedRound}
+      {/* ---- Podio Top 3 ---- */}
+      <section className="bf-dash-podio">
+        <span className="bf-dash-podio-kicker">Podio</span>
+        {top3.length > 0 ? (
+          <div className="bf-dash-podio-grid">
+            {top3.map((entry, index) => (
+              <article
+                key={entry.team_id}
+                className={`bf-dash-podio-card${index === 0 ? " is-champion" : ""}`}
+              >
+                <span className="bf-dash-rank">{index + 1}</span>
+                <div className="bf-dash-team">
+                  <span className="bf-dash-team-name">{entry.team_name}</span>
+                  <span className="bf-dash-team-roster">
+                    {entry.players.length > 0 ? entry.players.join(" / ") : "Roster pendiente"}
                   </span>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          {top3.length > 0 ? (
-            <div className="bf-dash-table">
-              <div className="bf-dash-thead">
-                <span>#</span>
-                <span>Equipo</span>
-                <span className="bf-dash-numhead">Pts</span>
-                <span className="bf-dash-numhead">Kills</span>
-                <span className="bf-dash-numhead">Best</span>
-                <span className="bf-dash-numhead">Games</span>
-              </div>
-              {top3.map((entry, index) => (
-                <div key={entry.team_id} className="bf-dash-trow" data-rank={index + 1}>
-                  <span className="bf-dash-rank">{index + 1}</span>
-                  <span className="bf-dash-team">
-                    <span className="bf-dash-team-name">{entry.team_name}</span>
-                    <span className="bf-dash-team-roster">
-                      {entry.players.length > 0 ? entry.players.join(" / ") : "Roster pendiente"}
-                    </span>
-                  </span>
-                  <span className="bf-dash-num is-pts">{entry.total_points.toFixed(1)}</span>
-                  <span className="bf-dash-num">{entry.kills}</span>
-                  <span className="bf-dash-num">{entry.best_placement ?? DASH}</span>
-                  <span className="bf-dash-num">{entry.matches_played}</span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="bf-dash-empty">
-              {loading ? "Cargando torneo activo…" : "Todavía no hay standings para este torneo."}
-            </p>
-          )}
-
-          <Link href={`/standings${query}`} className="bf-dash-cta">
-            Ver clasificación completa
-            <IconArrowRight size={16} />
-          </Link>
-        </article>
-
-        <article className="bf-dash-panel">
-          <div className="bf-dash-panel-head">
-            <div>
-              <span className="bf-dash-panel-kicker">Standings</span>
-              <h2 className="bf-dash-panel-title">Tabla general</h2>
-            </div>
+                <span className="bf-dash-podio-pts">{entry.total_points.toFixed(1)}</span>
+              </article>
+            ))}
           </div>
-
-          {compactStandings.length > 0 ? (
-            <div className="bf-dash-table">
-              <div className="bf-dash-thead">
-                <span>#</span>
-                <span>Equipo</span>
-                <span className="bf-dash-numhead">Pts</span>
-                <span className="bf-dash-numhead">Kills</span>
-                <span className="bf-dash-numhead">Best</span>
-                <span className="bf-dash-numhead">Games</span>
-              </div>
-              {compactStandings.map((entry, index) => (
-                <div key={entry.team_id} className="bf-dash-trow" data-rank={index + 1}>
-                  <span className="bf-dash-rank is-green">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="bf-dash-team">
-                    <span className="bf-dash-team-name">{entry.team_name}</span>
-                    <span className="bf-dash-team-roster">
-                      {entry.players.length > 0 ? entry.players.join(" / ") : "Roster pendiente"}
-                    </span>
-                  </span>
-                  <span className="bf-dash-num is-pts">{entry.total_points.toFixed(1)}</span>
-                  <span className="bf-dash-num">{entry.kills}</span>
-                  <span className="bf-dash-num">{entry.best_placement ?? DASH}</span>
-                  <span className="bf-dash-num">{entry.matches_played}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="bf-dash-empty">
-              {loading ? "Cargando standings…" : "Sin standings disponibles."}
-            </p>
-          )}
-
-          <Link href={`/standings${query}`} className="bf-dash-cta">
-            Ver standings completos
-            <IconArrowRight size={16} />
-          </Link>
-        </article>
+        ) : (
+          <p className="bf-dash-empty">
+            {loading ? "Cargando podio…" : "Todavía no hay resultados para este torneo."}
+          </p>
+        )}
+        <Link href={`/standings${query}`} className="bf-dash-cta">
+          Ver clasificación completa
+          <IconArrowRight size={16} />
+        </Link>
       </section>
 
-      {/* ---- Cargar game + Accesos rápidos ---- */}
-      <section className="bf-dash-grid">
-        <article className="bf-dash-panel">
-          <div className="bf-dash-panel-head">
-            <div>
-              <span className="bf-dash-panel-kicker">Cargar game</span>
-              <h2 className="bf-dash-panel-title">
-                {activeMatch ? `Game ${gameNumber}` : "Sin game en curso"}
-              </h2>
-            </div>
-            <div className="bf-dash-panel-meta">
-              <span className="bf-dash-badge">
-                {activeMatchResults.length}/{teams.length} reportes
-              </span>
-            </div>
-          </div>
-
-          {gameCards.length > 0 ? (
-            <div className="bf-dash-games">
-              {gameCards.map(({ team, report }) => (
-                <div
-                  key={team.id}
-                  className={`bf-dash-gamecard ${report ? "" : "is-pending"}`.trim()}
-                >
-                  <span className="bf-dash-gamecard-name">{team.name}</span>
-                  <div className="bf-dash-gamecard-stats">
-                    <span className="bf-dash-gamecard-stat">
-                      <span>Kills</span>
-                      <strong>{report ? report.kills : DASH}</strong>
-                    </span>
-                    <span className="bf-dash-gamecard-stat">
-                      <span>Place</span>
-                      <strong>{report ? report.placement : DASH}</strong>
-                    </span>
-                    <span className="bf-dash-gamecard-stat">
-                      <span>Total</span>
-                      <strong className={report ? "is-total" : ""}>
-                        {report ? report.total_points.toFixed(1) : DASH}
-                      </strong>
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="bf-dash-empty">
-              {loading ? "Cargando game…" : "Carga equipos para empezar a reportar games."}
-            </p>
-          )}
-
-          <Link href={`/operator${query}`} className="bf-dash-cta">
-            Ir a cargar partida
-            <IconArrowRight size={16} />
-          </Link>
-        </article>
-
-        <article className="bf-dash-panel">
-          <div className="bf-dash-panel-head">
-            <div>
-              <span className="bf-dash-panel-kicker">Accesos rápidos</span>
-              <h2 className="bf-dash-panel-title">Atajos del operador</h2>
-            </div>
-          </div>
-
-          <div className="bf-dash-quick">
-            {/* Crear torneo: el formulario vive en el hub actual (`/`). */}
-            <Link href="/" className="bf-dash-quick-link">
-              <span className="bf-dash-quick-icon">
-                <IconPlus size={20} />
-              </span>
-              <span className="bf-dash-quick-copy">
-                <strong>Crear Torneo</strong>
-                <span>Nueva práctica</span>
-              </span>
-            </Link>
-
-            <Link href={`/operator${query}`} className="bf-dash-quick-link">
-              <span className="bf-dash-quick-icon">
-                <IconUpload size={20} />
-              </span>
-              <span className="bf-dash-quick-copy">
-                <strong>Abrir Operator</strong>
-                <span>Cargar games</span>
-              </span>
-            </Link>
-
-            <Link href={`/standings${query}`} className="bf-dash-quick-link">
-              <span className="bf-dash-quick-icon">
-                <IconStandings size={20} />
-              </span>
-              <span className="bf-dash-quick-copy">
-                <strong>Abrir Standings</strong>
-                <span>Tabla general</span>
-              </span>
-            </Link>
-
-            <Link href={`/stream${query}`} className="bf-dash-quick-link">
-              <span className="bf-dash-quick-icon">
-                <IconStream size={20} />
-              </span>
-              <span className="bf-dash-quick-copy">
-                <strong>Abrir Stream</strong>
-                <span>Vista broadcast</span>
-              </span>
-            </Link>
-          </div>
-        </article>
+      {/* ---- 4 acciones héroe ---- */}
+      <section className="bf-dash-hero-actions">
+        <Link href="/" className="bf-dash-hero-action">
+          <span className="bf-dash-hero-action-icon">
+            <IconPlus size={26} />
+          </span>
+          <strong>Crear torneo</strong>
+          <span>Nueva práctica</span>
+        </Link>
+        <Link href={`/operator${query}`} className="bf-dash-hero-action">
+          <span className="bf-dash-hero-action-icon">
+            <IconUpload size={26} />
+          </span>
+          <strong>Abrir Operator</strong>
+          <span>Cargar games</span>
+        </Link>
+        <Link href={`/standings${query}`} className="bf-dash-hero-action">
+          <span className="bf-dash-hero-action-icon">
+            <IconStandings size={26} />
+          </span>
+          <strong>Abrir Standings</strong>
+          <span>Tabla general</span>
+        </Link>
+        <Link href={`/stream${query}`} className="bf-dash-hero-action">
+          <span className="bf-dash-hero-action-icon">
+            <IconStream size={26} />
+          </span>
+          <strong>Abrir Stream</strong>
+          <span>Vista broadcast</span>
+        </Link>
       </section>
 
       <footer className="bf-dash-footer">

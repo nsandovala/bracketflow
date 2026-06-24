@@ -96,8 +96,8 @@ export default function AppTopbar({
 
         {showBackendStatus ? (
           <StatusBadge
-            tone={backendOnline ? "success" : "pending"}
-            label={backendOnline ? "Backend online" : "Backend offline"}
+            tone={backendOnline ? "live" : "pending"}
+            label={backendOnline ? "EN VIVO" : "SIN CONEXIÓN"}
           />
         ) : null}
       </div>

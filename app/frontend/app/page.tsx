@@ -84,13 +84,12 @@ export default function Home() {
           <SectionHeader
             eyebrow="Main Mode"
             title="World Series Practice"
-            subtitle="Una interfaz clara para crear practicas, cargar games y compartir standings sin ruido visual."
+            subtitle="Tu torneo, listo para transmitir. Carga partidas, calcula puntos y saca standings al stream en segundos."
           />
 
           <div className="bf-chip-cloud">
             <StatusBadge tone="live" label="Warzone LATAM" />
             <StatusBadge tone="neutral" label="Operator / Standings / Stream" />
-            <StatusBadge tone="success" label="Backend funcional" />
           </div>
 
           <form className="bf-form bf-home-form" onSubmit={handleCreateTournament}>
@@ -170,8 +169,7 @@ export default function Home() {
       <GlassPanel className="bf-home-secondary">
         <SectionHeader
           eyebrow="Otros Modos"
-          title="Documentados, no prioritarios"
-          subtitle="Siguen presentes como referencia, pero la energia del MVP esta en World Series Practice."
+          title="Formatos alternativos"
         />
 
         <div className="bf-hub-options">
