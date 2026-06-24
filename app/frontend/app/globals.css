@@ -2554,11 +2554,19 @@ a:focus-visible {
     linear-gradient(180deg, var(--amon-bg), var(--amon-bg-deep));
 }
 
+/* El fondo ambiental queda DETRÁS de todo el contenido del operator.
+   z-index:-1 es relativo al stacking context de .bf-page-operator (z:1),
+   por lo que no traspasa al root y el gradiente sigue siendo visible. */
+.bf-page-operator > .opr-amb { z-index: -1; }
+
 /* El contenido del operator queda sobre el gradiente ambiental. */
 .bf-page-operator {
   position: relative;
   z-index: 1;
 }
+
+/* Forzar que los hijos directos queden sobre .opr-amb (z:-1). */
+.bf-page-operator > *:not(.opr-amb) { position: relative; z-index: 1; }
 
 /* ---- Command bar sticky ---- */
 .opr-command {
