@@ -422,8 +422,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       });
       setMessage(`Reporte guardado: ${teams.find((team) => team.id === teamId)?.name ?? "equipo"}`);
       return result;
-    } catch {
-      setMessage("No se pudo guardar el reporte.");
+    } catch (error) {
+      // El backend devuelve 409 (placement duplicado) con un detail explicativo;
+      // request() lo propaga como Error.message. Surfacearlo en vez del genérico.
+      setMessage(error instanceof Error ? error.message : "No se pudo guardar el reporte.");
       return null;
     } finally {
       setSubmitting(false);

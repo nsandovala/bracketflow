@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEventHandler, useState } from "react";
+import { FormEventHandler, useMemo, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { Match, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { ResultDraft } from "../lib/useWorldSeriesPractice";
-
-import AppTopbar from "./AppTopbar";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
@@ -84,6 +84,7 @@ export default function WorldSeriesOperator({
   onCreateNextGame,
 }: WorldSeriesOperatorProps) {
   const tournamentQuery = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
+  const pathname = usePathname();
 
   const [mode, setMode] = useState<OperatorMode>("op");
   const [filter, setFilter] = useState<ResultFilter>("all");
@@ -93,28 +94,86 @@ export default function WorldSeriesOperator({
   const progressPct = totalTeams > 0 ? (reportsLoaded / totalTeams) * 100 : 0;
   const visibleTeams = filter === "pending" ? pendingTeams : teams;
 
+  const gameStats = useMemo(() => {
+    if (activeMatchResults.length === 0) {
+      return null;
+    }
+    const leader = activeMatchResults.reduce((best, result) =>
+      result.total_points > best.total_points ? result : best
+    );
+    const totalKills = activeMatchResults.reduce((sum, result) => sum + result.kills, 0);
+    const bestPlacement = activeMatchResults.reduce(
+      (min, result) => (result.placement < min ? result.placement : min),
+      activeMatchResults[0].placement
+    );
+    const bestPlacementResult = activeMatchResults.find(
+      (result) => result.placement === bestPlacement
+    );
+    return { leader, totalKills, bestPlacement, bestPlacementResult };
+  }, [activeMatchResults]);
+
+  const leaderTeam = gameStats
+    ? teams.find((team) => team.id === gameStats.leader.team_id)
+    : undefined;
+
   return (
     <main className="bf-page bf-page-operator">
       <div className="opr-amb" aria-hidden="true" />
 
-      <AppTopbar
-        title="BracketFlow"
-        subtitle={selectedTournament ? selectedTournament.name : "World Series Practice"}
-        navLinks={[
-          { href: "/", label: "Hub" },
-          { href: "/operator", label: "Operator" },
-          { href: `/standings${tournamentQuery}`, label: "Standings" },
-          { href: `/stream${tournamentQuery}`, label: "Stream" },
-        ]}
-        backHref="/"
-        showBackendStatus
-        backendOnline={backendOnline}
-        tournamentSelector={{
-          tournaments,
-          selectedTournamentId,
-          onSelectTournament,
-        }}
-      />
+      <div className="opr-topbar">
+        <div className="opr-brand">
+          <span className="opr-brand-mark">BF</span>
+          <div className="opr-brand-copy">
+            <div className="opr-brand-name">BracketFlow</div>
+            <div className="opr-brand-sub">
+              {selectedTournament ? selectedTournament.name : "World Series Practice"}
+            </div>
+          </div>
+        </div>
+
+        <nav className="opr-nav" aria-label="Primary">
+          <Link href="/" className={pathname === "/" ? "is-active" : ""}>
+            Hub
+          </Link>
+          <Link href="/operator" className={pathname === "/operator" ? "is-active" : ""}>
+            Operator
+          </Link>
+          <Link
+            href={`/standings${tournamentQuery}`}
+            className={pathname === "/standings" ? "is-active" : ""}
+          >
+            Standings
+          </Link>
+          <Link
+            href={`/stream${tournamentQuery}`}
+            className={pathname === "/stream" ? "is-active" : ""}
+          >
+            Stream
+          </Link>
+        </nav>
+
+        <div className="opr-topbar-side">
+          {tournaments.length > 0 ? (
+            <label className="opr-select">
+              <span>Torneo</span>
+              <select
+                value={selectedTournamentId ?? ""}
+                onChange={(event) => onSelectTournament(Number(event.target.value))}
+              >
+                {tournaments.map((tournament) => (
+                  <option key={tournament.id} value={tournament.id}>
+                    {tournament.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <span className={`opr-backend ${backendOnline ? "is-on" : "is-off"}`}>
+            <i />
+            {backendOnline ? "Backend online" : "Backend offline"}
+          </span>
+        </div>
+      </div>
 
       {message ? <p className="bf-message">{message}</p> : null}
 
@@ -154,6 +213,57 @@ export default function WorldSeriesOperator({
               Crear Game {nextGameNumber} <span className="arrow">→</span>
             </button>
           </section>
+
+          <div className="opr-stats">
+            <div className={`opr-stat${gameStats ? "" : " is-empty"}`}>
+              <span className="opr-stat-ico" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+              </span>
+              <div className="opr-stat-body">
+                <div className="opr-stat-label">Líder del game</div>
+                <div className="opr-stat-value">
+                  {gameStats ? (
+                    <>
+                      {gameStats.leader.team_name} · <em>{gameStats.leader.total_points.toFixed(1)}</em> pts
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </div>
+                {gameStats && leaderTeam ? (
+                  <div className="opr-stat-sub">{rosterText(leaderTeam)}</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={`opr-stat${gameStats ? "" : " is-empty"}`}>
+              <span className="opr-stat-ico" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 13c0-1 1-2 2-2s2 1 2 2-1 5 5 5 5-4 5-5 1-2 2-2 2 1 2 2c0 3.5-3 6-9 6s-9-2.5-9-6Z"/><path d="M12 2v4"/><path d="m4.93 6.93 1.41 1.41"/><path d="m17.66 8.34 1.41-1.41"/></svg>
+              </span>
+              <div className="opr-stat-body">
+                <div className="opr-stat-label">Kills totales del game</div>
+                <div className="opr-stat-value">{gameStats ? gameStats.totalKills : "—"}</div>
+                {gameStats ? (
+                  <div className="opr-stat-sub">sumados de {activeMatchResults.length} reportes</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className={`opr-stat${gameStats ? "" : " is-empty"}`}>
+              <span className="opr-stat-ico" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>
+              </span>
+              <div className="opr-stat-body">
+                <div className="opr-stat-label">Mejor placement reportado</div>
+                <div className="opr-stat-value">
+                  {gameStats ? <em>#{gameStats.bestPlacement}</em> : "—"}
+                </div>
+                {gameStats && gameStats.bestPlacementResult ? (
+                  <div className="opr-stat-sub">por {gameStats.bestPlacementResult.team_name}</div>
+                ) : null}
+              </div>
+            </div>
+          </div>
 
           {/* ---- Toggle modo + filtro ---- */}
           <div className="opr-controls">

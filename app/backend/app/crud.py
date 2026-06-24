@@ -373,6 +373,21 @@ def build_team_result_schema(
     )
 
 
+def get_conflicting_placement(
+    db: Session, match_id: int, placement: int, team_id: int
+) -> models.TeamResult | None:
+    """Otro equipo del mismo game con ese placement (excluye al propio equipo)."""
+    return (
+        db.query(models.TeamResult)
+        .filter(
+            models.TeamResult.match_id == match_id,
+            models.TeamResult.placement == placement,
+            models.TeamResult.team_id != team_id,
+        )
+        .first()
+    )
+
+
 def upsert_team_result(
     db: Session,
     tournament: models.Tournament,

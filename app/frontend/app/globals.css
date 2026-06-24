@@ -2699,15 +2699,58 @@ a:focus-visible {
 .opr-teamcard .n { font-family: var(--amon-font-display); font-weight: 700; letter-spacing: .03em; color: var(--amon-text); }
 .opr-teamcard .r { font-size: .8rem; color: var(--amon-muted); }
 
+/* ---- Nav compacta (reemplaza AppTopbar en operator) ---- */
+.opr-topbar { display: flex; align-items: center; gap: 18px; height: 58px; padding: 0 4px; margin: 14px 0 16px; }
+.opr-brand { display: inline-flex; align-items: center; gap: 11px; flex-shrink: 0; }
+.opr-brand-mark {
+  display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+  border-radius: 11px; border: 1px solid var(--amon-line-strong);
+  background: linear-gradient(180deg, rgba(97, 242, 163, .14), rgba(97, 242, 163, .04)), var(--amon-surface);
+  color: var(--amon-accent); font-family: var(--amon-font-display); font-weight: 700; font-size: .95rem; letter-spacing: .06em;
+}
+.opr-brand-copy { display: grid; gap: 1px; }
+.opr-brand-name { font-family: var(--amon-font-display); font-weight: 700; font-size: .96rem; letter-spacing: .12em; text-transform: uppercase; color: var(--amon-text); line-height: 1; }
+.opr-brand-sub { font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; color: var(--amon-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+
+.opr-nav { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid var(--amon-line); background: rgba(255, 255, 255, .025); }
+.opr-nav a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 15px; border-radius: 999px; border: 1px solid transparent; color: var(--amon-muted); text-decoration: none; font-size: .86rem; font-weight: 500; transition: .15s; }
+.opr-nav a:hover { color: var(--amon-text); background: rgba(255, 255, 255, .04); }
+.opr-nav a.is-active { color: var(--amon-text); background: var(--amon-accent-dim); border-color: rgba(97, 242, 163, .22); }
+
+.opr-topbar-side { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; }
+.opr-select { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 12px 0 14px; border-radius: var(--amon-radius-md); border: 1px solid var(--amon-line); background: rgba(6, 10, 18, .6); }
+.opr-select span { color: var(--amon-faint); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; }
+.opr-select select { border: 0; background: transparent; color: var(--amon-text); font-size: .84rem; font-weight: 600; cursor: pointer; outline: none; max-width: 200px; }
+.opr-select select option { background: var(--amon-bg-deep); color: var(--amon-text); }
+
+.opr-backend { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(97, 242, 163, .2); background: var(--amon-accent-dim); color: var(--amon-text); font-size: .76rem; letter-spacing: .04em; white-space: nowrap; }
+.opr-backend i { width: 7px; height: 7px; border-radius: 999px; background: var(--amon-accent); box-shadow: 0 0 8px rgba(97, 242, 163, .6); }
+.opr-backend.is-off { border-color: var(--amon-cream-line); background: var(--amon-cream-dim); color: var(--amon-cream-soft); }
+.opr-backend.is-off i { background: var(--amon-cream-soft); box-shadow: none; }
+
+/* ---- Tira de 3 stats del game ---- */
+.opr-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.opr-stat { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-radius: var(--amon-radius-md); border: 1px solid var(--amon-glass-v2-border); background: rgba(255, 255, 255, .025); }
+.opr-stat-ico { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; border: 1px solid var(--amon-line-strong); background: rgba(255, 255, 255, .04); color: var(--amon-accent); }
+.opr-stat-body { display: grid; gap: 2px; min-width: 0; }
+.opr-stat-label { font-size: .66rem; letter-spacing: .12em; text-transform: uppercase; color: var(--amon-muted); font-weight: 600; }
+.opr-stat-value { font-family: var(--amon-font-display); font-weight: 700; font-size: 1.35rem; line-height: 1.05; color: var(--amon-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opr-stat-value em { font-style: normal; color: var(--amon-accent); }
+.opr-stat-sub { font-size: .72rem; color: var(--amon-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opr-stat.is-empty .opr-stat-value, .opr-stat.is-empty .opr-stat-ico { color: var(--amon-faint); }
+
 /* ---- Responsive ---- */
 @media (max-width: 1080px) {
   .opr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .opr-command { grid-template-columns: 1fr; gap: 16px; }
   .opr-progress { max-width: none; }
+  .opr-stats { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
   .opr-grid { grid-template-columns: 1fr; }
   .opr-form { grid-template-columns: 1fr; }
+  .opr-topbar { flex-wrap: wrap; height: auto; gap: 12px; }
+  .opr-topbar-side { margin-left: 0; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   .opr-bar i, .opr-next, .opr-card, .opr-save { transition: none; }
