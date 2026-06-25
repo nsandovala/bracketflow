@@ -13,21 +13,29 @@ const MOTORS = [
     id: "ws-classic",
     name: "World Series Clásico",
     tags: ["BR", "WSOW", "Squad fijo", "Acumulativo"],
+    status: "Disponible",
+    tone: "available",
   },
   {
     id: "resurgence-ws",
     name: "Resurgence / Rebirth WS",
     tags: ["Rebirth", "WSOW", "Squad fijo", "Acumulativo"],
+    status: "Experimental",
+    tone: "experimental",
   },
   {
     id: "gedeon-style",
     name: "Gedeon Style / Roulette WS",
     tags: ["Rebirth", "WSOW", "Ruleta", "Acumulativo"],
+    status: "Experimental",
+    tone: "experimental",
   },
   {
     id: "challonge",
     name: "Challonge Competitivo",
     tags: ["Kill Race", "Ruleta/Squad", "Single/Double Elim"],
+    status: "Próximamente",
+    tone: "soon",
   },
 ] as const;
 
@@ -39,6 +47,7 @@ const TOOLS = [
     name: "Discord Bot",
     sub: "Resultados y alertas en tiempo real",
     href: null,
+    status: "Próximamente",
     Icon: IconBell,
   },
   {
@@ -46,6 +55,7 @@ const TOOLS = [
     name: "Overlay OBS",
     sub: "Overlays oficiales listos para usar",
     href: "/stream",
+    status: "Disponible",
     Icon: IconStream,
   },
   {
@@ -53,6 +63,7 @@ const TOOLS = [
     name: "Caster Center",
     sub: "Recursos para casters",
     href: null,
+    status: "Próximamente",
     Icon: IconTeams,
   },
 ] as const;
@@ -64,6 +75,11 @@ export default function Home() {
     submitting,
     message,
     tournaments,
+    selectedTournamentId,
+    selectedTournament,
+    currentGameNumber,
+    reportsLoaded,
+    totalTeams,
     createWorldSeriesTournament,
   } = useWorldSeriesPractice();
 
@@ -129,7 +145,7 @@ export default function Home() {
         <div className="bf-hub-arena-h2" />
         <div className="bf-hub-arena-h3" />
         <div className="bf-hub-arena-particles">
-          <DashboardParticles count={22} speed={0.55} />
+          <DashboardParticles count={28} speed={0.5} />
         </div>
       </div>
 
@@ -144,13 +160,41 @@ export default function Home() {
 
       {/* ---- Hero ---- */}
       <section className="bf-hub-hero" ref={heroRef}>
-        <div className="bf-hub-hero-copy">
-          <span className="bf-hub-eyebrow">Ready to Operate</span>
-          <h2 className="bf-hub-title">BRACKETFLOW</h2>
-          <p className="bf-hub-os-label">Tournament Operating System</p>
+        <div className="bf-hub-command">
+          <div className="bf-hub-command-head">
+            <div>
+              <span className="bf-hub-eyebrow">Arena Control</span>
+              <h2 className="bf-hub-title">Command Deck</h2>
+            </div>
+            <span className={`bf-hub-command-state${selectedTournament ? " is-live" : ""}`}>
+              <i className="bf-op-dot" />
+              {selectedTournament ? "Operativo" : "En espera"}
+            </span>
+          </div>
+
           <p className="bf-hub-sub">
-            Carga partidas, calcula puntos y saca standings al stream en segundos.
+            Del lobby al leaderboard: resultados, standings y stream en un solo flujo.
           </p>
+
+          <div className="bf-hub-command-grid">
+            <div className="bf-hub-command-stat is-tournament">
+              <span>Torneo activo</span>
+              <strong>{selectedTournament?.name ?? "Sin práctica activa"}</strong>
+              <small>{selectedTournament?.game ?? "Crea una práctica para comenzar"}</small>
+            </div>
+            <div className="bf-hub-command-stat">
+              <span>Game actual</span>
+              <strong>{currentGameNumber > 0 ? `#${currentGameNumber}` : "—"}</strong>
+              <small>{currentGameNumber > 0 ? "Ronda en operación" : "Sin game abierto"}</small>
+            </div>
+            <div className="bf-hub-command-stat">
+              <span>Reportes cargados</span>
+              <strong>
+                {selectedTournament ? `${reportsLoaded}/${totalTeams}` : "—"}
+              </strong>
+              <small>{selectedTournament ? "Equipos reportados" : "Sin actividad"}</small>
+            </div>
+          </div>
         </div>
 
         <div className="bf-hub-hero-cta">
@@ -164,7 +208,10 @@ export default function Home() {
                 Crear práctica
               </button>
               {hasActiveTournament ? (
-                <Link href="/dashboard" className="bf-button bf-button-ghost bf-button-hero">
+                <Link
+                  href={`/dashboard${selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : ""}`}
+                  className="bf-button bf-button-ghost bf-button-hero"
+                >
                   Continuar torneo
                 </Link>
               ) : null}
@@ -271,12 +318,17 @@ export default function Home() {
             return (
               <article
                 key={motor.id}
-                className={`bf-hub-motor-card${motorsVisible ? " is-visible" : ""}`}
+                className={`bf-hub-motor-card is-${motor.tone}${motorsVisible ? " is-visible" : ""}`}
                 style={{ "--motor-i": i } as CSSProperties}
               >
-                <span className="bf-hub-motor-icon">
-                  <Icon size={20} />
-                </span>
+                <div className="bf-hub-motor-head">
+                  <span className="bf-hub-motor-icon">
+                    <Icon size={21} />
+                  </span>
+                  <span className={`bf-hub-motor-status is-${motor.tone}`}>
+                    {motor.status}
+                  </span>
+                </div>
                 <strong className="bf-hub-motor-name">{motor.name}</strong>
                 <ul className="bf-hub-motor-tags">
                   {motor.tags.map((tag) => (
@@ -288,7 +340,7 @@ export default function Home() {
                   className="bf-hub-motor-cta"
                   onClick={revealTournamentForm}
                 >
-                  Seleccionar <span aria-hidden="true">→</span>
+                  Seleccionar motor <span aria-hidden="true">→</span>
                 </button>
               </article>
             );
@@ -298,9 +350,12 @@ export default function Home() {
 
       {/* ---- Herramientas esenciales ---- */}
       <section className="bf-hub-tools">
-        <span className="bf-hub-section-kicker">Herramientas esenciales</span>
+        <div className="bf-hub-tools-head">
+          <span className="bf-hub-section-kicker">Ecosistema próximo</span>
+          <p>Módulos que expanden la operación sin salir del torneo.</p>
+        </div>
         <div className="bf-hub-tool-row">
-          {TOOLS.map(({ id, name, sub, href, Icon }) => {
+          {TOOLS.map(({ id, name, sub, href, status, Icon }) => {
             const content = (
               <>
                 <span className="bf-hub-tool-icon">
@@ -309,6 +364,11 @@ export default function Home() {
                 <span className="bf-hub-tool-copy">
                   <strong className="bf-hub-tool-name">{name}</strong>
                   <span className="bf-hub-tool-sub">{sub}</span>
+                </span>
+                <span
+                  className={`bf-hub-tool-state${status === "Disponible" ? " is-available" : ""}`}
+                >
+                  {status}
                 </span>
               </>
             );
@@ -320,7 +380,6 @@ export default function Home() {
             ) : (
               <div key={id} className="bf-hub-tool-item is-placeholder">
                 {content}
-                <span className="bf-hub-tool-state">Próximamente</span>
               </div>
             );
           })}

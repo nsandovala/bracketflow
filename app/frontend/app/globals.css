@@ -689,21 +689,34 @@ a:focus-visible {
 
 .bf-hub-hero {
   display: grid;
-  grid-template-columns: 1fr 360px;
-  align-items: flex-start;
-  gap: var(--amon-space-7);
-  padding: var(--amon-space-7);
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: stretch;
+  gap: var(--amon-space-5);
+  padding: var(--amon-space-6);
   margin-bottom: var(--amon-space-5);
   border-radius: var(--amon-radius-xl);
   border: 1px solid var(--amon-glass-v2-border);
-  background: var(--amon-glass-v2-bg);
+  background:
+    linear-gradient(145deg, rgba(95, 227, 154, 0.035), transparent 38%),
+    var(--amon-glass-v2-bg);
   backdrop-filter: var(--amon-glass-v2-blur);
   -webkit-backdrop-filter: var(--amon-glass-v2-blur);
-  box-shadow: var(--amon-glass-v2-shadow);
+  box-shadow:
+    var(--amon-glass-v2-shadow),
+    inset 0 0 80px rgba(35, 76, 105, 0.055);
 }
 
-.bf-hub-hero-copy {
+.bf-hub-command {
+  display: grid;
+  gap: var(--amon-space-5);
   min-width: 0;
+}
+
+.bf-hub-command-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--amon-space-4);
 }
 
 .bf-hub-eyebrow {
@@ -716,21 +729,100 @@ a:focus-visible {
 }
 
 .bf-hub-title {
-  margin: 0 0 var(--amon-space-2);
+  margin: 0;
   font-family: var(--amon-font-display);
   font-weight: 800;
-  font-size: 4.5rem;
-  line-height: 0.96;
-  letter-spacing: 0.04em;
+  font-size: clamp(2.4rem, 5vw, 4.4rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: var(--amon-text);
 }
 
 .bf-hub-sub {
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--amon-muted);
-  max-width: 40ch;
+  font-size: 1rem;
+  color: var(--amon-text-dim);
+  max-width: 62ch;
   line-height: 1.55;
+}
+
+.bf-hub-command-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--amon-line);
+  border-radius: 999px;
+  color: var(--amon-muted);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bf-hub-command-state .bf-op-dot {
+  background: var(--amon-faint);
+}
+
+.bf-hub-command-state.is-live {
+  border-color: rgba(95, 227, 154, 0.22);
+  color: var(--amon-text-dim);
+  background: rgba(95, 227, 154, 0.07);
+}
+
+.bf-hub-command-state.is-live .bf-op-dot {
+  background: var(--amon-accent);
+  box-shadow: 0 0 12px rgba(95, 227, 154, 0.48);
+}
+
+.bf-hub-command-grid {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.5fr) repeat(2, minmax(120px, 0.7fr));
+  gap: 10px;
+}
+
+.bf-hub-command-stat {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-height: 104px;
+  padding: 15px 17px;
+  border: 1px solid var(--amon-line);
+  border-radius: var(--amon-radius-md);
+  background: rgba(5, 10, 17, 0.28);
+}
+
+.bf-hub-command-stat > span {
+  color: var(--amon-faint);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bf-hub-command-stat strong {
+  overflow: hidden;
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: 1.55rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bf-hub-command-stat.is-tournament strong {
+  font-size: 1.18rem;
+}
+
+.bf-hub-command-stat small {
+  color: var(--amon-muted);
+  font-size: 0.7rem;
 }
 
 .bf-hub-form {
@@ -903,7 +995,8 @@ a:focus-visible {
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% -10%, rgba(21, 49, 79, 0.18), transparent 52%),
+    radial-gradient(ellipse at 50% -10%, rgba(21, 55, 88, 0.23), transparent 52%),
+    radial-gradient(ellipse at 92% 62%, rgba(14, 48, 57, 0.16), transparent 43%),
     linear-gradient(150deg, #0a0e16 0%, #0a111b 52%, #080c13 100%);
 }
 
@@ -919,7 +1012,7 @@ a:focus-visible {
   height: 700px;
   top: -280px;
   left: -180px;
-  background: radial-gradient(circle, rgba(25, 73, 116, 0.10), transparent 65%);
+  background: radial-gradient(circle, rgba(25, 73, 116, 0.14), transparent 65%);
   filter: blur(240px);
 }
 
@@ -928,7 +1021,7 @@ a:focus-visible {
   height: 600px;
   bottom: -200px;
   right: -120px;
-  background: radial-gradient(circle, rgba(30, 83, 75, 0.08), transparent 65%);
+  background: radial-gradient(circle, rgba(30, 83, 75, 0.11), transparent 65%);
   filter: blur(260px);
 }
 
@@ -938,32 +1031,25 @@ a:focus-visible {
   top: 32%;
   left: 42%;
   transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(95, 227, 154, 0.06), transparent 65%);
+  background: radial-gradient(circle, rgba(95, 227, 154, 0.075), transparent 65%);
   filter: blur(220px);
 }
 
 .bf-hub-arena-particles {
   position: absolute;
   inset: 0;
-  opacity: 0.12;
-}
-
-/* ---- Hero: OS label + CTA stack ---- */
-.bf-hub-os-label {
-  margin: 0 0 var(--amon-space-3);
-  font-family: var(--amon-font-display);
-  font-weight: 600;
-  font-size: 0.92rem;
-  letter-spacing: 0.20em;
-  text-transform: uppercase;
-  color: var(--amon-muted);
+  opacity: 0.17;
 }
 
 .bf-hub-hero-cta {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--amon-space-3);
-  padding-top: 8px;
+  padding: var(--amon-space-4);
+  border: 1px solid var(--amon-line);
+  border-radius: var(--amon-radius-lg);
+  background: rgba(5, 10, 17, 0.22);
 }
 
 .bf-hub-hero-cta .bf-button {
@@ -997,15 +1083,23 @@ a:focus-visible {
 .bf-hub-motor-card {
   display: flex;
   flex-direction: column;
-  gap: var(--amon-space-3);
-  padding: var(--amon-space-5);
+  gap: var(--amon-space-4);
+  min-height: 290px;
+  padding: 26px;
   border-radius: var(--amon-radius-lg);
   border: 1px solid var(--amon-glass-v2-border);
-  background: var(--amon-glass-v2-bg);
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012) 48%),
+    rgba(7, 12, 20, 0.48);
   backdrop-filter: var(--amon-glass-v2-blur);
   -webkit-backdrop-filter: var(--amon-glass-v2-blur);
-  box-shadow: var(--amon-glass-v2-shadow);
-  transition: border-color 160ms ease;
+  box-shadow:
+    var(--amon-glass-v2-shadow),
+    inset 0 0 50px rgba(38, 75, 104, 0.035);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
   opacity: 0;
 }
 
@@ -1015,7 +1109,19 @@ a:focus-visible {
 }
 
 .bf-hub-motor-card:hover {
-  border-color: rgba(95, 227, 154, 0.22);
+  transform: translateY(-3px);
+  border-color: rgba(95, 227, 154, 0.26);
+  box-shadow:
+    var(--amon-glass-v2-shadow),
+    inset 0 0 60px rgba(95, 227, 154, 0.035),
+    0 18px 46px rgba(0, 0, 0, 0.22);
+}
+
+.bf-hub-motor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--amon-space-3);
 }
 
 .bf-hub-motor-icon {
@@ -1031,10 +1137,35 @@ a:focus-visible {
   flex-shrink: 0;
 }
 
+.bf-hub-motor-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--amon-line);
+  border-radius: 999px;
+  color: var(--amon-muted);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.bf-hub-motor-status.is-available {
+  border-color: rgba(95, 227, 154, 0.24);
+  color: var(--amon-accent);
+  background: rgba(95, 227, 154, 0.07);
+}
+
+.bf-hub-motor-status.is-experimental {
+  color: var(--amon-text-dim);
+}
+
 .bf-hub-motor-name {
   font-family: var(--amon-font-display);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.2rem;
   letter-spacing: 0.02em;
   color: var(--amon-text);
   line-height: 1.3;
@@ -1046,13 +1177,14 @@ a:focus-visible {
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-content: flex-start;
+  gap: 7px;
   flex: 1;
 }
 
 .bf-hub-motor-tags li {
-  font-size: 0.7rem;
-  padding: 2px 8px;
+  font-size: 0.68rem;
+  padding: 4px 9px;
   border-radius: 999px;
   border: 1px solid var(--amon-line);
   color: var(--amon-muted);
@@ -1067,7 +1199,7 @@ a:focus-visible {
   width: fit-content;
   border: 0;
   background: transparent;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   letter-spacing: 0.10em;
   text-transform: uppercase;
   font-weight: 600;
@@ -1083,13 +1215,26 @@ a:focus-visible {
 /* ---- Herramientas esenciales ---- */
 .bf-hub-tools {
   display: grid;
-  gap: var(--amon-space-4);
+  gap: var(--amon-space-3);
   margin-bottom: var(--amon-space-5);
+}
+
+.bf-hub-tools-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--amon-space-4);
+}
+
+.bf-hub-tools-head p {
+  margin: 0;
+  color: var(--amon-faint);
+  font-size: 0.75rem;
 }
 
 .bf-hub-tool-row {
   display: flex;
-  gap: var(--amon-space-4);
+  gap: 10px;
 }
 
 .bf-hub-tool-item {
@@ -1099,16 +1244,22 @@ a:focus-visible {
   align-items: center;
   gap: var(--amon-space-3);
   flex: 1;
-  padding: var(--amon-space-4) var(--amon-space-5);
+  padding: 13px 15px;
   border-radius: var(--amon-radius-md);
   border: 1px solid var(--amon-line);
-  background: transparent;
+  background: rgba(6, 11, 18, 0.26);
   color: inherit;
   transition: border-color 160ms ease;
 }
 
 .bf-hub-tool-item:hover {
   border-color: var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.bf-hub-tool-item:not(.is-placeholder) {
+  border-color: rgba(95, 227, 154, 0.16);
+  background: linear-gradient(120deg, rgba(95, 227, 154, 0.045), rgba(6, 11, 18, 0.26));
 }
 
 .bf-hub-tool-item.is-placeholder {
@@ -1153,6 +1304,10 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.bf-hub-tool-state.is-available {
+  color: var(--amon-accent);
+}
+
 /* responsive: 2 cols at mid-width */
 @media (max-width: 1100px) {
   .bf-hub-motor-grid {
@@ -1165,6 +1320,20 @@ a:focus-visible {
     padding: var(--amon-space-5);
   }
 
+  .bf-hub-command-head,
+  .bf-hub-tools-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .bf-hub-command-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bf-hub-tool-row {
+    flex-direction: column;
+  }
+
   .bf-hub-tool-item {
     width: 100%;
   }
@@ -1174,6 +1343,7 @@ a:focus-visible {
   .bf-hub-motor-card {
     opacity: 1;
     animation: none;
+    transition: none;
   }
 
   .bf-hub-arena-particles {
