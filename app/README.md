@@ -5,6 +5,12 @@ BracketFlow es un MVP full-stack para gestionar torneos esports con dos modos ac
 - `single_elimination` para bracket clasico
 - `battle_royale_points`, `roulette_2v2` y `roulette_3v3` para Warzone con scoring por kills y placement
 
+## Filosofía de producto
+
+> Cada clic debe acercarte al torneo, nunca al software.
+
+La interfaz sigue el concepto **Arena OS**: control competitivo, calma con tensión elegante y profundidad visual sin estética gamer recargada.
+
 ## Stack
 
 - Frontend: Next.js App Router + TypeScript

@@ -689,8 +689,8 @@ a:focus-visible {
 
 .bf-hub-hero {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
+  grid-template-columns: 1fr 360px;
+  align-items: flex-start;
   gap: var(--amon-space-7);
   padding: var(--amon-space-7);
   margin-bottom: var(--amon-space-5);
@@ -716,12 +716,12 @@ a:focus-visible {
 }
 
 .bf-hub-title {
-  margin: 0 0 var(--amon-space-3);
+  margin: 0 0 var(--amon-space-2);
   font-family: var(--amon-font-display);
   font-weight: 800;
-  font-size: 3rem;
-  line-height: 1.04;
-  letter-spacing: 0.01em;
+  font-size: 4.5rem;
+  line-height: 0.96;
+  letter-spacing: 0.04em;
   color: var(--amon-text);
 }
 
@@ -864,7 +864,7 @@ a:focus-visible {
 
 @media (max-width: 720px) {
   .bf-hub-title {
-    font-size: 2.2rem;
+    font-size: 3rem;
   }
   .bf-hub-tournament-card {
     flex-direction: column;
@@ -875,6 +875,309 @@ a:focus-visible {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--amon-space-2);
+  }
+  .bf-hub-motor-grid {
+    grid-template-columns: 1fr;
+  }
+  .bf-hub-tool-row {
+    flex-direction: column;
+  }
+}
+
+/* ============================================================
+   Hub — Arena OS: background, hero CTA, motores, herramientas
+   ============================================================ */
+
+/* ---- Background halos (estáticos, sin JS) ---- */
+.bf-hub-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.bf-hub-page > .bf-hub-arena { z-index: -1; }
+.bf-hub-page > *:not(.bf-hub-arena) { position: relative; z-index: 1; }
+
+.bf-hub-arena {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(21, 49, 79, 0.18), transparent 52%),
+    linear-gradient(150deg, #0a0e16 0%, #0a111b 52%, #080c13 100%);
+}
+
+.bf-hub-arena-h1,
+.bf-hub-arena-h2,
+.bf-hub-arena-h3 {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.bf-hub-arena-h1 {
+  width: 900px;
+  height: 700px;
+  top: -280px;
+  left: -180px;
+  background: radial-gradient(circle, rgba(25, 73, 116, 0.10), transparent 65%);
+  filter: blur(240px);
+}
+
+.bf-hub-arena-h2 {
+  width: 700px;
+  height: 600px;
+  bottom: -200px;
+  right: -120px;
+  background: radial-gradient(circle, rgba(30, 83, 75, 0.08), transparent 65%);
+  filter: blur(260px);
+}
+
+.bf-hub-arena-h3 {
+  width: 560px;
+  height: 460px;
+  top: 32%;
+  left: 42%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(95, 227, 154, 0.06), transparent 65%);
+  filter: blur(220px);
+}
+
+.bf-hub-arena-particles {
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+}
+
+/* ---- Hero: OS label + CTA stack ---- */
+.bf-hub-os-label {
+  margin: 0 0 var(--amon-space-3);
+  font-family: var(--amon-font-display);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-hub-hero-cta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--amon-space-3);
+  padding-top: 8px;
+}
+
+.bf-hub-hero-cta .bf-button {
+  width: 100%;
+}
+
+.bf-hub-form-actions {
+  display: flex;
+  gap: var(--amon-space-3);
+  flex-wrap: wrap;
+}
+
+/* ---- 4 motores de torneo ---- */
+.bf-hub-motors {
+  display: grid;
+  gap: var(--amon-space-4);
+  margin-bottom: var(--amon-space-5);
+}
+
+.bf-hub-motor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--amon-space-4);
+}
+
+@keyframes bf-hub-reveal {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.bf-hub-motor-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--amon-space-3);
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+  transition: border-color 160ms ease;
+  opacity: 0;
+}
+
+.bf-hub-motor-card.is-visible {
+  animation: bf-hub-reveal 0.45s ease forwards;
+  animation-delay: calc(var(--motor-i, 0) * 90ms + 120ms);
+}
+
+.bf-hub-motor-card:hover {
+  border-color: rgba(95, 227, 154, 0.22);
+}
+
+.bf-hub-motor-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--amon-accent);
+  flex-shrink: 0;
+}
+
+.bf-hub-motor-name {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  color: var(--amon-text);
+  line-height: 1.3;
+}
+
+.bf-hub-motor-tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.bf-hub-motor-tags li {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  color: var(--amon-muted);
+  letter-spacing: 0.04em;
+}
+
+.bf-hub-motor-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  font-size: 0.72rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--amon-accent);
+  margin-top: auto;
+  padding-top: var(--amon-space-2);
+  transition: opacity 160ms ease;
+  cursor: pointer;
+}
+
+.bf-hub-motor-cta:hover { opacity: 0.72; }
+
+/* ---- Herramientas esenciales ---- */
+.bf-hub-tools {
+  display: grid;
+  gap: var(--amon-space-4);
+  margin-bottom: var(--amon-space-5);
+}
+
+.bf-hub-tool-row {
+  display: flex;
+  gap: var(--amon-space-4);
+}
+
+.bf-hub-tool-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--amon-space-3);
+  flex: 1;
+  padding: var(--amon-space-4) var(--amon-space-5);
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-line);
+  background: transparent;
+  color: inherit;
+  transition: border-color 160ms ease;
+}
+
+.bf-hub-tool-item:hover {
+  border-color: var(--amon-line-strong);
+}
+
+.bf-hub-tool-item.is-placeholder {
+  cursor: default;
+}
+
+.bf-hub-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--amon-radius-sm);
+  border: 1px solid var(--amon-line);
+  color: var(--amon-muted);
+}
+
+.bf-hub-tool-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bf-hub-tool-name {
+  font-family: var(--amon-font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  color: var(--amon-text);
+}
+
+.bf-hub-tool-sub {
+  font-size: 0.75rem;
+  color: var(--amon-faint);
+  line-height: 1.4;
+}
+
+.bf-hub-tool-state {
+  color: var(--amon-faint);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* responsive: 2 cols at mid-width */
+@media (max-width: 1100px) {
+  .bf-hub-motor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .bf-hub-hero {
+    padding: var(--amon-space-5);
+  }
+
+  .bf-hub-tool-item {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-hub-motor-card {
+    opacity: 1;
+    animation: none;
+  }
+
+  .bf-hub-arena-particles {
+    display: none;
   }
 }
 

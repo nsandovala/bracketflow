@@ -2,7 +2,15 @@
 
 import { useEffect, useRef } from "react";
 
-export default function DashboardParticles() {
+type DashboardParticlesProps = {
+  count?: number;
+  speed?: number;
+};
+
+export default function DashboardParticles({
+  count = 46,
+  speed = 1,
+}: DashboardParticlesProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -28,13 +36,13 @@ export default function DashboardParticles() {
     resize();
     window.addEventListener("resize", resize);
 
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < count; i++) {
       dots.push({
         x: Math.random() * w,
         y: Math.random() * h,
         r: Math.random() * 1.4 + 0.4,
-        vx: (Math.random() - 0.5) * 0.12,
-        vy: (Math.random() - 0.5) * 0.12,
+        vx: (Math.random() - 0.5) * 0.12 * speed,
+        vy: (Math.random() - 0.5) * 0.12 * speed,
         a: Math.random() * 0.5 + 0.15,
       });
     }
@@ -62,7 +70,7 @@ export default function DashboardParticles() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [count, speed]);
 
   return (
     <canvas
