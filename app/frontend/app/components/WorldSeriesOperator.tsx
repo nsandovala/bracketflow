@@ -170,7 +170,7 @@ export default function WorldSeriesOperator({
           ) : null}
           <span className={`opr-backend ${backendOnline ? "is-on" : "is-off"}`}>
             <i />
-            {backendOnline ? "Backend online" : "Backend offline"}
+            {backendOnline ? "EN VIVO" : "SIN CONEXIÓN"}
           </span>
         </div>
       </div>
@@ -280,7 +280,7 @@ export default function WorldSeriesOperator({
                 className={mode === "setup" ? "is-on" : ""}
                 onClick={() => setMode("setup")}
               >
-                Setup · Equipos
+                Equipos & Roster
               </button>
             </div>
 
