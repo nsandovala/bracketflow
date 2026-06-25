@@ -1,13 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import AppTopbar from "./components/AppTopbar";
-import GlassPanel from "./components/GlassPanel";
-import ModeCard from "./components/ModeCard";
-import SectionHeader from "./components/SectionHeader";
-import StatusBadge from "./components/StatusBadge";
 import { useWorldSeriesPractice } from "./lib/useWorldSeriesPractice";
 
 export default function Home() {
@@ -17,51 +13,18 @@ export default function Home() {
     submitting,
     message,
     tournaments,
-    selectedTournamentId,
-    selectedTournament,
     createWorldSeriesTournament,
-    selectTournament,
   } = useWorldSeriesPractice();
 
   const [tournamentName, setTournamentName] = useState("");
   const [tournamentGame, setTournamentGame] = useState("Warzone");
 
-  const activeQuery = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
-
-  const documentedModes = useMemo(
-    () => [
-      {
-        id: "classic",
-        label: "Classic Bracket",
-        description: "Documentado para eliminacion directa.",
-      },
-      {
-        id: "kill-race-2v2",
-        label: "Kill Race 2v2",
-        description: "Documentado para parejas con kills.",
-      },
-      {
-        id: "kill-race-3v3",
-        label: "Kill Race 3v3",
-        description: "Documentado para trios con kills.",
-      },
-      {
-        id: "round-robin",
-        label: "Round Robin",
-        description: "Proximamente.",
-      },
-    ],
-    []
-  );
-
   async function handleCreateTournament(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const created = await createWorldSeriesTournament({
       name: tournamentName,
       game: tournamentGame,
     });
-
     if (created) {
       setTournamentName("");
       setTournamentGame("Warzone");
@@ -72,121 +35,108 @@ export default function Home() {
     <main className="bf-page">
       <AppTopbar
         title="BracketFlow"
-        subtitle="World Series Practice para Warzone y esports LATAM."
+        subtitle="World Series Practice · Warzone LATAM"
         showBackendStatus
         backendOnline={backendOnline}
       />
 
       {message ? <p className="bf-message">{message}</p> : null}
 
-      <section className="bf-home-grid">
-        <GlassPanel className="bf-home-hero">
-          <SectionHeader
-            eyebrow="Main Mode"
-            title="World Series Practice"
-            subtitle="Tu torneo, listo para transmitir. Carga partidas, calcula puntos y saca standings al stream en segundos."
-          />
+      {/* ---- Hero: crear torneo ---- */}
+      <section className="bf-hub-hero">
+        <div className="bf-hub-hero-copy">
+          <span className="bf-hub-eyebrow">World Series Practice</span>
+          <h2 className="bf-hub-title">
+            Tu torneo,<br />listo para transmitir.
+          </h2>
+          <p className="bf-hub-sub">
+            Carga partidas, calcula puntos y saca standings al stream en segundos.
+          </p>
+        </div>
 
-          <div className="bf-chip-cloud">
-            <StatusBadge tone="live" label="Warzone LATAM" />
-            <StatusBadge tone="neutral" label="Operator / Standings / Stream" />
-          </div>
-
-          <form className="bf-form bf-home-form" onSubmit={handleCreateTournament}>
-            <div className="bf-form-grid">
-              <label className="bf-field">
-                <span>Nombre del torneo</span>
-                <input
-                  value={tournamentName}
-                  onChange={(event) => setTournamentName(event.target.value)}
-                  placeholder="WS Practice LATAM"
-                  required
-                />
-              </label>
-
-              <label className="bf-field">
-                <span>Juego</span>
-                <input
-                  value={tournamentGame}
-                  onChange={(event) => setTournamentGame(event.target.value)}
-                  placeholder="Warzone"
-                  required
-                />
-              </label>
-            </div>
-
-            <button type="submit" className="bf-button bf-button-primary" disabled={submitting}>
-              {submitting ? "Creando..." : "Crear torneo"}
-            </button>
-          </form>
-        </GlassPanel>
-
-        <GlassPanel className="bf-home-side">
-          <SectionHeader
-            eyebrow="Torneos Activos"
-            title="Practicas en curso"
-            subtitle="Selecciona un torneo y abre la vista que necesitas."
-          />
-
-          {loading ? <p className="bf-empty">Cargando torneos...</p> : null}
-          {!loading && tournaments.length === 0 ? (
-            <p className="bf-empty">Todavia no hay torneos World Series Practice.</p>
-          ) : null}
-
-          {!loading && tournaments.length > 0 ? (
-            <div className="bf-list">
-              {tournaments.map((tournament) => (
-                <button
-                  key={tournament.id}
-                  type="button"
-                  className={`bf-list-card ${selectedTournamentId === tournament.id ? "is-selected" : ""}`}
-                  onClick={() => selectTournament(tournament.id)}
-                >
-                  <strong>{tournament.name}</strong>
-                  <span>{tournament.game}</span>
-                  <small>{tournament.status}</small>
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {selectedTournament ? (
-            <div className="bf-home-cta-grid">
-              <Link href={`/operator${activeQuery}`} className="bf-button bf-button-primary">
-                Abrir Operator
-              </Link>
-              <Link href={`/standings${activeQuery}`} className="bf-button bf-button-ghost">
-                Abrir Standings
-              </Link>
-              <Link href={`/stream${activeQuery}`} className="bf-button bf-button-ghost">
-                Abrir Stream
-              </Link>
-            </div>
-          ) : null}
-        </GlassPanel>
+        <form className="bf-hub-form" onSubmit={handleCreateTournament}>
+          <label className="bf-field">
+            <span>Nombre del torneo</span>
+            <input
+              value={tournamentName}
+              onChange={(e) => setTournamentName(e.target.value)}
+              placeholder="WS Practice LATAM"
+              required
+            />
+          </label>
+          <label className="bf-field">
+            <span>Juego</span>
+            <input
+              value={tournamentGame}
+              onChange={(e) => setTournamentGame(e.target.value)}
+              placeholder="Warzone"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="bf-button bf-button-primary bf-button-hero"
+            disabled={submitting}
+          >
+            {submitting ? "Creando…" : "Crear torneo"}
+          </button>
+        </form>
       </section>
 
-      <GlassPanel className="bf-home-secondary">
-        <SectionHeader
-          eyebrow="Otros Modos"
-          title="Formatos alternativos"
-        />
+      {/* ---- Prácticas en curso ---- */}
+      {loading || tournaments.length > 0 ? (
+        <section className="bf-hub-active">
+          <span className="bf-hub-section-kicker">Prácticas en curso</span>
+          {loading ? (
+            <p className="bf-empty">Cargando torneos…</p>
+          ) : (
+            <div className="bf-hub-tournament-list">
+              {tournaments.map((tournament) => (
+                <article key={tournament.id} className="bf-hub-tournament-card">
+                  <div className="bf-hub-tournament-info">
+                    <strong className="bf-hub-tournament-name">{tournament.name}</strong>
+                    <span className="bf-hub-tournament-meta">
+                      <span className="bf-hub-tournament-game">{tournament.game}</span>
+                      <span className="bf-hub-tournament-status">{tournament.status}</span>
+                    </span>
+                  </div>
+                  <div className="bf-hub-tournament-actions">
+                    <Link
+                      href={`/operator?tournamentId=${tournament.id}`}
+                      className="bf-button bf-button-primary"
+                    >
+                      Operator
+                    </Link>
+                    <Link
+                      href={`/standings?tournamentId=${tournament.id}`}
+                      className="bf-button bf-button-ghost"
+                    >
+                      Standings
+                    </Link>
+                    <Link
+                      href={`/stream?tournamentId=${tournament.id}`}
+                      className="bf-button bf-button-ghost"
+                    >
+                      Stream
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
-        <div className="bf-hub-options">
-          {documentedModes.map((mode, index) => (
-            <ModeCard
-              key={mode.id}
-              index={index + 1}
-              label={mode.label}
-              description={mode.description}
-              selected={false}
-              disabled
-              badge="Secundario"
-              onSelect={() => {}}
-            />
-          ))}
+      {/* ---- Formatos alternativos (comprimido) ---- */}
+      <section className="bf-hub-formats">
+        <span className="bf-hub-section-kicker">Otros formatos</span>
+        <div className="bf-hub-format-chips">
+          <span className="bf-hub-format-chip">Classic Bracket</span>
+          <span className="bf-hub-format-chip">Kill Race 2v2</span>
+          <span className="bf-hub-format-chip">Kill Race 3v3</span>
+          <span className="bf-hub-format-chip">Round Robin</span>
         </div>
-      </GlassPanel>
+      </section>
     </main>
   );
 }

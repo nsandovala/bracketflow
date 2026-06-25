@@ -683,6 +683,201 @@ a:focus-visible {
   gap: 14px;
 }
 
+/* ============================================================
+   Hub redesign — cara de entrada (línea Amon)
+   ============================================================ */
+
+.bf-hub-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--amon-space-7);
+  padding: var(--amon-space-7);
+  margin-bottom: var(--amon-space-5);
+  border-radius: var(--amon-radius-xl);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.bf-hub-hero-copy {
+  min-width: 0;
+}
+
+.bf-hub-eyebrow {
+  display: inline-block;
+  margin-bottom: var(--amon-space-3);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amon-accent);
+}
+
+.bf-hub-title {
+  margin: 0 0 var(--amon-space-3);
+  font-family: var(--amon-font-display);
+  font-weight: 800;
+  font-size: 3rem;
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+  color: var(--amon-text);
+}
+
+.bf-hub-sub {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--amon-muted);
+  max-width: 40ch;
+  line-height: 1.55;
+}
+
+.bf-hub-form {
+  display: grid;
+  gap: var(--amon-space-3);
+  min-width: 300px;
+  max-width: 360px;
+}
+
+.bf-button-hero {
+  min-height: 52px;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+}
+
+/* ---- Prácticas en curso ---- */
+.bf-hub-active {
+  display: grid;
+  gap: var(--amon-space-3);
+  margin-bottom: var(--amon-space-5);
+}
+
+.bf-hub-section-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-hub-tournament-list {
+  display: grid;
+  gap: var(--amon-space-3);
+}
+
+.bf-hub-tournament-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--amon-space-5);
+  padding: var(--amon-space-4) var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.bf-hub-tournament-info {
+  display: flex;
+  align-items: center;
+  gap: var(--amon-space-4);
+  min-width: 0;
+}
+
+.bf-hub-tournament-name {
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  color: var(--amon-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-hub-tournament-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.bf-hub-tournament-game {
+  font-size: 0.78rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line-strong);
+  color: var(--amon-muted);
+}
+
+.bf-hub-tournament-status {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--amon-faint);
+  text-transform: uppercase;
+}
+
+.bf-hub-tournament-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---- Formatos alternativos (chip row) ---- */
+.bf-hub-formats {
+  display: grid;
+  gap: var(--amon-space-3);
+}
+
+.bf-hub-format-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bf-hub-format-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  color: var(--amon-faint);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 1140px) {
+  .bf-hub-hero {
+    grid-template-columns: 1fr;
+  }
+  .bf-hub-form {
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .bf-hub-title {
+    font-size: 2.2rem;
+  }
+  .bf-hub-tournament-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--amon-space-3);
+  }
+  .bf-hub-tournament-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--amon-space-2);
+  }
+}
+
 .bf-standings-shell {
   display: grid;
   gap: 10px;
