@@ -11,7 +11,6 @@ import {
   IconStream,
   IconTeams,
   IconTrophy,
-  IconUpload,
 } from "./icons";
 
 function parseTournamentId(value: string | null) {
@@ -89,7 +88,7 @@ export default function DashboardHome() {
           <div className="bf-dash-active-meta">
             <span>{selectedTournament?.game ?? "Selecciona o crea una práctica"}</span>
             <span aria-hidden="true">·</span>
-            <span>{gameNumber > 0 ? `Game ${gameNumber}` : "Sin game abierto"}</span>
+            <span>{gameNumber > 0 ? `Partida ${gameNumber}` : "Sin partida abierta"}</span>
             <span aria-hidden="true">·</span>
             <span>
               {leader ? (
@@ -109,7 +108,7 @@ export default function DashboardHome() {
             {selectedTournament ? `${reportsLoaded}/${totalTeams} resultados cargados` : "Sistema listo"}
           </span>
           <Link href={`/operator${query}`} className="bf-dash-operator-cta">
-            Ir a Operator
+            Ir a Operator · cargar {gameNumber > 0 ? `Partida ${gameNumber}` : "Partida 1"}
             <IconArrowRight size={17} />
           </Link>
         </div>
@@ -147,7 +146,7 @@ export default function DashboardHome() {
           <div className="bf-dash-stat-body">
             <span className="bf-dash-stat-label">Partidas jugadas</span>
             <span className="bf-dash-stat-value">{stat(gamesCount)}</span>
-            <span className="bf-dash-stat-sub">Games con resultados</span>
+            <span className="bf-dash-stat-sub">Partidas con resultados</span>
           </div>
         </article>
 
@@ -174,7 +173,7 @@ export default function DashboardHome() {
               <span className="bf-dash-section-label">Clasificación</span>
               <h3>Podio actual</h3>
             </div>
-            <span className="bf-dash-badge">{gameNumber > 0 ? `Game ${gameNumber}` : "Sin resultados"}</span>
+            <span className="bf-dash-badge">{gameNumber > 0 ? `Partida ${gameNumber}` : "Sin resultados"}</span>
           </div>
 
           {top3.length > 0 ? (
@@ -208,47 +207,6 @@ export default function DashboardHome() {
           </Link>
         </div>
 
-        <div className="bf-dash-actions-panel">
-          <div className="bf-dash-panel-heading">
-            <div>
-              <span className="bf-dash-section-label">Siguiente paso</span>
-              <h3>Continuar operación</h3>
-            </div>
-          </div>
-
-          <Link href={`/operator${query}`} className="bf-dash-action-primary">
-            <span className="bf-dash-action-icon">
-              <IconUpload size={24} />
-            </span>
-            <span>
-              <strong>Ir a Operator</strong>
-              <small>Cargar resultados del game actual</small>
-            </span>
-            <IconArrowRight size={18} />
-          </Link>
-
-          <div className="bf-dash-action-secondary">
-            <Link href={`/standings${query}`}>
-              <IconStandings size={18} />
-              <span>
-                <strong>Standings</strong>
-                <small>Clasificación completa</small>
-              </span>
-            </Link>
-            <Link href={`/stream${query}`}>
-              <IconStream size={18} />
-              <span>
-                <strong>Stream</strong>
-                <small>Vista de transmisión</small>
-              </span>
-            </Link>
-          </div>
-
-          <Link href="/torneos" className="bf-dash-action-small">
-            Gestionar torneos
-            <IconArrowRight size={15} />
-          </Link>
-        </div>
       </section>
 
       <section className="bf-dash-motors">
