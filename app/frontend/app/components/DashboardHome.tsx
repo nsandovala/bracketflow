@@ -7,7 +7,6 @@ import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
 import {
   IconArrowRight,
   IconDashboard,
-  IconPlus,
   IconStandings,
   IconStream,
   IconTeams,
@@ -25,6 +24,33 @@ function parseTournamentId(value: string | null) {
 
 const DASH = "—";
 
+const DASHBOARD_MOTORS = [
+  {
+    name: "World Series Clásico",
+    axes: "BR · WSOW · Squad fijo",
+    status: "Disponible",
+    Icon: IconTrophy,
+  },
+  {
+    name: "Resurgence / Rebirth WS",
+    axes: "Rebirth · WSOW · Squad fijo",
+    status: "Experimental",
+    Icon: IconDashboard,
+  },
+  {
+    name: "Gedeon Style / Roulette WS",
+    axes: "Rebirth · WSOW · Ruleta",
+    status: "Experimental",
+    Icon: IconTeams,
+  },
+  {
+    name: "Challonge Competitivo",
+    axes: "Kill Race · Single/Double Elim",
+    status: "Próximamente",
+    Icon: IconStandings,
+  },
+] as const;
+
 export default function DashboardHome() {
   const searchParams = useSearchParams();
   const preferredTournamentId = parseTournamentId(searchParams.get("tournamentId"));
@@ -33,12 +59,13 @@ export default function DashboardHome() {
     loading,
     tournaments,
     teams,
-    matches,
     selectedTournament,
     selectedTournamentId,
     sortedStandings,
     latestReportedRound,
     currentGameNumber,
+    reportsLoaded,
+    totalTeams,
   } = useWorldSeriesPractice(preferredTournamentId);
 
   const query = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
@@ -46,41 +73,48 @@ export default function DashboardHome() {
   const stat = (value: number) => (loading ? DASH : String(value));
   const tournamentsCount = tournaments.length;
   const teamsCount = teams.length;
-  const gamesCount = matches.length;
+  const gamesCount = latestReportedRound;
 
   const top3 = sortedStandings.slice(0, 3);
   const gameNumber = currentGameNumber || latestReportedRound;
+  const leader = top3[0];
+  const streamReady = Boolean(selectedTournament);
 
   return (
-    <div className="bf-dash">
-      {/* ---- Franja de estado (1 línea) ---- */}
-      <div className="bf-dash-statline">
-        <span className="bf-dash-statline-name">
-          {selectedTournament ? selectedTournament.name : "Sin torneo activo"}
-        </span>
-        {selectedTournament ? (
-          <>
-            <span className="bf-dash-statline-sep" aria-hidden="true">·</span>
-            <span className="bf-dash-badge">{selectedTournament.game}</span>
-            {gameNumber > 0 ? (
-              <span className="bf-dash-badge is-live">
-                <i className="bf-op-dot" />
-                Game {gameNumber}
-              </span>
-            ) : null}
-            {top3[0] ? (
-              <>
-                <span className="bf-dash-statline-sep" aria-hidden="true">·</span>
-                <span className="bf-dash-statline-leader">
-                  Líder: <strong>{top3[0].team_name}</strong>
-                </span>
-              </>
-            ) : null}
-          </>
-        ) : null}
-      </div>
+    <div className="bf-dash bf-dash-v2">
+      <section className="bf-dash-active">
+        <div className="bf-dash-active-main">
+          <span className="bf-dash-section-label">Práctica activa</span>
+          <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
+          <div className="bf-dash-active-meta">
+            <span>{selectedTournament?.game ?? "Selecciona o crea una práctica"}</span>
+            <span aria-hidden="true">·</span>
+            <span>{gameNumber > 0 ? `Game ${gameNumber}` : "Sin game abierto"}</span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {leader ? (
+                <>
+                  Líder: <strong>{leader.team_name}</strong>
+                </>
+              ) : (
+                "Sin líder todavía"
+              )}
+            </span>
+          </div>
+        </div>
 
-      {/* ---- Fila de stat-cards ---- */}
+        <div className="bf-dash-active-side">
+          <span className="bf-dash-results-state">
+            <i className="bf-op-dot" />
+            {selectedTournament ? `${reportsLoaded}/${totalTeams} resultados cargados` : "Sistema listo"}
+          </span>
+          <Link href={`/operator${query}`} className="bf-dash-operator-cta">
+            Ir a Operator
+            <IconArrowRight size={17} />
+          </Link>
+        </div>
+      </section>
+
       <section className="bf-dash-stats">
         <article className="bf-dash-stat">
           <span className="bf-dash-stat-icon">
@@ -89,7 +123,7 @@ export default function DashboardHome() {
           <div className="bf-dash-stat-body">
             <span className="bf-dash-stat-label">Torneos activos</span>
             <span className="bf-dash-stat-value">{stat(tournamentsCount)}</span>
-            <span className="bf-dash-stat-sub">World Series Practice</span>
+            <span className="bf-dash-stat-sub">Operación World Series</span>
           </div>
         </article>
 
@@ -113,79 +147,136 @@ export default function DashboardHome() {
           <div className="bf-dash-stat-body">
             <span className="bf-dash-stat-label">Partidas jugadas</span>
             <span className="bf-dash-stat-value">{stat(gamesCount)}</span>
-            <span className="bf-dash-stat-sub">Games cargados en esta práctica</span>
+            <span className="bf-dash-stat-sub">Games con resultados</span>
+          </div>
+        </article>
+
+        <article className="bf-dash-stat is-stream">
+          <span className="bf-dash-stat-icon">
+            <IconStream size={22} />
+          </span>
+          <div className="bf-dash-stat-body">
+            <span className="bf-dash-stat-label">Stream listo</span>
+            <span className="bf-dash-stat-value is-state">
+              {loading ? DASH : streamReady ? "LISTO" : "ESPERA"}
+            </span>
+            <span className="bf-dash-stat-sub">
+              {streamReady ? "Sistema listo para transmisión" : "Activa una práctica"}
+            </span>
           </div>
         </article>
       </section>
 
-      {/* ---- Podio Top 3 ---- */}
-      <section className="bf-dash-podio">
-        <span className="bf-dash-podio-kicker">Podio</span>
-        {top3.length > 0 ? (
-          <div className="bf-dash-podio-grid">
-            {top3.map((entry, index) => (
-              <article
-                key={entry.team_id}
-                className={`bf-dash-podio-card${index === 0 ? " is-champion" : ""}`}
-              >
-                <span className="bf-dash-rank">{index + 1}</span>
-                <div className="bf-dash-team">
-                  <span className="bf-dash-team-name">{entry.team_name}</span>
-                  <span className="bf-dash-team-roster">
-                    {entry.players.length > 0 ? entry.players.join(" / ") : "Roster pendiente"}
-                  </span>
-                </div>
-                <span className="bf-dash-podio-pts">{entry.total_points.toFixed(1)}</span>
-              </article>
-            ))}
+      <section className="bf-dash-workspace">
+        <div className="bf-dash-podium-panel">
+          <div className="bf-dash-panel-heading">
+            <div>
+              <span className="bf-dash-section-label">Clasificación</span>
+              <h3>Podio actual</h3>
+            </div>
+            <span className="bf-dash-badge">{gameNumber > 0 ? `Game ${gameNumber}` : "Sin resultados"}</span>
           </div>
-        ) : (
-          <p className="bf-dash-empty">
-            {loading ? "Cargando podio…" : "Todavía no hay resultados para este torneo."}
-          </p>
-        )}
-        <Link href={`/standings${query}`} className="bf-dash-cta">
-          Ver clasificación completa
-          <IconArrowRight size={16} />
-        </Link>
+
+          {top3.length > 0 ? (
+            <div className="bf-dash-podium-list">
+              {top3.map((entry, index) => (
+                <article
+                  key={entry.team_id}
+                  className={`bf-dash-podium-row${index === 0 ? " is-leader" : ""}`}
+                >
+                  <span className="bf-dash-rank">{index + 1}</span>
+                  <div className="bf-dash-team">
+                    <span className="bf-dash-team-name">{entry.team_name}</span>
+                    <span className="bf-dash-team-roster">
+                      {entry.players.length > 0 ? entry.players.join(" / ") : "Roster pendiente"}
+                    </span>
+                  </div>
+                  <span className="bf-dash-podium-kills">{entry.kills} K</span>
+                  <span className="bf-dash-podio-pts">{entry.total_points.toFixed(1)}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="bf-dash-empty">
+              {loading ? "Cargando clasificación…" : "Todavía no hay resultados cargados."}
+            </p>
+          )}
+
+          <Link href={`/standings${query}`} className="bf-dash-cta">
+            Ver clasificación completa
+            <IconArrowRight size={16} />
+          </Link>
+        </div>
+
+        <div className="bf-dash-actions-panel">
+          <div className="bf-dash-panel-heading">
+            <div>
+              <span className="bf-dash-section-label">Siguiente paso</span>
+              <h3>Continuar operación</h3>
+            </div>
+          </div>
+
+          <Link href={`/operator${query}`} className="bf-dash-action-primary">
+            <span className="bf-dash-action-icon">
+              <IconUpload size={24} />
+            </span>
+            <span>
+              <strong>Ir a Operator</strong>
+              <small>Cargar resultados del game actual</small>
+            </span>
+            <IconArrowRight size={18} />
+          </Link>
+
+          <div className="bf-dash-action-secondary">
+            <Link href={`/standings${query}`}>
+              <IconStandings size={18} />
+              <span>
+                <strong>Standings</strong>
+                <small>Clasificación completa</small>
+              </span>
+            </Link>
+            <Link href={`/stream${query}`}>
+              <IconStream size={18} />
+              <span>
+                <strong>Stream</strong>
+                <small>Vista de transmisión</small>
+              </span>
+            </Link>
+          </div>
+
+          <Link href="/torneos" className="bf-dash-action-small">
+            Gestionar torneos
+            <IconArrowRight size={15} />
+          </Link>
+        </div>
       </section>
 
-      {/* ---- 4 acciones héroe ---- */}
-      <section className="bf-dash-hero-actions">
-        <Link href="/" className="bf-dash-hero-action">
-          <span className="bf-dash-hero-action-icon">
-            <IconPlus size={26} />
-          </span>
-          <strong>Crear torneo</strong>
-          <span>Nueva práctica</span>
-        </Link>
-        <Link href={`/operator${query}`} className="bf-dash-hero-action">
-          <span className="bf-dash-hero-action-icon">
-            <IconUpload size={26} />
-          </span>
-          <strong>Abrir Operator</strong>
-          <span>Cargar games</span>
-        </Link>
-        <Link href={`/standings${query}`} className="bf-dash-hero-action">
-          <span className="bf-dash-hero-action-icon">
-            <IconStandings size={26} />
-          </span>
-          <strong>Abrir Standings</strong>
-          <span>Tabla general</span>
-        </Link>
-        <Link href={`/stream${query}`} className="bf-dash-hero-action">
-          <span className="bf-dash-hero-action-icon">
-            <IconStream size={26} />
-          </span>
-          <strong>Abrir Stream</strong>
-          <span>Vista broadcast</span>
-        </Link>
-      </section>
+      <section className="bf-dash-motors">
+        <div className="bf-dash-panel-heading">
+          <div>
+            <span className="bf-dash-section-label">Taxonomía operativa</span>
+            <h3>Motores de torneo</h3>
+          </div>
+          <span className="bf-dash-motors-note">Informativo</span>
+        </div>
 
-      <footer className="bf-dash-footer">
-        <span>© BracketFlow</span>
-        <span>World Series Practice · esports LATAM</span>
-      </footer>
+        <div className="bf-dash-motors-grid">
+          {DASHBOARD_MOTORS.map(({ name, axes, status, Icon }) => (
+            <article key={name} className="bf-dash-motor">
+              <span className="bf-dash-motor-icon">
+                <Icon size={18} />
+              </span>
+              <span className="bf-dash-motor-copy">
+                <strong>{name}</strong>
+                <small>{axes}</small>
+              </span>
+              <span className={`bf-dash-motor-status${status === "Disponible" ? " is-ready" : ""}`}>
+                {status}
+              </span>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

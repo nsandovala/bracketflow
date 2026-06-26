@@ -16,8 +16,8 @@ function parseTournamentId(value: string | null) {
 
 const ROUTE_COPY: Record<string, { title: string; subtitle: string }> = {
   "/dashboard": {
-    title: "Bienvenido de vuelta, Operator 👋",
-    subtitle: "Tu centro de control para torneos World Series Practice.",
+    title: "Dashboard Operativo",
+    subtitle: "Control rápido para prácticas World Series.",
   },
   "/torneos": {
     title: "Torneos",
