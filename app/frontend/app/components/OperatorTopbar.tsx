@@ -15,13 +15,17 @@ function parseTournamentId(value: string | null) {
 }
 
 const ROUTE_COPY: Record<string, { title: string; subtitle: string }> = {
+  "/": {
+    title: "BRACKETFLOW",
+    subtitle: "Tournament Operating System.",
+  },
   "/dashboard": {
     title: "Dashboard Operativo",
     subtitle: "Control rápido para prácticas World Series.",
   },
   "/torneos": {
     title: "Torneos",
-    subtitle: "Configura y administra tus competencias.",
+    subtitle: "Hub operativo para listar, seleccionar y crear torneos.",
   },
   "/equipos": {
     title: "Equipos",
@@ -41,7 +45,7 @@ function StandingsTopbarCopy() {
 
   const subtitle = selectedTournament
     ? `${selectedTournament.name} · ${
-        latestReportedRound > 0 ? `Después del Game ${latestReportedRound}` : "Sin games reportados"
+        latestReportedRound > 0 ? `Después de la Partida ${latestReportedRound}` : "Sin partidas reportadas"
       }`
     : "Selecciona un torneo activo.";
 

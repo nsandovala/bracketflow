@@ -18,7 +18,7 @@ export default function StandingsTable({ entries }: StandingsTableProps) {
         <span>Puntos</span>
         <span>Kills</span>
         <span>Best Place</span>
-        <span>Games</span>
+        <span>Partidas</span>
       </div>
 
       {entries.map((entry, index) => (

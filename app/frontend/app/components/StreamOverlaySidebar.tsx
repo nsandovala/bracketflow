@@ -77,12 +77,12 @@ export default function StreamOverlaySidebar({
   if (afterGameNumber === 0 || standings.length === 0) {
     return (
       <div className="bf-ov-empty-chip">
-        {afterGameNumber === 0 ? "Esperando Game 1" : "Sin datos"}
+        {afterGameNumber === 0 ? "Esperando Partida 1" : "Sin datos"}
       </div>
     );
   }
 
-  const gameLine = `${tournamentGame ?? "Warzone"} · After Game ${afterGameNumber}`;
+  const gameLine = `${tournamentGame ?? "Warzone"} · Tras Partida ${afterGameNumber}`;
   const brandLine = brand ?? "Gedeon Esport";
 
   return (

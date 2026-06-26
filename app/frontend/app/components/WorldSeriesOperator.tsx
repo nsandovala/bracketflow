@@ -186,14 +186,14 @@ export default function WorldSeriesOperator({
             <div className="opr-game">
               <div>
                 <div className="eye">Operando</div>
-                <strong>Game {currentGame}</strong>
+                <strong>Partida {currentGame}</strong>
               </div>
               <span className="t">{totalTeams} equipos</span>
             </div>
 
             <div className="opr-progress">
               <div className="opr-progress-top">
-                <span>Reportes del game</span>
+                <span>Reportes de la partida</span>
                 <b>
                   <em>{reportsLoaded}</em>/{totalTeams} cargados ·{" "}
                   <span className="opr-pending-n">{pendingCount}</span> pendientes
@@ -210,7 +210,7 @@ export default function WorldSeriesOperator({
               disabled={!canCreateNextGame || submitting}
               onClick={onCreateNextGame}
             >
-              Crear Game {nextGameNumber} <span className="arrow">→</span>
+              Crear Partida {nextGameNumber} <span className="arrow">→</span>
             </button>
           </section>
 
@@ -220,7 +220,7 @@ export default function WorldSeriesOperator({
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
               </span>
               <div className="opr-stat-body">
-                <div className="opr-stat-label">Líder del game</div>
+                <div className="opr-stat-label">Líder de la partida</div>
                 <div className="opr-stat-value">
                   {gameStats ? (
                     <>
@@ -241,7 +241,7 @@ export default function WorldSeriesOperator({
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 13c0-1 1-2 2-2s2 1 2 2-1 5 5 5 5-4 5-5 1-2 2-2 2 1 2 2c0 3.5-3 6-9 6s-9-2.5-9-6Z"/><path d="M12 2v4"/><path d="m4.93 6.93 1.41 1.41"/><path d="m17.66 8.34 1.41-1.41"/></svg>
               </span>
               <div className="opr-stat-body">
-                <div className="opr-stat-label">Kills totales del game</div>
+                <div className="opr-stat-label">Kills totales de la partida</div>
                 <div className="opr-stat-value">{gameStats ? gameStats.totalKills : "—"}</div>
                 {gameStats ? (
                   <div className="opr-stat-sub">sumados de {activeMatchResults.length} reportes</div>
@@ -408,7 +408,7 @@ export default function WorldSeriesOperator({
                 })}
               </div>
             ) : (
-              <p className="bf-empty">Crea el primer game para comenzar a cargar reportes.</p>
+              <p className="bf-empty">Crea la primera partida para comenzar a cargar reportes.</p>
             )
           ) : null}
 

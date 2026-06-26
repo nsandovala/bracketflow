@@ -28,8 +28,8 @@ export default function WorldSeriesStandings({
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
           <p>
             {afterGameNumber > 0
-              ? `Resultados acumulados después del Game ${afterGameNumber}.`
-              : "Los resultados aparecerán al reportar el primer game."}
+              ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
+              : "Los resultados aparecerán al reportar la primera partida."}
           </p>
         </div>
 

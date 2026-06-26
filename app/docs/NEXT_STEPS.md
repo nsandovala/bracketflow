@@ -1,59 +1,39 @@
 # Next Steps
 
-## Sprint actual
+## HECHO
 
-- Dashboard v2 completado como cockpit operator-first.
-- Siguiente foco: revisar visualmente Dashboard v2 con datos reales y decidir si Arena OS baja a Operator/Standings.
-- Auth sprint posterior: Neon Auth + RLS + ownership de torneos + migración SQLite→Postgres.
-
-## HECHO (sprints anteriores)
-
-- `ui(dashboard): operator-first cockpit v2` — `/dashboard` convertido en cabina operativa: topbar "Dashboard Operativo", franja de práctica activa con juego/game/líder y CTA a Operator, cuatro métricas superiores, podio compacto Top 3, acciones jerarquizadas y motores compactos informativos. Commit: `8cd5a56`.
-- `ui(hub): refine arena os hierarchy and visual depth` — Hub refinado con Command Deck, estado operativo real, jerarquía sin marca duplicada, motores con estados y mayor presencia, ecosistema compacto y fondo con más profundidad. Commit: `c894d60`.
-- `ui(hub): arena os — motores de torneo + ecosistema + fondo` — Hub completo con hero Tap Tap, formulario por progressive disclosure, cuatro motores visuales, herramientas esenciales y fondo minimalista de halos/partículas. Filosofía Arena OS registrada en README. Commit: `cae017c`.
-- `ui(shell): migra standings al shell operator + topbar contextual` — `/standings` migrado al route group `(operator)`, topbar contextual, selector de torneo preservado. Commit: `8b9b6c6`.
-- `fix(operator): opr-amb z-index, nav+stats visibles` — Commit: `c49df7e`.
-- `ui(dashboard): operador-first layout + copy esport, kill redundancia` — Dashboard reescrito: franja estado + podio Top 3 + 4 acciones héroe. Commit: `64b67d3`.
-- `ui(hub): rediseño cara de entrada esport` — Base previa del hero, prácticas en curso y navegación del hub. Commit: `9724da5`.
-- `ui: EN VIVO en operator + rename equipos&roster` — "Backend online"→"EN VIVO"/"SIN CONEXIÓN" en operator cockpit y "Setup · Equipos"→"Equipos & Roster". Commit: `13d90c2`.
+- Fase 1 IA presentacional: `/` ahora es HOME de marca/venta y no muestra formulario de creación.
+- `/torneos` ahora es hub operativo: lista torneos desde `useWorldSeriesPractice`, selecciona hacia `/dashboard` y muestra `+ Nuevo torneo` con progressive disclosure.
+- `/dashboard` quedó de-duplicado: una sola CTA a Operator, podio full-width y motores informativos intactos.
+- Sidebar: el lockup BF/BRACKETFLOW enlaza a `/`.
+- Topbar: mapa ruta→título ajustado para `/` y `/torneos`.
+- Decisión de lenguaje fijada: BracketFlow usa "Partida" en UI visible, no "Game". Variables, campos y endpoints se mantienen en inglés.
 
 ## ESTADO
 
-- Frontend lint verde.
-- Frontend production build verde.
-- `/dashboard` ahora responde a la pregunta operativa: torneo activo, estado, líder y siguiente paso.
-- Hub Arena OS refinado: Command Deck con torneo/game/reportes reales, tres acciones contextuales, form oculto hasta interacción, motores modulares y ecosistema próximo.
-- `/dashboard` y `/standings` comparten sidebar y shell.
-- `/operator` conserva su layout cockpit.
-- `/stream` OBS (sidebar y lower) conserva canvas transparente, sin shell.
-
-## VERIFICAR
-
-- `/`: hero con CTA "Crear práctica", "Continuar torneo" cuando exista uno activo y "Explorar motores"; el form no aparece hasta tocar Crear/Seleccionar.
-- `/`: cuatro motores, herramientas esenciales y fondo Arena OS sin efectos reactivos.
-- `/dashboard`: topbar "Dashboard Operativo", franja de práctica activa, 4 métricas, podio Top 3, acciones jerarquizadas, motores compactos.
-- `/dashboard`, `/standings` y `/operator`: sin regresión.
-- `/stream?tournamentId=1&obs=1&bg=transparent&layout=sidebar` y `layout=lower`: overlays intactos.
-
-```bash
-cd app/frontend
-PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run lint
-PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run build
-```
+- Fase actual limitada a presentación, routing y copy visible.
+- No se tocaron scoring, backend, auth, schemas, migraciones ni lógica de motores.
+- Los motores siguen siendo cards visuales.
+- `/stream` sigue fuera del shell operator; overlays OBS se mantienen como mundo broadcast independiente.
+- `app/docs/NEXT_STEPS.md` es la ruta documental existente en este repo.
 
 ## SIGUIENTE
 
-- QA visual de Dashboard v2 con datos reales de torneo.
-- Luego: Arena OS en Operator/Standings si el cockpit queda validado.
-- Después: sprint Auth con Neon.
+- Fase de motores: model lock → Rebirth → Roulette+pozo → Challonge.
 
 ## BLOQUEOS
 
-- El modelo definitivo de motores de torneo y sus variantes de scoring sigue pendiente de research.
-- No implementar esa lógica desde las cards del hub hasta cerrar contratos y reglas.
-- QA visual con navegador integrado no estuvo disponible; se validó por lint/build y HTML inicial/rutas.
+- Modelo definitivo de motores y contratos de scoring pendiente de cierre.
+- Roulette prize pool/respin queda fuera hasta la fase de motor correspondiente.
+- Auth/login al crear torneo queda para sprint aparte.
 
-## Regla de enfoque
+## VERIFICAR
 
-- Seguir el MAPA-MAESTRO: una fase a la vez.
-- Toda idea nueva va a `docs/PARKING_LOT.md` antes de entrar al sprint.
+- `npm run lint`
+- `npm run build`
+- Rutas 200: `/`, `/torneos`, `/dashboard`, `/operator`, `/standings`, `/equipos`, `/ajustes`.
+- Overlays intactos: `/stream?obs=1&bg=transparent&layout=sidebar` y `/stream?obs=1&bg=transparent&layout=lower` transparentes y sin shell.
+- Dashboard: una sola CTA "Ir a Operator · cargar Partida {n}", sin tiles de Standings/Stream ni "Gestionar torneos".
+- HOME: sin form de creación a la vista.
+- Torneos: lista vía reads existentes; "Nuevo torneo" abre el form existente.
+- UI visible: "Partida" aplicado de cara al usuario; nombres de código como `game_number`, `currentGameNumber` y `tournament.game` se mantienen.

@@ -38,13 +38,13 @@ export default function OperatorSidebar() {
 
   return (
     <aside className="bf-op-sidebar">
-      <div className="bf-op-brand">
+      <Link href="/" className="bf-op-brand">
         <span className="bf-op-brand-mark">BF</span>
         <span className="bf-op-brand-copy">
           <span className="bf-op-brand-name">BracketFlow</span>
           <span className="bf-op-brand-tag">Operator Suite</span>
         </span>
-      </div>
+      </Link>
 
       <nav className="bf-op-nav" aria-label="Navegación principal">
         {NAV_ITEMS.map(({ href, label, Icon }) => {

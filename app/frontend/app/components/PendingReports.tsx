@@ -33,7 +33,7 @@ export default function PendingReports({
     <GlassPanel as="aside" className="bf-control-rail">
       <SectionHeader
         eyebrow="Control"
-        title={currentGameNumber > 0 ? `Game ${currentGameNumber}` : "Game pendiente"}
+        title={currentGameNumber > 0 ? `Partida ${currentGameNumber}` : "Partida pendiente"}
         subtitle="Pendientes, avance y siguiente accion."
       />
 
@@ -66,12 +66,12 @@ export default function PendingReports({
         onClick={onCreateNextGame}
         disabled={!canCreateNextGame || submitting}
       >
-        {currentGameNumber === 0 ? "Crear Game 1" : `Crear Game ${nextGameNumber}`}
+        {currentGameNumber === 0 ? "Crear Partida 1" : `Crear Partida ${nextGameNumber}`}
       </button>
 
       {!canCreateNextGame && totalTeams > 0 ? (
         <p className="bf-inline-note">
-          Completa los reportes pendientes antes de abrir el siguiente game.
+          Completa los reportes pendientes antes de abrir la siguiente partida.
         </p>
       ) : null}
 

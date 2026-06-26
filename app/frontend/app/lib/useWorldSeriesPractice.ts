@@ -382,10 +382,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     try {
       const match = await createBattleRoyaleMatch(selectedTournamentId, { round: nextGameNumber });
       await refreshSelectedTournament(selectedTournamentId, { preferLatestMatch: true });
-      setMessage(`Game ${match.round} creado.`);
+      setMessage(`Partida ${match.round} creada.`);
       return match;
     } catch {
-      setMessage("No se pudo crear el siguiente game.");
+      setMessage("No se pudo crear la siguiente partida.");
       return null;
     } finally {
       setSubmitting(false);

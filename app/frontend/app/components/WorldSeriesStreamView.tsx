@@ -111,7 +111,7 @@ export default function WorldSeriesStreamView({
 
           <div className="bf-stream-status">
             <div className="bf-stream-badge">
-              <span>After Game</span>
+              <span>Tras Partida</span>
               <strong>{afterGameNumber}</strong>
             </div>
             <div className={`bf-stream-live${connected ? "" : " is-off"}`}>

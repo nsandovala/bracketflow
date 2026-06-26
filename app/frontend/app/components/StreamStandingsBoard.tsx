@@ -131,13 +131,13 @@ export default function StreamStandingsBoard({
     }
   };
 
-  // --- Estado vacio / pre-show: sin games reportados todavia ---
+  // --- Estado vacio / pre-show: sin partidas reportadas todavia ---
   if (afterGameNumber === 0 || visible.length === 0) {
     return (
       <div className="bf-stream-board is-empty">
         <div className="bf-stream-empty">
           <span className="bf-stream-empty-kicker">{tournamentName ?? "BracketFlow"}</span>
-          <h2 className="bf-stream-empty-title">Esperando Game 1</h2>
+          <h2 className="bf-stream-empty-title">Esperando Partida 1</h2>
           <span className="bf-stream-empty-sub">El leaderboard aparecera al cargar el primer reporte.</span>
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function StreamStandingsBoard({
         <span className="bf-stream-num">Pts</span>
         <span className="bf-stream-num">Kills</span>
         <span className="bf-stream-num">Best</span>
-        <span className="bf-stream-num">Games</span>
+        <span className="bf-stream-num">Partidas</span>
       </div>
 
       <div className="bf-stream-rows">

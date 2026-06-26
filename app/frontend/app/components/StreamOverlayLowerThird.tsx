@@ -36,7 +36,7 @@ export default function StreamOverlayLowerThird({
   if (afterGameNumber === 0 || standings.length === 0) {
     return (
       <div className="bf-ov-empty-chip">
-        {afterGameNumber === 0 ? "Esperando Game 1" : "Sin datos"}
+        {afterGameNumber === 0 ? "Esperando Partida 1" : "Sin datos"}
       </div>
     );
   }
@@ -48,7 +48,7 @@ export default function StreamOverlayLowerThird({
     visible.push({ entry: standings[idx], rank: idx + 1 });
   }
 
-  const gameLine = `After Game ${afterGameNumber}`;
+  const gameLine = `Tras Partida ${afterGameNumber}`;
   const brandLine = brand ?? "Gedeon Esport";
 
   return (
