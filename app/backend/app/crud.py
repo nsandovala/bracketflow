@@ -19,6 +19,13 @@ def normalize_team_size(format_name: str, requested_team_size: int) -> int:
     return requested_team_size
 
 
+def requires_unique_placement(tournament: models.Tournament) -> bool:
+    return (
+        tournament.scoring_profile == "wsow_like"
+        and tournament.format in WORLD_SERIES_FORMATS
+    )
+
+
 def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> models.Tournament:
     normalized_team_size = normalize_team_size(tournament.format, tournament.team_size)
     db_tournament = models.Tournament(

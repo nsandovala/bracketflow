@@ -46,6 +46,9 @@ export type Tournament = {
   format: TournamentFormat;
   team_size: number;
   scoring_profile: string;
+  config?: {
+    lobbySize?: number;
+  };
 };
 
 export type Player = {

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { Match, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
+import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
 import { ResultDraft } from "../lib/useWorldSeriesPractice";
 
 type WorldSeriesOperatorProps = {
@@ -21,6 +22,7 @@ type WorldSeriesOperatorProps = {
   reportsLoaded: number;
   totalTeams: number;
   canCreateNextGame: boolean;
+  selectedEngine: ResolvedTournamentEngine | null;
   nextGameNumber: number;
   submitting: boolean;
   teamName: string;
@@ -69,6 +71,7 @@ export default function WorldSeriesOperator({
   reportsLoaded,
   totalTeams,
   canCreateNextGame,
+  selectedEngine,
   nextGameNumber,
   submitting,
   teamName,
@@ -93,6 +96,10 @@ export default function WorldSeriesOperator({
   const pendingCount = pendingTeams.length;
   const progressPct = totalTeams > 0 ? (reportsLoaded / totalTeams) * 100 : 0;
   const visibleTeams = filter === "pending" ? pendingTeams : teams;
+  const usesPlacement = selectedEngine?.usesPlacement ?? true;
+  const effectiveLobbySize = selectedEngine
+    ? getEffectiveLobbySize(selectedEngine, totalTeams)
+    : totalTeams;
 
   const gameStats = useMemo(() => {
     if (activeMatchResults.length === 0) {
@@ -189,6 +196,11 @@ export default function WorldSeriesOperator({
                 <strong>Partida {currentGame}</strong>
               </div>
               <span className="t">{totalTeams} equipos</span>
+              <span className="t">
+                {selectedEngine?.scoringProfile === "kill_race"
+                  ? "Kill race"
+                  : `Lobby ${effectiveLobbySize}`}
+              </span>
             </div>
 
             <div className="opr-progress">
@@ -249,20 +261,33 @@ export default function WorldSeriesOperator({
               </div>
             </div>
 
-            <div className={`opr-stat${gameStats ? "" : " is-empty"}`}>
-              <span className="opr-stat-ico" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>
-              </span>
-              <div className="opr-stat-body">
-                <div className="opr-stat-label">Mejor placement reportado</div>
-                <div className="opr-stat-value">
-                  {gameStats ? <em>#{gameStats.bestPlacement}</em> : "—"}
+            {usesPlacement ? (
+              <div className={`opr-stat${gameStats ? "" : " is-empty"}`}>
+                <span className="opr-stat-ico" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>
+                </span>
+                <div className="opr-stat-body">
+                  <div className="opr-stat-label">Mejor placement reportado</div>
+                  <div className="opr-stat-value">
+                    {gameStats ? <em>#{gameStats.bestPlacement}</em> : "—"}
+                  </div>
+                  {gameStats && gameStats.bestPlacementResult ? (
+                    <div className="opr-stat-sub">por {gameStats.bestPlacementResult.team_name}</div>
+                  ) : null}
                 </div>
-                {gameStats && gameStats.bestPlacementResult ? (
-                  <div className="opr-stat-sub">por {gameStats.bestPlacementResult.team_name}</div>
-                ) : null}
               </div>
-            </div>
+            ) : (
+              <div className={`opr-stat${gameStats ? "" : " is-empty"}`}>
+                <span className="opr-stat-ico" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/></svg>
+                </span>
+                <div className="opr-stat-body">
+                  <div className="opr-stat-label">Regla de avance</div>
+                  <div className="opr-stat-value">Más kills</div>
+                  <div className="opr-stat-sub">Empates requieren desempate manual</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ---- Toggle modo + filtro ---- */}
@@ -339,7 +364,9 @@ export default function WorldSeriesOperator({
                   };
                   const estimatedTotal =
                     savedResult?.total_points.toFixed(1) ??
-                    estimateWorldSeriesPoints(draft.kills, draft.placement);
+                    (usesPlacement
+                      ? estimateWorldSeriesPoints(draft.kills, draft.placement)
+                      : draft.kills);
                   const isSaved = Boolean(savedResult);
                   const hasVal = estimatedTotal != null && estimatedTotal !== "";
 
@@ -373,22 +400,24 @@ export default function WorldSeriesOperator({
                             }
                           />
                         </div>
-                        <div className="opr-field">
-                          <label>Placement</label>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            value={draft.placement}
-                            placeholder="0"
-                            onChange={(event) =>
-                              onUpdateDraft(activeMatch.id, team.id, {
-                                placement: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
+                        {usesPlacement ? (
+                          <div className="opr-field">
+                            <label>Placement</label>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={draft.placement}
+                              placeholder={`1-${effectiveLobbySize}`}
+                              onChange={(event) =>
+                                onUpdateDraft(activeMatch.id, team.id, {
+                                  placement: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        ) : null}
                         <div className="opr-total">
-                          <label>Total</label>
+                          <label>{usesPlacement ? "Total" : "Kills"}</label>
                           <b className={hasVal ? "has-val" : ""}>{hasVal ? estimatedTotal : "—"}</b>
                         </div>
                       </div>

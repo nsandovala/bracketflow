@@ -61,6 +61,35 @@
 - No se deben crear todavia.
 - Antes hay que fijar eventos, contratos de datos, formatos de salida y puntos de integracion.
 - Cuando la base del producto este estable, se puede abrir un sprint especifico para stats prints, overlays u outputs automaticos.
+- Contrato futuro posible:
+
+```ts
+type ReportEvidence = {
+  type: "manual" | "screenshot" | "agent";
+  status: "none" | "pending" | "verified" | "rejected";
+  file_url?: string;
+  extracted_kills?: number;
+  extracted_placement?: number;
+};
+```
+
+- No implementar upload, OCR ni agentes hasta abrir un sprint especifico.
+
+## Juegos futuros
+
+- FIFA:
+  - scoring_profile probable: `head_to_head`.
+  - game_mode: `head_to_head`.
+  - estructuras posibles: single elim, double elim, ligas o grupos.
+  - No implementar ahora.
+- Valorant / CS:GO:
+  - scoring_profile probable: `rounds`.
+  - game_mode: `round_based`.
+  - metricas: rondas ganadas, mapas, BO1/BO3/BO5.
+  - No implementar ahora.
+- Fortnite:
+  - scoring_profile posible: `placement_points` o `custom`.
+  - No implementar ahora.
 
 ## Riesgos o temas diferidos
 

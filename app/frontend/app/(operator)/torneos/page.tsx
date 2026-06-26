@@ -98,13 +98,13 @@ export default function TorneosPage() {
       setTournamentName("");
       setTournamentGame("Warzone");
       setShowForm(false);
-      router.push(`/dashboard?tournamentId=${created.id}`);
+      router.push(`/operator?tournamentId=${created.id}`);
     }
   }
 
   function handleSelectTournament(tournamentId: number) {
     selectTournament(tournamentId);
-    router.push(`/dashboard?tournamentId=${tournamentId}`);
+    router.push(`/operator?tournamentId=${tournamentId}`);
   }
 
   return (
@@ -152,10 +152,16 @@ export default function TorneosPage() {
                     className="bf-button bf-button-primary"
                     onClick={() => handleSelectTournament(tournament.id)}
                   >
-                    Seleccionar
+                    Operar
                   </button>
                   <Link href={`/dashboard?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
                     Dashboard
+                  </Link>
+                  <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                    Standings
+                  </Link>
+                  <Link href={`/stream?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                    Stream
                   </Link>
                 </div>
               </article>

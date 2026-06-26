@@ -238,14 +238,15 @@ def upsert_match_result(
             detail="Team does not belong to the same tournament as the match",
         )
 
-    conflict = crud.get_conflicting_placement(
-        db, match.id, payload.placement, payload.team_id
-    )
-    if conflict is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=f"El placement {payload.placement} ya está asignado a otro equipo en este game",
+    if crud.requires_unique_placement(tournament):
+        conflict = crud.get_conflicting_placement(
+            db, match.id, payload.placement, payload.team_id
         )
+        if conflict is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Placement #{payload.placement} ya fue reportado por {conflict.team.name}.",
+            )
 
     return crud.upsert_team_result(db, tournament, match, payload)
 

@@ -32,6 +32,7 @@ function OperatorPageClient() {
     reportsLoaded,
     totalTeams,
     canCreateNextGame,
+    selectedEngine,
     nextGameNumber,
     submitting,
     resultDrafts,
@@ -83,6 +84,7 @@ function OperatorPageClient() {
       reportsLoaded={reportsLoaded}
       totalTeams={totalTeams}
       canCreateNextGame={canCreateNextGame}
+      selectedEngine={selectedEngine}
       nextGameNumber={nextGameNumber}
       submitting={submitting}
       teamName={teamName}

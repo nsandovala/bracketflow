@@ -23,6 +23,12 @@ import {
   getTeams,
   saveMatchResult,
 } from "../../lib/api";
+import {
+  getEffectiveLobbySize,
+  getMissingReportsMessage,
+  isOperatorSupportedTournament,
+  resolveTournamentEngine,
+} from "../../lib/tournamentModel";
 
 const ACTIVE_WORLD_SERIES_TOURNAMENT_KEY = "bf:world-series-practice:tournament-id";
 
@@ -34,6 +40,10 @@ export type ResultDraft = {
 export type WorldSeriesStanding = LeaderboardEntry & {
   players: string[];
 };
+
+type ReportValidation =
+  | { ok: true; kills: number; placement: number }
+  | { ok: false; message: string };
 
 function getDraftKey(matchId: number, teamId: number) {
   return `${matchId}:${teamId}`;
@@ -92,6 +102,19 @@ function parseRosterAliases(rosterValue: string) {
     .filter((value) => value.length > 0);
 }
 
+function parseRequiredNumber(value: string, missingMessage: string) {
+  if (value.trim() === "") {
+    return { ok: false as const, message: missingMessage };
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return { ok: false as const, message: missingMessage };
+  }
+
+  return { ok: true as const, value: parsed };
+}
+
 export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const [backendOnline, setBackendOnline] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -117,8 +140,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const refreshSelectedTournament = useCallback(
     async (tournamentId: number, options?: { preferLatestMatch?: boolean }) => {
       const tournament = await getTournament(tournamentId);
-      if (tournament.format !== "battle_royale_points") {
-        throw new Error("Selected tournament is not a World Series Practice tournament");
+      if (!isOperatorSupportedTournament(tournament)) {
+        throw new Error("Selected tournament is not supported by Operator yet");
       }
 
       const [nextTeams, nextMatches, nextLeaderboard, nextResults, nextPlayers] = await Promise.all([
@@ -154,9 +177,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const refreshTournaments = useCallback(
     async (nextSelectedId?: number | null) => {
       const allTournaments = await getTournaments();
-      const worldSeriesTournaments = allTournaments.filter(
-        (tournament) => tournament.format === "battle_royale_points"
-      );
+      const worldSeriesTournaments = allTournaments.filter(isOperatorSupportedTournament);
       setTournaments(worldSeriesTournaments);
 
       const requestedId = nextSelectedId ?? preferredTournamentId ?? readStoredTournamentId();
@@ -294,7 +315,25 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
   const reportsLoaded = activeMatchResults.length;
   const totalTeams = teams.length;
-  const canCreateNextGame = totalTeams > 0 && (activeMatch === null || reportsLoaded === totalTeams);
+  const selectedEngine = useMemo(
+    () => (selectedTournament ? resolveTournamentEngine(selectedTournament) : null),
+    [selectedTournament]
+  );
+  const hasKillRaceTie = useMemo(() => {
+    if (!selectedEngine || selectedEngine.scoringProfile !== "kill_race") {
+      return false;
+    }
+    if (activeMatchResults.length < 2 || activeMatchResults.length < totalTeams) {
+      return false;
+    }
+
+    const maxKills = Math.max(...activeMatchResults.map((result) => result.kills));
+    return activeMatchResults.filter((result) => result.kills === maxKills).length > 1;
+  }, [activeMatchResults, selectedEngine, totalTeams]);
+  const canCreateNextGame =
+    totalTeams > 0 &&
+    (activeMatch === null ||
+      (reportsLoaded === totalTeams && !hasKillRaceTie));
 
   async function createWorldSeriesTournament(payload: { name: string; game: string }) {
     setSubmitting(true);
@@ -376,6 +415,19 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       return null;
     }
 
+    if (activeMatch && pendingTeams.length > 0) {
+      const names = pendingTeams.map((team) => team.name).join(", ");
+      setMessage(
+        `${getMissingReportsMessage(pendingTeams.length, activeMatch.round)} Faltan reportes de: ${names}.`
+      );
+      return null;
+    }
+
+    if (selectedEngine?.scoringProfile === "kill_race" && hasKillRaceTie) {
+      setMessage("Empate en kills: define desempate manual antes de avanzar.");
+      return null;
+    }
+
     setSubmitting(true);
     setMessage(null);
 
@@ -392,17 +444,84 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     }
   }
 
+  function validateTeamReport(
+    matchId: number,
+    teamId: number,
+    killsValue: string,
+    placementValue: string,
+  ): ReportValidation {
+    if (!selectedTournament || !selectedEngine) {
+      return { ok: false, message: "No active tournament" };
+    }
+
+    const killsResult = parseRequiredNumber(killsValue, "Kills es requerido.");
+    if (!killsResult.ok) {
+      return { ok: false, message: killsResult.message };
+    }
+
+    if (killsResult.value < 0) {
+      return { ok: false, message: "Kills debe ser 0 o mayor." };
+    }
+
+    if (!selectedEngine.usesPlacement) {
+      return { ok: true, kills: killsResult.value, placement: 1 };
+    }
+
+    const placementResult = parseRequiredNumber(
+      placementValue,
+      "Placement es requerido."
+    );
+    if (!placementResult.ok) {
+      return { ok: false, message: placementResult.message };
+    }
+
+    if (placementResult.value < 1) {
+      return { ok: false, message: "Placement debe ser 1 o mayor." };
+    }
+
+    const lobbySize = getEffectiveLobbySize(selectedEngine, totalTeams);
+    if (placementResult.value > lobbySize) {
+      return {
+        ok: false,
+        message: `Placement debe estar entre 1 y ${lobbySize}.`,
+      };
+    }
+
+    if (selectedEngine.requiresUniquePlacement) {
+      const conflict = activeMatchResults.find(
+        (result) =>
+          result.match_id === matchId &&
+          result.team_id !== teamId &&
+          result.placement === placementResult.value
+      );
+      if (conflict) {
+        return {
+          ok: false,
+          message: `Placement #${placementResult.value} ya fue reportado por ${conflict.team_name}.`,
+        };
+      }
+    }
+
+    return {
+      ok: true,
+      kills: killsResult.value,
+      placement: placementResult.value,
+    };
+  }
+
   async function saveTeamReport(matchId: number, teamId: number) {
     const key = getDraftKey(matchId, teamId);
     const saved = activeMatchResults.find((result) => result.team_id === teamId);
     const killsValue = resultDrafts[key]?.kills ?? (saved ? String(saved.kills) : "");
     const placementValue = resultDrafts[key]?.placement ?? (saved ? String(saved.placement) : "");
-
-    if (killsValue.trim() === "" || placementValue.trim() === "") {
-      throw new Error("Completa kills y placement.");
-    }
     if (selectedTournamentId === null) {
       throw new Error("No active tournament");
+    }
+
+    const validation = validateTeamReport(matchId, teamId, killsValue, placementValue);
+    if (!validation.ok) {
+      setMessage(validation.message);
+      return null;
     }
 
     setSubmitting(true);
@@ -411,8 +530,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     try {
       const result = await saveMatchResult(matchId, {
         team_id: teamId,
-        kills: Number(killsValue),
-        placement: Number(placementValue),
+        kills: validation.kills,
+        placement: validation.placement,
       });
       await refreshSelectedTournament(selectedTournamentId);
       setResultDrafts((current) => {
@@ -454,6 +573,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     reportsLoaded,
     totalTeams,
     canCreateNextGame,
+    selectedEngine,
+    hasKillRaceTie,
     currentGameNumber: activeMatch?.round ?? 0,
     nextGameNumber,
     latestReportedRound,

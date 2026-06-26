@@ -7,7 +7,8 @@ y puntos negativos cuando placement > equipos inscritos.
 
 import pytest
 
-from app.crud import calculate_points, get_placement_multiplier
+from app.crud import calculate_points, get_placement_multiplier, requires_unique_placement
+from app.models import Tournament
 
 WORLD_SERIES_FORMAT = "battle_royale_points"
 
@@ -46,3 +47,23 @@ def test_calculate_points_world_series_never_negative():
     assert multiplier == 1.6
     assert total_points == 19.2
     assert total_points >= 0
+
+
+def test_unique_placement_guard_only_applies_to_wsow_like_world_series():
+    world_series = Tournament(
+        name="WS",
+        game="Warzone",
+        format="battle_royale_points",
+        team_size=2,
+        scoring_profile="wsow_like",
+    )
+    kill_race = Tournament(
+        name="Kill Race",
+        game="Warzone",
+        format="roulette_2v2",
+        team_size=2,
+        scoring_profile="kill_race",
+    )
+
+    assert requires_unique_placement(world_series) is True
+    assert requires_unique_placement(kill_race) is False
