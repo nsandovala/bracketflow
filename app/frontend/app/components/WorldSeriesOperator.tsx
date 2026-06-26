@@ -97,6 +97,7 @@ export default function WorldSeriesOperator({
   const progressPct = totalTeams > 0 ? (reportsLoaded / totalTeams) * 100 : 0;
   const visibleTeams = filter === "pending" ? pendingTeams : teams;
   const usesPlacement = selectedEngine?.usesPlacement ?? true;
+  const isKillRace = selectedEngine?.scoringProfile === "kill_race";
   const effectiveLobbySize = selectedEngine
     ? getEffectiveLobbySize(selectedEngine, totalTeams)
     : totalTeams;
@@ -185,7 +186,152 @@ export default function WorldSeriesOperator({
       {message ? <p className="bf-message">{message}</p> : null}
 
       {!selectedTournament ? (
-        <p className="bf-empty">No hay torneo World Series Practice seleccionado.</p>
+        <p className="bf-empty">No hay torneo seleccionado.</p>
+      ) : totalTeams === 0 ? (
+        <section className="opr-panel">
+          <div className="opr-eyebrow">Setup requerido</div>
+          <h2>Agrega equipos o genera una ruleta antes de operar la partida.</h2>
+          <p className="sub">
+            Primero deja listo el roster del torneo. Despues vuelve a Operator para cargar
+            resultados.
+          </p>
+          <div className="bf-hub-form-actions">
+            <button
+              type="button"
+              className="bf-button bf-button-primary"
+              onClick={() => setMode("setup")}
+            >
+              Configurar equipos
+            </button>
+            <Link href="/torneos" className="bf-button bf-button-ghost">
+              Volver a Torneos
+            </Link>
+          </div>
+
+          {mode === "setup" ? (
+            <form className="opr-form" onSubmit={onCreateTeam}>
+              <div className="opr-field">
+                <label>Nombre del equipo</label>
+                <input
+                  value={teamName}
+                  onChange={(event) => onTeamNameChange(event.target.value)}
+                  placeholder="Team Alpha"
+                  required
+                />
+              </div>
+              <div className="opr-field">
+                <label>Roster</label>
+                <input
+                  value={teamRoster}
+                  onChange={(event) => onTeamRosterChange(event.target.value)}
+                  placeholder="player1, player2, player3"
+                  required
+                />
+              </div>
+              <button type="submit" className="opr-save" disabled={submitting}>
+                Agregar equipo
+              </button>
+            </form>
+          ) : null}
+
+          {teamFormError ? <p className="bf-inline-error">{teamFormError}</p> : null}
+        </section>
+      ) : isKillRace ? (
+        <section className="opr-panel">
+          <div className="opr-eyebrow">Kill Race</div>
+          <h2>Bracket pendiente</h2>
+          <p className="sub">
+            Este formato se resolverá por llaves. Hoy puedes preparar equipos; el avance
+            automático single/double elim va en el siguiente sprint.
+          </p>
+
+          <div className="opr-stats">
+            <div className="opr-stat">
+              <span className="opr-stat-ico" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/></svg>
+              </span>
+              <div className="opr-stat-body">
+                <div className="opr-stat-label">Regla de avance</div>
+                <div className="opr-stat-value">Más kills</div>
+                <div className="opr-stat-sub">Sin placement</div>
+              </div>
+            </div>
+            <div className="opr-stat">
+              <span className="opr-stat-ico" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16"/><path d="M4 12h10"/><path d="M4 19h7"/></svg>
+              </span>
+              <div className="opr-stat-body">
+                <div className="opr-stat-label">Formato</div>
+                <div className="opr-stat-value">Bracket pendiente</div>
+                <div className="opr-stat-sub">
+                  {selectedEngine?.tournamentStructure === "double_elim"
+                    ? "Double elim"
+                    : "Single elim"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="opr-controls">
+            <div className="opr-seg">
+              <button
+                type="button"
+                className={mode === "setup" ? "is-on" : ""}
+                onClick={() => setMode("setup")}
+              >
+                Equipos & Roster
+              </button>
+              <Link href={`/standings${tournamentQuery}`} className="bf-button bf-button-ghost">
+                Bracket / Resultados
+              </Link>
+            </div>
+          </div>
+
+          {mode === "setup" ? (
+            <>
+              <form className="opr-form" onSubmit={onCreateTeam}>
+                <div className="opr-field">
+                  <label>Nombre del equipo</label>
+                  <input
+                    value={teamName}
+                    onChange={(event) => onTeamNameChange(event.target.value)}
+                    placeholder="Team Alpha"
+                    required
+                  />
+                </div>
+                <div className="opr-field">
+                  <label>Roster</label>
+                  <input
+                    value={teamRoster}
+                    onChange={(event) => onTeamRosterChange(event.target.value)}
+                    placeholder="player1, player2, player3"
+                    required
+                  />
+                </div>
+                <button type="submit" className="opr-save" disabled={submitting}>
+                  Agregar equipo
+                </button>
+              </form>
+
+              {teamFormError ? <p className="bf-inline-error">{teamFormError}</p> : null}
+
+              <div className="opr-teamgrid">
+                {teams.map((team) => (
+                  <div key={team.id} className="opr-teamcard">
+                    <div className="h">
+                      <span className="n">{team.name}</span>
+                      <span className="opr-tag t-saved">
+                        <i />
+                        {team.members.length} players
+                      </span>
+                    </div>
+                    <span className="r">{rosterText(team)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </section>
       ) : (
         <>
           {/* ---- Command bar ---- */}
@@ -196,11 +342,21 @@ export default function WorldSeriesOperator({
                 <strong>Partida {currentGame}</strong>
               </div>
               <span className="t">{totalTeams} equipos</span>
+              <span className="t">{selectedEngine?.label ?? "World Series Clasico"}</span>
               <span className="t">
                 {selectedEngine?.scoringProfile === "kill_race"
                   ? "Kill race"
                   : `Lobby ${effectiveLobbySize}`}
               </span>
+              {usesPlacement && selectedEngine?.requiresUniquePlacement ? (
+                <span className="t">Placement unico</span>
+              ) : null}
+              {selectedEngine?.rosterPolicy === "roulette" ? (
+                <span className="t">Roster policy: roulette</span>
+              ) : null}
+              {selectedEngine?.engineKey === "roulette_ws" ? (
+                <span className="t">Scoring profile: wsow_like</span>
+              ) : null}
             </div>
 
             <div className="opr-progress">

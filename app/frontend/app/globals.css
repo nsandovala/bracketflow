@@ -3419,6 +3419,11 @@ a:focus-visible {
   gap: 12px;
 }
 
+.bf-shell-standings .bf-standings-shell.is-kill-race .bf-standings-head,
+.bf-shell-standings .bf-standings-shell.is-kill-race .bf-standings-row {
+  grid-template-columns: 58px minmax(150px, 1.1fr) minmax(210px, 1.5fr) 90px 72px;
+}
+
 .bf-shell-standings .bf-standings-head {
   padding: 0 14px 8px;
   color: var(--amon-muted);

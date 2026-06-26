@@ -1,4 +1,4 @@
-from sqlalchemy import Float, ForeignKey, Integer, String
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -18,6 +18,7 @@ class Tournament(Base):
     scoring_profile: Mapped[str] = mapped_column(
         String, nullable=False, default="wsow_like"
     )
+    config: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     teams: Mapped[list["Team"]] = relationship(
         "Team", back_populates="tournament", cascade="all, delete-orphan"

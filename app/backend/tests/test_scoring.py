@@ -5,9 +5,16 @@ Blinda la tabla fija por bandas que reemplazo la interpolacion
 y puntos negativos cuando placement > equipos inscritos.
 """
 
+import json
+
 import pytest
 
-from app.crud import calculate_points, get_placement_multiplier, requires_unique_placement
+from app.crud import (
+    calculate_points,
+    get_effective_format,
+    get_placement_multiplier,
+    requires_unique_placement,
+)
 from app.models import Tournament
 
 WORLD_SERIES_FORMAT = "battle_royale_points"
@@ -67,3 +74,31 @@ def test_unique_placement_guard_only_applies_to_wsow_like_world_series():
 
     assert requires_unique_placement(world_series) is True
     assert requires_unique_placement(kill_race) is False
+
+
+def test_roulette_ws_engine_uses_wsow_scoring_even_with_legacy_format():
+    tournament = Tournament(
+        name="Roulette WS",
+        game="Warzone",
+        format="roulette_2v2",
+        team_size=2,
+        scoring_profile="wsow_like",
+        config=json.dumps({"engine_key": "roulette_ws", "roster_policy": "roulette"}),
+    )
+
+    assert get_effective_format(tournament) == "battle_royale_points"
+    assert requires_unique_placement(tournament) is True
+
+
+def test_kill_race_engine_does_not_require_unique_placement():
+    tournament = Tournament(
+        name="Kill Race",
+        game="Warzone",
+        format="roulette_3v3",
+        team_size=3,
+        scoring_profile="kill_race",
+        config=json.dumps({"engine_key": "kill_race_bracket"}),
+    )
+
+    assert get_effective_format(tournament) == "roulette_3v3"
+    assert requires_unique_placement(tournament) is False

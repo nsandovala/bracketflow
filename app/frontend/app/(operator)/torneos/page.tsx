@@ -6,37 +6,55 @@ import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
 import { IconDashboard, IconStandings, IconTeams, IconTrophy } from "../../components/icons";
 import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
+import {
+  ENGINE_PRESETS,
+  type TournamentEngineKey,
+  type TournamentStructure,
+  type RosterPolicy,
+  type TeamSize,
+} from "../../../lib/tournamentModel";
 
 const TOURNAMENT_MOTORS = [
   {
     id: "world-series",
-    name: "World Series",
+    engineKey: "wsow_classic",
+    name: "World Series Clasico",
     tags: ["BR", "WSOW", "Acumulativo"],
     status: "Disponible",
     tone: "available",
   },
   {
     id: "rebirth",
-    name: "Rebirth",
-    tags: ["Rebirth", "Squad fijo", "Experimental"],
-    status: "Experimental",
-    tone: "experimental",
+    engineKey: "rebirth_ws",
+    name: "Resurgence / Rebirth WS",
+    tags: ["Rebirth", "Squad fijo", "WSOW-like"],
+    status: "Disponible",
+    tone: "available",
   },
   {
     id: "roulette",
-    name: "Roulette",
-    tags: ["Ruleta", "Broadcast", "Experimental"],
-    status: "Experimental",
-    tone: "experimental",
+    engineKey: "roulette_ws",
+    name: "Gedeon Style / Roulette WS",
+    tags: ["Ruleta", "Rebirth", "WSOW-like"],
+    status: "Disponible",
+    tone: "available",
   },
   {
     id: "kill-race",
+    engineKey: "kill_race_bracket",
     name: "Kill Race",
-    tags: ["Challonge", "Bracket", "Próximamente"],
-    status: "Próximamente",
-    tone: "soon",
+    tags: ["Kills", "Single/Double", "Sin placement"],
+    status: "Disponible",
+    tone: "available",
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  id: string;
+  engineKey: TournamentEngineKey;
+  name: string;
+  tags: readonly string[];
+  status: string;
+  tone: "available" | "experimental" | "soon";
+}>;
 
 const MOTOR_ICONS = [IconTrophy, IconTeams, IconDashboard, IconStandings];
 
@@ -50,15 +68,24 @@ export default function TorneosPage() {
     selectedTournamentId,
     selectedTournament,
     selectTournament,
-    createWorldSeriesTournament,
+    createEngineTournament,
   } = useWorldSeriesPractice();
 
   const [tournamentName, setTournamentName] = useState("");
   const [tournamentGame, setTournamentGame] = useState("Warzone");
+  const [selectedEngineKey, setSelectedEngineKey] =
+    useState<TournamentEngineKey>("wsow_classic");
+  const [teamSize, setTeamSize] = useState<TeamSize>(2);
+  const [lobbySize, setLobbySize] = useState("150");
+  const [killRaceStructure, setKillRaceStructure] =
+    useState<TournamentStructure>("single_elim");
+  const [killRaceRoster, setKillRaceRoster] = useState<RosterPolicy>("fixed_squad");
   const [showForm, setShowForm] = useState(false);
   const [motorsVisible, setMotorsVisible] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const motorsRef = useRef<HTMLElement>(null);
+  const selectedPreset = ENGINE_PRESETS[selectedEngineKey];
+  const isKillRace = selectedEngineKey === "kill_race_bracket";
 
   useEffect(() => {
     const section = motorsRef.current;
@@ -81,7 +108,17 @@ export default function TorneosPage() {
     return () => observer.disconnect();
   }, []);
 
-  function revealTournamentForm() {
+  function selectEngine(engineKey: TournamentEngineKey) {
+    const preset = ENGINE_PRESETS[engineKey];
+    setSelectedEngineKey(engineKey);
+    setTeamSize(preset.team_size);
+    setLobbySize(preset.defaultLobbySize ? String(preset.defaultLobbySize) : "");
+    setKillRaceStructure(preset.tournament_structure);
+    setKillRaceRoster(preset.roster_policy);
+  }
+
+  function revealTournamentForm(engineKey: TournamentEngineKey = selectedEngineKey) {
+    selectEngine(engineKey);
     setShowForm(true);
     requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -90,9 +127,20 @@ export default function TorneosPage() {
 
   async function handleCreateTournament(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const created = await createWorldSeriesTournament({
+    const parsedLobbySize = Number(lobbySize);
+    const created = await createEngineTournament({
       name: tournamentName,
       game: tournamentGame,
+      preset: selectedPreset,
+      teamSize,
+      lobbySize:
+        !isKillRace && Number.isFinite(parsedLobbySize) && parsedLobbySize > 0
+          ? parsedLobbySize
+          : undefined,
+      rosterPolicy: isKillRace ? killRaceRoster : selectedPreset.roster_policy,
+      tournamentStructure: isKillRace
+        ? killRaceStructure
+        : selectedPreset.tournament_structure,
     });
     if (created) {
       setTournamentName("");
@@ -114,13 +162,13 @@ export default function TorneosPage() {
       <section className="bf-tournaments-hero">
         <div>
           <span className="bf-dash-section-label">Hub operativo</span>
-          <h2>Mis torneos</h2>
-          <p>Lista, selección y creación viven acá. El cockpit queda para operar el torneo activo.</p>
+          <h2>Torneos</h2>
+          <p>Crea, selecciona y opera torneos desde un solo lugar.</p>
         </div>
         <button
           type="button"
           className="bf-button bf-button-primary bf-button-hero"
-          onClick={revealTournamentForm}
+          onClick={() => revealTournamentForm()}
         >
           + Nuevo torneo
         </button>
@@ -169,7 +217,7 @@ export default function TorneosPage() {
           })
         ) : (
           <p className="bf-empty">
-            No hay torneos creados. Abre Nuevo torneo para iniciar una práctica World Series.
+            No hay torneos creados. Abre Nuevo torneo para elegir formato competitivo.
           </p>
         )}
       </section>
@@ -205,7 +253,7 @@ export default function TorneosPage() {
                 <button
                   type="button"
                   className="bf-hub-motor-cta"
-                  onClick={revealTournamentForm}
+                  onClick={() => revealTournamentForm(motor.engineKey)}
                 >
                   Usar este motor <span aria-hidden="true">-&gt;</span>
                 </button>
@@ -219,10 +267,27 @@ export default function TorneosPage() {
         <section className="bf-tournaments-create">
           <div>
             <span className="bf-dash-section-label">Nuevo torneo</span>
-            <h3>Crear práctica World Series</h3>
-            <p>El submit usa el mismo flujo existente del hub, sin endpoints nuevos.</p>
+            <h3>Nuevo torneo</h3>
+            <p>Elige el formato competitivo y luego completa los detalles.</p>
           </div>
           <form className="bf-hub-form" onSubmit={handleCreateTournament} ref={formRef}>
+            <div className="bf-field">
+              <span>Elige el formato competitivo</span>
+              <div className="bf-hub-format-chips">
+                {TOURNAMENT_MOTORS.map((motor) => (
+                  <button
+                    key={motor.engineKey}
+                    type="button"
+                    className={`bf-hub-format-chip${
+                      selectedEngineKey === motor.engineKey ? " is-active" : ""
+                    }`}
+                    onClick={() => selectEngine(motor.engineKey)}
+                  >
+                    {motor.name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label className="bf-field">
               <span>Nombre del torneo</span>
               <input
@@ -242,6 +307,73 @@ export default function TorneosPage() {
                 required
               />
             </label>
+            {isKillRace ? (
+              <>
+                <label className="bf-field">
+                  <span>Modalidad</span>
+                  <select
+                    value={teamSize}
+                    onChange={(event) => setTeamSize(Number(event.target.value) as TeamSize)}
+                  >
+                    <option value={1}>1v1</option>
+                    <option value={2}>2v2</option>
+                    <option value={3}>3v3</option>
+                  </select>
+                </label>
+                <label className="bf-field">
+                  <span>Estructura</span>
+                  <select
+                    value={killRaceStructure}
+                    onChange={(event) =>
+                      setKillRaceStructure(event.target.value as TournamentStructure)
+                    }
+                  >
+                    <option value="single_elim">Single elim</option>
+                    <option value="double_elim">Double elim</option>
+                  </select>
+                </label>
+                <label className="bf-field">
+                  <span>Roster</span>
+                  <select
+                    value={killRaceRoster}
+                    onChange={(event) =>
+                      setKillRaceRoster(event.target.value as RosterPolicy)
+                    }
+                  >
+                    <option value="fixed_squad">Fijo</option>
+                    <option value="roulette">Ruleta</option>
+                  </select>
+                </label>
+                <p className="bf-empty">Gana quien sume más kills. Placement no aplica.</p>
+              </>
+            ) : (
+              <>
+                <label className="bf-field">
+                  <span>Team size</span>
+                  <select
+                    value={teamSize}
+                    onChange={(event) => setTeamSize(Number(event.target.value) as TeamSize)}
+                  >
+                    <option value={2}>2v2</option>
+                    <option value={3}>3v3</option>
+                    <option value={4}>4v4</option>
+                  </select>
+                </label>
+                <label className="bf-field">
+                  <span>Lobby size</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={lobbySize}
+                    onChange={(event) => setLobbySize(event.target.value)}
+                    required
+                  />
+                </label>
+                <p className="bf-empty">
+                  Placement se valida contra lobby size, no contra equipos registrados.
+                </p>
+              </>
+            )}
             <div className="bf-hub-form-actions">
               <button
                 type="submit"

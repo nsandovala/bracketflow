@@ -45,7 +45,13 @@ type TournamentStructure =
 type TeamSize = 1 | 2 | 3 | 4;
 
 type TournamentConfig = {
+  engine_key?: TournamentEngineKey;
+  game_mode?: "br" | "rebirth" | "custom";
+  roster_policy?: RosterPolicy;
+  tournament_structure?: TournamentStructure;
   lobbySize?: number;
+  bracketMode?: "single_elim" | "double_elim";
+  teamSize?: TeamSize;
 };
 ```
 
@@ -73,12 +79,12 @@ Compatibility now lives in `app/frontend/lib/tournamentModel.ts` via `resolveTou
 | --- | --- | --- |
 | `format = battle_royale` | Mixes mode and scoring; not currently the active backend literal | `engine_key = wsow_classic`, `game = warzone`, `game_mode = br`, `scoring_profile = wsow_like`, `roster_policy = fixed_squad`, `tournament_structure = cumulative` |
 | `format = battle_royale_points` | Assumes kills + placement | `engine_key = wsow_classic`, `game = warzone`, `game_mode = br`, `scoring_profile = wsow_like`, `roster_policy = fixed_squad`, `tournament_structure = cumulative` |
-| `format = roulette_2v2` | Mixes roster + team size + scoring | Compatibility resolves to `engine_key = kill_race_bracket`, `scoring_profile = kill_race`, `roster_policy = roulette`, `team_size = 2` until a distinct Roulette WS schema exists. |
-| `format = roulette_3v3` | Mixes roster + team size + scoring | Compatibility resolves to `engine_key = kill_race_bracket`, `scoring_profile = kill_race`, `roster_policy = roulette`, `team_size = 3` until a distinct Roulette WS schema exists. |
+| `format = roulette_2v2` | Mixes roster + team size + scoring | Legacy fallback resolves to `engine_key = kill_race_bracket`, `scoring_profile = kill_race`, `roster_policy = roulette`, `team_size = 2` only when no `config.engine_key` exists. |
+| `format = roulette_3v3` | Mixes roster + team size + scoring | Legacy fallback resolves to `engine_key = kill_race_bracket`, `scoring_profile = kill_race`, `roster_policy = roulette`, `team_size = 3` only when no `config.engine_key` exists. |
 | `battle_royale_points` scoring | Kills + placement with WSOW-like multiplier | Keep only for `scoring_profile = wsow_like`; do not use generically. |
 | `tournamentMode.ts` | Infers scoring from format | Keep as legacy UI helper; new work should use `resolveTournamentEngine`. |
 
-No database migration is included in this sprint. The resolver prepares replacement without duplicating endpoint behavior.
+SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadata. The resolver reads `tournament.engine_key` first, then `tournament.config.engine_key`, then legacy `format`.
 
 ## Base Engines
 
@@ -130,6 +136,41 @@ No database migration is included in this sprint. The resolver prepares replacem
 - placement must not block validations
 - placement uniqueness does not apply
 - ties remain pending until manual tiebreak
+
+# Motor -> vista principal
+
+## `wsow_classic`
+
+- Vista principal: standings acumulativo.
+- Inputs: kills + placement.
+- Valida placement unico por partida.
+- Uso: Battle Royale tipo World Series.
+
+## `rebirth_ws`
+
+- Vista principal: standings acumulativo.
+- Inputs: kills + placement.
+- Valida placement unico por partida.
+- Pendiente: confirmar tabla oficial Rebirth/Resurgence.
+
+## `roulette_ws`
+
+- Vista principal: standings acumulativo.
+- Inputs: kills + placement.
+- Roster policy: roulette.
+- Requiere ruleta real antes de operar.
+- Ruleta real va en sprint propio.
+
+## `kill_race_bracket`
+
+- Vista principal esperada: bracket / llave.
+- Inputs futuros: kills por enfrentamiento.
+- No usa placement.
+- Single elim: perdedor eliminado.
+- Double elim: perdedor baja a losers bracket.
+- Hoy queda como "Bracket pendiente".
+
+Kill Race no debe renderizarse como World Series. Si no existe bracket real, la UI debe decir "Bracket pendiente" en vez de mostrar una tabla WSOW falsa.
 
 ## Operator Guardrails
 

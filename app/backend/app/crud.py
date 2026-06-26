@@ -1,3 +1,4 @@
+import json
 import random
 import re
 from collections import defaultdict
@@ -9,9 +10,13 @@ from . import models, schemas
 BR_FORMATS = {"battle_royale_points", "roulette_2v2", "roulette_3v3"}
 ROULETTE_FORMATS = {"roulette_2v2", "roulette_3v3"}
 WORLD_SERIES_FORMATS = {"battle_royale_points"}
+WSOW_ENGINE_KEYS = {"wsow_classic", "rebirth_ws", "roulette_ws"}
+KILL_RACE_ENGINE_KEYS = {"kill_race_bracket"}
 
 
 def normalize_team_size(format_name: str, requested_team_size: int) -> int:
+    if requested_team_size == 1:
+        return 1
     if format_name == "roulette_3v3":
         return 3
     if format_name == "roulette_2v2":
@@ -19,10 +24,43 @@ def normalize_team_size(format_name: str, requested_team_size: int) -> int:
     return requested_team_size
 
 
+def serialize_config(config: schemas.TournamentConfig | None) -> str | None:
+    if config is None:
+        return None
+    data = config.model_dump(exclude_none=True)
+    return json.dumps(data) if data else None
+
+
+def read_tournament_config(tournament: models.Tournament) -> dict:
+    if not tournament.config:
+        return {}
+    try:
+        parsed = json.loads(tournament.config)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def get_engine_key(tournament: models.Tournament) -> str | None:
+    config = read_tournament_config(tournament)
+    engine_key = config.get("engine_key")
+    return engine_key if isinstance(engine_key, str) else None
+
+
+def get_effective_format(tournament: models.Tournament) -> str:
+    engine_key = get_engine_key(tournament)
+    if engine_key in WSOW_ENGINE_KEYS:
+        return "battle_royale_points"
+    if engine_key in KILL_RACE_ENGINE_KEYS:
+        return "roulette_3v3" if tournament.team_size == 3 else "roulette_2v2"
+    return tournament.format
+
+
 def requires_unique_placement(tournament: models.Tournament) -> bool:
+    effective_format = get_effective_format(tournament)
     return (
         tournament.scoring_profile == "wsow_like"
-        and tournament.format in WORLD_SERIES_FORMATS
+        and effective_format in WORLD_SERIES_FORMATS
     )
 
 
@@ -35,6 +73,7 @@ def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> mode
         format=tournament.format,
         team_size=normalized_team_size,
         scoring_profile=tournament.scoring_profile,
+        config=serialize_config(tournament.config),
     )
     db.add(db_tournament)
     db.commit()
@@ -401,8 +440,9 @@ def upsert_team_result(
     match: models.Match,
     payload: schemas.TeamResultUpsert,
 ) -> schemas.TeamResult:
+    effective_format = get_effective_format(tournament)
     kill_points, placement_points, total_points = calculate_points(
-        tournament.format,
+        effective_format,
         payload.kills,
         payload.placement,
     )
@@ -448,7 +488,7 @@ def upsert_team_result(
     db.commit()
     db.refresh(db_result)
     db.refresh(match)
-    return build_team_result_schema(db_result, tournament.format)
+    return build_team_result_schema(db_result, effective_format)
 
 
 def get_team_results_by_tournament(
@@ -478,8 +518,9 @@ def get_team_result_details_by_tournament(
 
     details: list[schemas.TeamResultDetail] = []
     for result, team_name, round_number, match_status in rows:
+        effective_format = get_effective_format(tournament)
         kill_points, placement_points, total_points = calculate_points(
-            tournament.format,
+            effective_format,
             result.kills,
             result.placement,
         )
@@ -522,8 +563,9 @@ def get_leaderboard(
     )
 
     for result in results:
+        effective_format = get_effective_format(tournament)
         _, _, result_total_points = calculate_points(
-            tournament.format,
+            effective_format,
             result.kills,
             result.placement,
         )
@@ -552,7 +594,7 @@ def get_leaderboard(
                 kills=kills,
                 placement_points=(
                     effective_multiplier
-                    if tournament.format in WORLD_SERIES_FORMATS and kills > 0
+                    if get_effective_format(tournament) in WORLD_SERIES_FORMATS and kills > 0
                     else 0.0
                 ),
                 total_points=total_points,
@@ -564,7 +606,7 @@ def get_leaderboard(
             )
         )
 
-    if tournament.format in WORLD_SERIES_FORMATS:
+    if get_effective_format(tournament) in WORLD_SERIES_FORMATS:
         leaderboard.sort(
             key=lambda entry: (
                 -entry.total_points,

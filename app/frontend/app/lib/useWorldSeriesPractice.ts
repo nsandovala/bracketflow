@@ -24,6 +24,8 @@ import {
   saveMatchResult,
 } from "../../lib/api";
 import {
+  ENGINE_PRESETS,
+  type EnginePreset,
   getEffectiveLobbySize,
   getMissingReportsMessage,
   isOperatorSupportedTournament,
@@ -90,6 +92,18 @@ function sortStandings(entries: LeaderboardEntry[]) {
     }
     if (left.best_placement !== right.best_placement) {
       return (left.best_placement ?? Number.MAX_SAFE_INTEGER) - (right.best_placement ?? Number.MAX_SAFE_INTEGER);
+    }
+    return left.team_name.localeCompare(right.team_name);
+  });
+}
+
+function sortKillRaceStandings(entries: LeaderboardEntry[]) {
+  return [...entries].sort((left, right) => {
+    if (right.kills !== left.kills) {
+      return right.kills - left.kills;
+    }
+    if (right.matches_played !== left.matches_played) {
+      return right.matches_played - left.matches_played;
     }
     return left.team_name.localeCompare(right.team_name);
   });
@@ -288,8 +302,16 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     [activeMatchResults, teams]
   );
 
+  const selectedEngine = useMemo(
+    () => (selectedTournament ? resolveTournamentEngine(selectedTournament) : null),
+    [selectedTournament]
+  );
+
   const sortedStandings = useMemo<WorldSeriesStanding[]>(() => {
-    const sorted = sortStandings(leaderboard);
+    const sorted =
+      selectedEngine?.scoringProfile === "kill_race"
+        ? sortKillRaceStandings(leaderboard)
+        : sortStandings(leaderboard);
     return sorted.map((entry) => {
       const team = teams.find((candidate) => candidate.id === entry.team_id);
       return {
@@ -297,7 +319,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         players: team?.members.map((member) => member.player.nickname) ?? [],
       };
     });
-  }, [leaderboard, teams]);
+  }, [leaderboard, selectedEngine, teams]);
 
   const latestReportedRound = useMemo(() => {
     if (tournamentResults.length === 0) {
@@ -315,10 +337,6 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
   const reportsLoaded = activeMatchResults.length;
   const totalTeams = teams.length;
-  const selectedEngine = useMemo(
-    () => (selectedTournament ? resolveTournamentEngine(selectedTournament) : null),
-    [selectedTournament]
-  );
   const hasKillRaceTie = useMemo(() => {
     if (!selectedEngine || selectedEngine.scoringProfile !== "kill_race") {
       return false;
@@ -335,16 +353,46 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     (activeMatch === null ||
       (reportsLoaded === totalTeams && !hasKillRaceTie));
 
-  async function createWorldSeriesTournament(payload: { name: string; game: string }) {
+  async function createEngineTournament(payload: {
+    name: string;
+    game: string;
+    preset: EnginePreset;
+    teamSize: 1 | 2 | 3 | 4;
+    lobbySize?: number;
+    rosterPolicy?: "fixed_squad" | "roulette";
+    tournamentStructure?: "cumulative" | "single_elim" | "double_elim";
+  }) {
     setSubmitting(true);
     setMessage(null);
 
     try {
+      const legacyFormat =
+        payload.preset.engineKey === "kill_race_bracket"
+          ? payload.teamSize === 3
+            ? "roulette_3v3"
+            : "roulette_2v2"
+          : payload.preset.format;
       const tournament = await createTournament({
-        ...payload,
-        format: "battle_royale_points",
-        team_size: 2,
-        scoring_profile: "wsow_like",
+        name: payload.name,
+        game: payload.game,
+        format: legacyFormat,
+        team_size: payload.teamSize,
+        scoring_profile: payload.preset.scoring_profile,
+        config: {
+          engine_key: payload.preset.engineKey,
+          game_mode: payload.preset.game_mode,
+          roster_policy: payload.rosterPolicy ?? payload.preset.roster_policy,
+          tournament_structure:
+            payload.tournamentStructure ?? payload.preset.tournament_structure,
+          lobbySize: payload.lobbySize,
+          teamSize: payload.teamSize,
+          bracketMode:
+            payload.preset.engineKey === "kill_race_bracket"
+              ? payload.tournamentStructure === "double_elim"
+                ? "double_elim"
+                : "single_elim"
+              : undefined,
+        },
       });
       await refreshTournaments(tournament.id);
       setMessage(`Torneo creado: ${tournament.name}`);
@@ -355,6 +403,15 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function createWorldSeriesTournament(payload: { name: string; game: string }) {
+    return createEngineTournament({
+      ...payload,
+      preset: ENGINE_PRESETS.wsow_classic,
+      teamSize: 2,
+      lobbySize: 150,
+    });
   }
 
   async function createTeamWithRoster(payload: { name: string; roster: string }) {
@@ -583,6 +640,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setResultDrafts,
     selectTournament,
     updateResultDraft,
+    createEngineTournament,
     createWorldSeriesTournament,
     createTeamWithRoster,
     createNextGame,

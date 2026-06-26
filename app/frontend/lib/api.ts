@@ -38,6 +38,22 @@ export type TournamentFormat =
   | "roulette_2v2"
   | "roulette_3v3";
 
+export type TournamentEngineKey =
+  | "wsow_classic"
+  | "rebirth_ws"
+  | "roulette_ws"
+  | "kill_race_bracket";
+
+export type TournamentConfig = {
+  engine_key?: TournamentEngineKey;
+  game_mode?: "br" | "rebirth" | "custom";
+  roster_policy?: "fixed_squad" | "roulette";
+  tournament_structure?: "cumulative" | "single_elim" | "double_elim";
+  lobbySize?: number;
+  bracketMode?: "single_elim" | "double_elim";
+  teamSize?: 1 | 2 | 3 | 4;
+};
+
 export type Tournament = {
   id: number;
   name: string;
@@ -46,9 +62,8 @@ export type Tournament = {
   format: TournamentFormat;
   team_size: number;
   scoring_profile: string;
-  config?: {
-    lobbySize?: number;
-  };
+  engine_key?: TournamentEngineKey;
+  config?: TournamentConfig;
 };
 
 export type Player = {
@@ -148,6 +163,7 @@ export function createTournament(payload: {
   format: TournamentFormat;
   team_size: number;
   scoring_profile: string;
+  config?: TournamentConfig;
 }) {
   return request<Tournament>("/tournaments", {
     method: "POST",

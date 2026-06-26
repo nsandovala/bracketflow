@@ -1,4 +1,22 @@
-from pydantic import BaseModel, ConfigDict, Field
+import json
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class TournamentConfig(BaseModel):
+    engine_key: Literal[
+        "wsow_classic",
+        "rebirth_ws",
+        "roulette_ws",
+        "kill_race_bracket",
+    ] | None = None
+    game_mode: Literal["br", "rebirth", "custom"] | None = None
+    roster_policy: Literal["fixed_squad", "roulette"] | None = None
+    tournament_structure: Literal["cumulative", "single_elim", "double_elim"] | None = None
+    lobbySize: int | None = Field(default=None, ge=1)
+    bracketMode: Literal["single_elim", "double_elim"] | None = None
+    teamSize: Literal[1, 2, 3, 4] | None = None
 
 
 class TournamentBase(BaseModel):
@@ -7,6 +25,22 @@ class TournamentBase(BaseModel):
     format: str = "single_elimination"
     team_size: int = 2
     scoring_profile: str = "wsow_like"
+    config: TournamentConfig | None = None
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def parse_config(cls, value):
+        if value is None or isinstance(value, dict) or isinstance(value, TournamentConfig):
+            return value
+        if isinstance(value, str):
+            if value.strip() == "":
+                return None
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                return None
+            return parsed if isinstance(parsed, dict) else None
+        return None
 
 
 class TournamentCreate(TournamentBase):

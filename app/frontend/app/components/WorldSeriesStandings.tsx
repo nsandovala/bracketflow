@@ -1,6 +1,7 @@
 import StandingsTable from "./StandingsTable";
 
 import { Tournament } from "../../lib/api";
+import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 
 type WorldSeriesStandingsProps = {
@@ -20,16 +21,27 @@ export default function WorldSeriesStandings({
   afterGameNumber,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
+  const selectedEngine = selectedTournament
+    ? resolveTournamentEngine(selectedTournament)
+    : null;
+  const isKillRace = selectedEngine?.scoringProfile === "kill_race";
+
   return (
     <main className="bf-shell-standings">
       <section className="bf-standings-toolbar">
         <div>
-          <span className="bf-standings-kicker">Clasificación general</span>
+          <span className="bf-standings-kicker">
+            {isKillRace ? "Bracket / Resultados" : "Clasificación general"}
+          </span>
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
           <p>
-            {afterGameNumber > 0
-              ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
-              : "Los resultados aparecerán al reportar la primera partida."}
+            {isKillRace
+              ? standings.length > 0
+                ? "Kill Race se resolverá por llaves. La tabla actual es solo resumen temporal por kills."
+                : "Vista bracket pendiente. Los resultados aparecerán cuando se implemente la llave de eliminación."
+              : afterGameNumber > 0
+                ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
+                : "Los resultados aparecerán al reportar la primera partida."}
           </p>
         </div>
 
@@ -50,7 +62,10 @@ export default function WorldSeriesStandings({
       </section>
 
       <section className="bf-standings-panel">
-        <StandingsTable entries={standings} />
+        <StandingsTable
+          entries={standings}
+          scoringProfile={isKillRace ? "kill_race" : "wsow_like"}
+        />
       </section>
     </main>
   );

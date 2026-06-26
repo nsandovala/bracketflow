@@ -1,72 +1,60 @@
-# Next Steps
+# NEXT STEPS
 
 ## HECHO
 
-- Navegacion directa Torneos -> Operator: el boton principal de cada torneo y el flujo post-creacion van a `/operator?tournamentId={id}`.
-- Dashboard queda disponible como accion secundaria desde `/torneos`; Standings y Stream quedan como links discretos.
-- Model lock V2 documentado en `app/docs/TOURNAMENT_MODEL.md`.
-- Auditoria modelo viejo -> nuevo documentada: `format`, `scoring_profile`, `roulette_2v2`, `roulette_3v3`, `battle_royale_points`, `useWorldSeriesPractice`, `tournamentMode.ts` y backend scoring.
-- Compatibilidad implementada con `resolveTournamentEngine(tournament)` en frontend.
-- Guardrails Operator por scoring profile:
-  - `wsow_like`: kills requerido, placement requerido, placement contra `effectiveLobbySize`, placement unico por partida.
-  - `kill_race`: kills requerido, no se exige placement en UI, no se bloquean placements duplicados, empate en kills bloquea avanzar.
-- Backend ajustado minimamente: placement unico se valida solo para `wsow_like` + `battle_royale_points`.
-- Parking actualizado para FIFA, Valorant, CS:GO, Fortnite y evidencia/agentes futuros.
+- Diagnostico P0 ejecutado:
+  - `sqlite3 bracketflow.db ".tables"` -> `matches`, `players`, `team_members`, `team_results`, `teams`, `tournaments`.
+  - `sqlite3 bracketflow.db ".schema tournaments"` confirmo `config TEXT NULL`.
+  - `SELECT id, name, format, scoring_profile, config FROM tournaments ORDER BY id DESC;` mostraba torneos `Smoke...` antes de limpiar.
+- ¿Hay torneos Smoke/seed en DB local? SI antes de P1, NO despues de P1.
+- ¿Kill Race usa scoring_profile=kill_race? SI en los torneos Smoke Kill Race removidos; no queda torneo Kill Race local despues de limpiar.
+- ¿WSOW-like usa scoring_profile=wsow_like? SI.
+- Se limpiaron torneos Smoke/seed de DB local, borrando dependencias en orden: `team_results`, `team_members`, `matches`, `teams`, `players`, `tournaments`.
+- Se audito creacion automatica de torneos Smoke. No hay flujo de app que cree Smoke al cargar `/torneos`, `/dashboard` u `/operator`; `seed` existe solo como parametro manual de ruleta reproducible.
+- Operator ahora muestra Setup requerido cuando un torneo tiene 0 equipos.
+- Kill Race ya no se presenta como World Series en Operator: muestra `Kill Race`, `Regla de avance: más kills`, `Sin placement` y `Bracket pendiente`.
+- Standings ahora respeta scoring_profile:
+  - `wsow_like`: tabla acumulativa.
+  - `kill_race`: resumen por kills / bracket pendiente.
+- Navegacion desde Torneos permite operar directo sin pasar por Dashboard: `Operar`, `Dashboard`, `Standings`, `Stream`.
+- Se redujo duplicacion visual `Torneos / Torneos` en `/torneos`.
+- Modelo motor -> vista principal documentado en `app/docs/TOURNAMENT_MODEL.md`.
 
 ## ESTADO
 
-- Frontend lint verde: `npm run lint`.
-- Frontend build verde: `npm run build`.
-- Backend tests verdes usando venv: `./.venv/bin/python -m pytest` -> 15 passed.
-- No hubo migracion de DB.
-- `Tournament.config.lobbySize` queda como contrato frontend/documental; fallback actual: `tournament.config.lobbySize ?? totalTeams`.
-- El schema backend todavia requiere `placement`; para `kill_race`, Operator no lo pide y envia un placeholder tecnico compatible hasta migracion.
+- Backend tests: VERDE (`./.venv/bin/python -m pytest` -> 17 passed).
+- Frontend lint: VERDE (`PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run lint`).
+- Frontend build: VERDE (`PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run build`).
+- DB local limpia: SI.
+- `/stream?obs=1` sin regresion: SI (`curl -I 'http://localhost:3000/stream?obs=1'` -> 200).
+- Smoke HTTP probado: `/torneos`, `/operator?tournamentId=9`, `/standings?tournamentId=9`, `/stream?obs=1` -> 200.
+- Smoke visual Kill Race no se ejecuto contra DB local porque despues de limpiar no queda un torneo Kill Race persistido y no se reintrodujo un seed temporal.
 
 ## SIGUIENTE
 
-- Resolver primero `resolveTournamentEngine(tournament)` como contrato compartido frontend/backend antes de implementar `rebirth_ws` MVP.
-- Luego implementar `rebirth_ws` MVP sobre el model lock, sin asumir tablas oficiales hasta tener fuente confirmada.
+Sprint grande a decidir:
+
+1. Kill Race Bracket MVP estilo Challonge.
+2. Roulette WS real desde pool de jugadores.
+
+Recomendacion:
+
+- Si la comunidad esta usando Challonge, priorizar Kill Race Bracket MVP.
+- Si el wedge principal es Gedeon/Roulette, priorizar Roulette WS.
 
 ## BLOQUEOS
 
-- Tablas oficiales Rebirth/WSOW sin confirmar para variantes Rebirth.
-- `lobbySize` editable en UI queda pendiente.
-- Evidencia/agentes diferidos: no upload, no OCR, no agentes.
-- Auth diferido.
-- FIFA/Valorant/CS:GO/Fortnite parqueados.
-- Schema backend aun no modela `engine_key`, `game_mode`, `roster_policy`, `tournament_structure` ni `config`.
+- Bracket real pendiente.
+- Ruleta real pendiente.
+- Rebirth scoring oficial pendiente.
+- Auth/Neon diferido.
+- Chatbot/Discord/agentes/carga de screenshots diferidos.
 
 ## VERIFICAR
 
-```bash
-cd app/frontend
-PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run lint
-PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run build
-
-cd ../backend
-./.venv/bin/python -m pytest
-```
-
-Rutas smoke:
-
-- `/`
-- `/torneos`
-- `/dashboard`
-- `/operator`
-- `/standings`
-- `/equipos`
-- `/ajustes`
-- `/stream?obs=1&bg=transparent&layout=sidebar`
-- `/stream?obs=1&bg=transparent&layout=lower`
-
-Escenarios manuales/codigo:
-
-- `/torneos` boton principal: `Operar` -> `/operator?tournamentId=X`.
-- `/torneos` secundarios: Dashboard, Standings, Stream preservados.
-- `/dashboard` mantiene una sola CTA principal a Operator.
-- `/operator` bloquea placements duplicados solo en `wsow_like`.
-- `/operator` no bloquea placement duplicado para `kill_race`.
-- `/operator` valida placement contra `lobbySize` efectivo, no contra `totalTeams` como limite conceptual fijo.
-- `/operator` bloquea avanzar con reportes pendientes y lista equipos pendientes.
-- `/operator` bloquea avanzar en `kill_race` si hay empate en kills.
-- `/stream` sigue fuera del shell operator y mantiene modo transparente por `bf-stream-transparent`.
+- `/torneos`: no hay Smoke; acciones directas.
+- `/operator` con torneo sin equipos: muestra Setup requerido.
+- `/operator` con Kill Race: no muestra placement.
+- `/standings` con Kill Race: no muestra BEST PLACE ni WSOW falso.
+- `/standings` con WSOW: tabla acumulativa sigue normal.
+- `/stream?obs=1`: no se rompe.

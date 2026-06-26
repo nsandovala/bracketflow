@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import crud, schemas
-from .database import Base, engine, get_db
+from .database import Base, engine, ensure_sqlite_schema, get_db
 
 
 Base.metadata.create_all(bind=engine)
+ensure_sqlite_schema()
 
 app = FastAPI(title="BracketFlow API")
 
