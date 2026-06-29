@@ -6,17 +6,20 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class TournamentConfig(BaseModel):
     engine_key: Literal[
-        "wsow_classic",
+        "wsow_br",
         "rebirth_ws",
         "roulette_ws",
         "kill_race_bracket",
+        "wsow_classic",
     ] | None = None
-    game_mode: Literal["br", "rebirth", "custom"] | None = None
+    game_mode: Literal["br", "rebirth", "kill_race", "custom"] | None = None
     roster_policy: Literal["fixed_squad", "roulette"] | None = None
     tournament_structure: Literal["cumulative", "single_elim", "double_elim"] | None = None
     lobbySize: int | None = Field(default=None, ge=1)
     bracketMode: Literal["single_elim", "double_elim"] | None = None
     teamSize: Literal[1, 2, 3, 4] | None = None
+    bestOf: int | None = Field(default=None, ge=1)
+    matchPointThreshold: int | None = Field(default=None, ge=1)
 
 
 class TournamentBase(BaseModel):

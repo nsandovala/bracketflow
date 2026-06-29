@@ -39,6 +39,7 @@ function OperatorPageClient() {
     selectTournament,
     updateResultDraft,
     createTeamWithRoster,
+    generateRouletteForSelected,
     createNextGame,
     saveTeamReport,
   } = useWorldSeriesPractice(preferredTournamentId);
@@ -98,6 +99,9 @@ function OperatorPageClient() {
       onTeamNameChange={setTeamName}
       onTeamRosterChange={setTeamRoster}
       onCreateTeam={handleCreateTeam}
+      onGenerateRoulette={() => {
+        void generateRouletteForSelected();
+      }}
       onUpdateDraft={updateResultDraft}
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);

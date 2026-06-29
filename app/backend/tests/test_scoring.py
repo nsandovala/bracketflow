@@ -13,6 +13,8 @@ from app.crud import (
     calculate_points,
     get_effective_format,
     get_placement_multiplier,
+    get_rebirth_placement_multiplier,
+    is_wsow_like_tournament,
     requires_unique_placement,
 )
 from app.models import Tournament
@@ -56,6 +58,31 @@ def test_calculate_points_world_series_never_negative():
     assert total_points >= 0
 
 
+@pytest.mark.parametrize(
+    "placement, expected",
+    [
+        (1, 1.6),
+        (2, 1.4),
+        (5, 1.4),
+        (6, 1.2),
+        (10, 1.2),
+        (11, 1.0),
+        (17, 1.0),
+    ],
+)
+def test_rebirth_placement_multiplier_bands(placement, expected):
+    assert get_rebirth_placement_multiplier(placement) == expected
+
+
+def test_calculate_points_rebirth_uses_rebirth_multiplier():
+    kill_points, multiplier, total_points = calculate_points(
+        WORLD_SERIES_FORMAT, kills=10, placement=1, engine_key="rebirth_ws"
+    )
+    assert kill_points == 10.0
+    assert multiplier == 1.6
+    assert total_points == 16.0
+
+
 def test_unique_placement_guard_only_applies_to_wsow_like_world_series():
     world_series = Tournament(
         name="WS",
@@ -74,6 +101,8 @@ def test_unique_placement_guard_only_applies_to_wsow_like_world_series():
 
     assert requires_unique_placement(world_series) is True
     assert requires_unique_placement(kill_race) is False
+    assert is_wsow_like_tournament(world_series) is True
+    assert is_wsow_like_tournament(kill_race) is False
 
 
 def test_roulette_ws_engine_uses_wsow_scoring_even_with_legacy_format():

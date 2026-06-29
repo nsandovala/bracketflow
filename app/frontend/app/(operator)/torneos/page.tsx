@@ -10,15 +10,14 @@ import {
   ENGINE_PRESETS,
   type TournamentEngineKey,
   type TournamentStructure,
-  type RosterPolicy,
   type TeamSize,
 } from "../../../lib/tournamentModel";
 
 const TOURNAMENT_MOTORS = [
   {
     id: "world-series",
-    engineKey: "wsow_classic",
-    name: "World Series Clasico",
+    engineKey: "wsow_br",
+    name: "World Series BR",
     tags: ["BR", "WSOW", "Acumulativo"],
     status: "Disponible",
     tone: "available",
@@ -34,7 +33,7 @@ const TOURNAMENT_MOTORS = [
   {
     id: "roulette",
     engineKey: "roulette_ws",
-    name: "Gedeon Style / Roulette WS",
+    name: "Gedeon Roulette WS",
     tags: ["Ruleta", "Rebirth", "WSOW-like"],
     status: "Disponible",
     tone: "available",
@@ -69,17 +68,22 @@ export default function TorneosPage() {
     selectedTournament,
     selectTournament,
     createEngineTournament,
+    archiveSelectedTournament,
+    deleteSelectedTournament,
   } = useWorldSeriesPractice();
 
   const [tournamentName, setTournamentName] = useState("");
   const [tournamentGame, setTournamentGame] = useState("Warzone");
   const [selectedEngineKey, setSelectedEngineKey] =
-    useState<TournamentEngineKey>("wsow_classic");
-  const [teamSize, setTeamSize] = useState<TeamSize>(2);
-  const [lobbySize, setLobbySize] = useState("150");
+    useState<TournamentEngineKey>("wsow_br");
+  const [teamSize, setTeamSize] = useState<TeamSize>(3);
+  const [lobbySize, setLobbySize] = useState("50");
+  const [rouletteGameMode, setRouletteGameMode] = useState<"br" | "rebirth">("rebirth");
+  const [matchPointPreset, setMatchPointPreset] = useState<"125" | "150" | "custom">("125");
+  const [matchPointThreshold, setMatchPointThreshold] = useState("125");
+  const [bestOf, setBestOf] = useState("3");
   const [killRaceStructure, setKillRaceStructure] =
     useState<TournamentStructure>("single_elim");
-  const [killRaceRoster, setKillRaceRoster] = useState<RosterPolicy>("fixed_squad");
   const [showForm, setShowForm] = useState(false);
   const [motorsVisible, setMotorsVisible] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -113,8 +117,24 @@ export default function TorneosPage() {
     setSelectedEngineKey(engineKey);
     setTeamSize(preset.team_size);
     setLobbySize(preset.defaultLobbySize ? String(preset.defaultLobbySize) : "");
+    setMatchPointPreset("125");
+    setMatchPointThreshold(preset.defaultMatchPoint ? String(preset.defaultMatchPoint) : "");
+    setBestOf(preset.bestOf ? String(preset.bestOf) : "3");
     setKillRaceStructure(preset.tournament_structure);
-    setKillRaceRoster(preset.roster_policy);
+    setRouletteGameMode(preset.game_mode === "br" ? "br" : "rebirth");
+  }
+
+  function updateRouletteMode(mode: "br" | "rebirth") {
+    setRouletteGameMode(mode);
+    setTeamSize(mode === "br" ? 4 : 3);
+    setLobbySize(mode === "br" ? "50" : "16");
+  }
+
+  function updateMatchPointPreset(value: "125" | "150" | "custom") {
+    setMatchPointPreset(value);
+    if (value !== "custom") {
+      setMatchPointThreshold(value);
+    }
   }
 
   function revealTournamentForm(engineKey: TournamentEngineKey = selectedEngineKey) {
@@ -128,6 +148,10 @@ export default function TorneosPage() {
   async function handleCreateTournament(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedLobbySize = Number(lobbySize);
+    const parsedMatchPoint = Number(matchPointThreshold);
+    const parsedBestOf = Number(bestOf);
+    const gameMode =
+      selectedEngineKey === "roulette_ws" ? rouletteGameMode : selectedPreset.game_mode;
     const created = await createEngineTournament({
       name: tournamentName,
       game: tournamentGame,
@@ -137,10 +161,16 @@ export default function TorneosPage() {
         !isKillRace && Number.isFinite(parsedLobbySize) && parsedLobbySize > 0
           ? parsedLobbySize
           : undefined,
-      rosterPolicy: isKillRace ? killRaceRoster : selectedPreset.roster_policy,
+      rosterPolicy: selectedPreset.roster_policy,
       tournamentStructure: isKillRace
         ? killRaceStructure
         : selectedPreset.tournament_structure,
+      gameMode,
+      bestOf: isKillRace && Number.isFinite(parsedBestOf) ? parsedBestOf : undefined,
+      matchPointThreshold:
+        !isKillRace && Number.isFinite(parsedMatchPoint) && parsedMatchPoint > 0
+          ? parsedMatchPoint
+          : undefined,
     });
     if (created) {
       setTournamentName("");
@@ -153,6 +183,20 @@ export default function TorneosPage() {
   function handleSelectTournament(tournamentId: number) {
     selectTournament(tournamentId);
     router.push(`/operator?tournamentId=${tournamentId}`);
+  }
+
+  function handleArchiveTournament(tournamentId: number) {
+    const confirmed = window.confirm("¿Archivar este torneo? No aparecerá en la lista activa.");
+    if (confirmed) {
+      void archiveSelectedTournament(tournamentId);
+    }
+  }
+
+  function handleDeleteTournament(tournamentId: number) {
+    const confirmed = window.confirm("¿Eliminar este torneo? Esta acción no se puede deshacer.");
+    if (confirmed) {
+      void deleteSelectedTournament(tournamentId);
+    }
   }
 
   return (
@@ -211,6 +255,22 @@ export default function TorneosPage() {
                   <Link href={`/stream?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
                     Stream
                   </Link>
+                  <button
+                    type="button"
+                    className="bf-button bf-button-ghost"
+                    onClick={() => handleArchiveTournament(tournament.id)}
+                    disabled={submitting}
+                  >
+                    Archivar
+                  </button>
+                  <button
+                    type="button"
+                    className="bf-button bf-button-danger"
+                    onClick={() => handleDeleteTournament(tournament.id)}
+                    disabled={submitting}
+                  >
+                    Eliminar
+                  </button>
                 </div>
               </article>
             );
@@ -321,7 +381,7 @@ export default function TorneosPage() {
                   </select>
                 </label>
                 <label className="bf-field">
-                  <span>Estructura</span>
+                  <span>Bracket type</span>
                   <select
                     value={killRaceStructure}
                     onChange={(event) =>
@@ -333,21 +393,34 @@ export default function TorneosPage() {
                   </select>
                 </label>
                 <label className="bf-field">
-                  <span>Roster</span>
-                  <select
-                    value={killRaceRoster}
-                    onChange={(event) =>
-                      setKillRaceRoster(event.target.value as RosterPolicy)
-                    }
-                  >
-                    <option value="fixed_squad">Fijo</option>
-                    <option value="roulette">Ruleta</option>
-                  </select>
+                  <span>Best of</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={2}
+                    value={bestOf}
+                    onChange={(event) => setBestOf(event.target.value)}
+                    required
+                  />
                 </label>
-                <p className="bf-empty">Gana quien sume más kills. Placement no aplica.</p>
+                <p className="bf-empty">
+                  La ruleta armará equipos y luego se generará la llave. Placement NO aplica.
+                </p>
               </>
             ) : (
               <>
+                {selectedEngineKey === "roulette_ws" ? (
+                  <label className="bf-field">
+                    <span>Game mode</span>
+                    <select
+                      value={rouletteGameMode}
+                      onChange={(event) => updateRouletteMode(event.target.value as "br" | "rebirth")}
+                    >
+                      <option value="rebirth">Rebirth</option>
+                      <option value="br">BR</option>
+                    </select>
+                  </label>
+                ) : null}
                 <label className="bf-field">
                   <span>Team size</span>
                   <select
@@ -372,6 +445,35 @@ export default function TorneosPage() {
                 <p className="bf-empty">
                   Placement se valida contra lobby size, no contra equipos registrados.
                 </p>
+                <label className="bf-field">
+                  <span>Match point</span>
+                  <select
+                    value={matchPointPreset}
+                    onChange={(event) =>
+                      updateMatchPointPreset(event.target.value as "125" | "150" | "custom")
+                    }
+                  >
+                    <option value="125">125</option>
+                    <option value="150">150</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+                <label className="bf-field">
+                  <span>Match point threshold</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={matchPointThreshold}
+                    onChange={(event) => {
+                      setMatchPointThreshold(event.target.value);
+                      setMatchPointPreset("custom");
+                    }}
+                    required
+                  />
+                </label>
+                {selectedEngineKey === "roulette_ws" ? (
+                  <p className="bf-empty">La ruleta armará equipos antes de operar.</p>
+                ) : null}
               </>
             )}
             <div className="bf-hub-form-actions">

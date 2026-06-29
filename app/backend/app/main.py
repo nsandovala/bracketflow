@@ -28,10 +28,10 @@ def get_tournament_or_404(db: Session, tournament_id: int):
 
 
 def ensure_battle_royale_tournament(tournament) -> None:
-    if tournament.format not in crud.BR_FORMATS:
+    if not crud.is_wsow_like_tournament(tournament):
         raise HTTPException(
             status_code=400,
-            detail="This endpoint is only available for battle royale tournament formats",
+            detail="This endpoint is only available for standings-based WSOW-like tournaments",
         )
 
 
@@ -59,6 +59,25 @@ def get_tournament(
     db: Session = Depends(get_db),
 ) -> schemas.Tournament:
     return get_tournament_or_404(db, tournament_id)
+
+
+@app.post("/tournaments/{tournament_id}/archive", response_model=schemas.Tournament)
+def archive_tournament(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    return crud.archive_tournament(db, tournament)
+
+
+@app.delete("/tournaments/{tournament_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_tournament(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    tournament = get_tournament_or_404(db, tournament_id)
+    crud.delete_tournament(db, tournament)
+    return None
 
 
 @app.post(
@@ -184,10 +203,14 @@ def generate_roulette_teams(
     db: Session = Depends(get_db),
 ) -> schemas.RouletteGenerationResult:
     tournament = get_tournament_or_404(db, tournament_id)
-    ensure_battle_royale_tournament(tournament)
+    if not crud.requires_roulette(tournament):
+        raise HTTPException(
+            status_code=400,
+            detail="Roulette teams are only available for roulette tournament engines",
+        )
 
-    if payload.team_size not in {2, 3}:
-        raise HTTPException(status_code=400, detail="team_size must be 2 or 3")
+    if payload.team_size not in {1, 2, 3, 4}:
+        raise HTTPException(status_code=400, detail="team_size must be 1, 2, 3 or 4")
 
     players = crud.get_players_by_tournament(db, tournament_id)
     if len(players) < payload.team_size:

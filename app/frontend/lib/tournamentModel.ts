@@ -13,6 +13,7 @@ export type GameKey =
 export type GameMode =
   | "br"
   | "rebirth"
+  | "kill_race"
   | "head_to_head"
   | "round_based"
   | "custom";
@@ -39,29 +40,36 @@ export type EnginePreset = {
   game: "Warzone";
   format: TournamentFormat;
   scoring_profile: "wsow_like" | "kill_race";
-  game_mode: "br" | "rebirth" | "custom";
+  game_mode: "br" | "rebirth" | "kill_race" | "custom";
   roster_policy: "fixed_squad" | "roulette";
   tournament_structure: "cumulative" | "single_elim" | "double_elim";
   team_size: TeamSize;
   requiresPlacement: boolean;
   requiresUniquePlacement: boolean;
   defaultLobbySize?: number;
+  supportsMatchPoint: boolean;
+  defaultMatchPoint?: number;
+  bestOf?: number;
+  primaryView: "standings" | "bracket";
 };
 
-export const ENGINE_PRESETS: Record<TournamentEngineKey, EnginePreset> = {
-  wsow_classic: {
-    engineKey: "wsow_classic",
-    label: "World Series Clasico",
+export const TOURNAMENT_ENGINES: Record<TournamentEngineKey, EnginePreset> = {
+  wsow_br: {
+    engineKey: "wsow_br",
+    label: "World Series BR",
     game: "Warzone",
     format: "battle_royale_points",
     scoring_profile: "wsow_like",
     game_mode: "br",
     roster_policy: "fixed_squad",
     tournament_structure: "cumulative",
-    team_size: 2,
+    team_size: 3,
     requiresPlacement: true,
     requiresUniquePlacement: true,
-    defaultLobbySize: 150,
+    defaultLobbySize: 50,
+    supportsMatchPoint: true,
+    defaultMatchPoint: 125,
+    primaryView: "standings",
   },
   rebirth_ws: {
     engineKey: "rebirth_ws",
@@ -72,40 +80,50 @@ export const ENGINE_PRESETS: Record<TournamentEngineKey, EnginePreset> = {
     game_mode: "rebirth",
     roster_policy: "fixed_squad",
     tournament_structure: "cumulative",
-    team_size: 2,
+    team_size: 3,
     requiresPlacement: true,
     requiresUniquePlacement: true,
-    defaultLobbySize: 44,
+    defaultLobbySize: 16,
+    supportsMatchPoint: true,
+    defaultMatchPoint: 125,
+    primaryView: "standings",
   },
   roulette_ws: {
     engineKey: "roulette_ws",
-    label: "Gedeon Style / Roulette WS",
+    label: "Gedeon Roulette WS",
     game: "Warzone",
     format: "battle_royale_points",
     scoring_profile: "wsow_like",
     game_mode: "rebirth",
     roster_policy: "roulette",
     tournament_structure: "cumulative",
-    team_size: 2,
+    team_size: 3,
     requiresPlacement: true,
     requiresUniquePlacement: true,
-    defaultLobbySize: 44,
+    defaultLobbySize: 16,
+    supportsMatchPoint: true,
+    defaultMatchPoint: 125,
+    primaryView: "standings",
   },
   kill_race_bracket: {
     engineKey: "kill_race_bracket",
-    label: "Kill Race",
+    label: "Kill Race Bracket",
     game: "Warzone",
     format: "roulette_2v2",
     scoring_profile: "kill_race",
-    game_mode: "custom",
-    roster_policy: "fixed_squad",
+    game_mode: "kill_race",
+    roster_policy: "roulette",
     tournament_structure: "single_elim",
     team_size: 2,
     requiresPlacement: false,
     requiresUniquePlacement: false,
+    supportsMatchPoint: false,
+    bestOf: 3,
+    primaryView: "bracket",
   },
 };
 
+export const ENGINE_PRESETS = TOURNAMENT_ENGINES;
 export const ENGINE_PRESET_LIST = Object.values(ENGINE_PRESETS);
 
 export type ResolvedTournamentEngine = {
@@ -122,6 +140,10 @@ export type ResolvedTournamentEngine = {
   requiresUniquePlacement: boolean;
   legacyFormat: TournamentFormat;
   config: TournamentConfig;
+  primaryView: "standings" | "bracket";
+  supportsMatchPoint: boolean;
+  matchPointThreshold?: number;
+  bestOf?: number;
 };
 
 function normalizeGame(value: string): GameKey {
@@ -173,14 +195,19 @@ function readConfig(tournament: Tournament): TournamentConfig {
   const config = maybeConfig as Record<string, unknown>;
   const lobbySize = config.lobbySize;
   const teamSize = config.teamSize;
+  const bestOf = config.bestOf;
+  const matchPointThreshold = config.matchPointThreshold;
+  const rawEngineKey =
+    config.engine_key === "wsow_classic" ? "wsow_br" : config.engine_key;
   return {
     engine_key:
-      typeof config.engine_key === "string" && config.engine_key in ENGINE_PRESETS
-        ? (config.engine_key as TournamentEngineKey)
+      typeof rawEngineKey === "string" && rawEngineKey in ENGINE_PRESETS
+        ? (rawEngineKey as TournamentEngineKey)
         : undefined,
     game_mode:
       config.game_mode === "br" ||
       config.game_mode === "rebirth" ||
+      config.game_mode === "kill_race" ||
       config.game_mode === "custom"
         ? config.game_mode
         : undefined,
@@ -204,15 +231,31 @@ function readConfig(tournament: Tournament): TournamentConfig {
       teamSize === 1 || teamSize === 2 || teamSize === 3 || teamSize === 4
         ? teamSize
         : undefined,
+    bestOf:
+      typeof bestOf === "number" && Number.isFinite(bestOf) && bestOf > 0
+        ? bestOf
+        : undefined,
+    matchPointThreshold:
+      typeof matchPointThreshold === "number" &&
+      Number.isFinite(matchPointThreshold) &&
+      matchPointThreshold > 0
+        ? matchPointThreshold
+        : undefined,
   };
 }
 
-function readEngineKey(tournament: Tournament, config: TournamentConfig) {
-  const directEngineKey = (tournament as Tournament & { engine_key?: unknown }).engine_key;
+function readEngineKey(
+  tournament: Tournament,
+  config: TournamentConfig
+): TournamentEngineKey | undefined {
+  const directEngineKey = (tournament as Record<string, unknown>).engine_key;
+  if (directEngineKey === "wsow_classic") {
+    return "wsow_br";
+  }
   if (typeof directEngineKey === "string" && directEngineKey in ENGINE_PRESETS) {
     return directEngineKey as TournamentEngineKey;
   }
-  return config.engine_key;
+  return config.engine_key === "wsow_classic" ? "wsow_br" : config.engine_key;
 }
 
 function resolveFromPreset(
@@ -234,6 +277,10 @@ function resolveFromPreset(
     requiresUniquePlacement: preset.requiresUniquePlacement,
     legacyFormat: tournament.format,
     config,
+    primaryView: preset.primaryView,
+    supportsMatchPoint: preset.supportsMatchPoint,
+    matchPointThreshold: config.matchPointThreshold ?? preset.defaultMatchPoint,
+    bestOf: config.bestOf ?? preset.bestOf,
   };
 }
 
@@ -250,8 +297,8 @@ export function resolveTournamentEngine(
 
   if (tournament.format === "battle_royale_points") {
     return {
-      engineKey: "wsow_classic",
-      label: ENGINE_PRESETS.wsow_classic.label,
+      engineKey: "wsow_br",
+      label: ENGINE_PRESETS.wsow_br.label,
       game,
       gameMode: "br",
       scoringProfile: normalizeScoringProfile(tournament.scoring_profile),
@@ -263,6 +310,9 @@ export function resolveTournamentEngine(
       requiresUniquePlacement: true,
       legacyFormat: tournament.format,
       config,
+      primaryView: "standings",
+      supportsMatchPoint: true,
+      matchPointThreshold: config.matchPointThreshold ?? ENGINE_PRESETS.wsow_br.defaultMatchPoint,
     };
   }
 
@@ -271,7 +321,7 @@ export function resolveTournamentEngine(
       engineKey: "kill_race_bracket",
       label: ENGINE_PRESETS.kill_race_bracket.label,
       game,
-      gameMode: "custom",
+      gameMode: "kill_race",
       scoringProfile: normalizeScoringProfile(tournament.scoring_profile),
       rosterPolicy: "roulette",
       tournamentStructure: "single_elim",
@@ -281,6 +331,9 @@ export function resolveTournamentEngine(
       requiresUniquePlacement: false,
       legacyFormat: tournament.format,
       config,
+      primaryView: "bracket",
+      supportsMatchPoint: false,
+      bestOf: config.bestOf ?? ENGINE_PRESETS.kill_race_bracket.bestOf,
     };
   }
 
@@ -288,7 +341,7 @@ export function resolveTournamentEngine(
     engineKey: "kill_race_bracket",
     label: ENGINE_PRESETS.kill_race_bracket.label,
     game,
-    gameMode: "custom",
+    gameMode: "kill_race",
     scoringProfile: normalizeScoringProfile(tournament.scoring_profile),
     rosterPolicy: "fixed_squad",
     tournamentStructure: "single_elim",
@@ -298,6 +351,9 @@ export function resolveTournamentEngine(
     requiresUniquePlacement: false,
     legacyFormat: tournament.format,
     config,
+    primaryView: "bracket",
+    supportsMatchPoint: false,
+    bestOf: config.bestOf ?? ENGINE_PRESETS.kill_race_bracket.bestOf,
   };
 }
 
@@ -318,7 +374,7 @@ export function getEffectiveLobbySize(
   engine: ResolvedTournamentEngine,
   totalTeams: number
 ) {
-  return engine.config.lobbySize ?? totalTeams;
+  return engine.config.lobbySize ?? ENGINE_PRESETS[engine.engineKey].defaultLobbySize ?? totalTeams;
 }
 
 export function getMissingReportsMessage(

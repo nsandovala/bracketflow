@@ -14,7 +14,7 @@ type GameKey =
   | "custom";
 
 type TournamentEngineKey =
-  | "wsow_classic"
+  | "wsow_br"
   | "rebirth_ws"
   | "roulette_ws"
   | "kill_race_bracket";
@@ -22,6 +22,7 @@ type TournamentEngineKey =
 type GameMode =
   | "br"
   | "rebirth"
+  | "kill_race"
   | "head_to_head"
   | "round_based"
   | "custom";
@@ -46,12 +47,14 @@ type TeamSize = 1 | 2 | 3 | 4;
 
 type TournamentConfig = {
   engine_key?: TournamentEngineKey;
-  game_mode?: "br" | "rebirth" | "custom";
+  game_mode?: "br" | "rebirth" | "kill_race" | "custom";
   roster_policy?: RosterPolicy;
   tournament_structure?: TournamentStructure;
   lobbySize?: number;
   bracketMode?: "single_elim" | "double_elim";
   teamSize?: TeamSize;
+  bestOf?: number;
+  matchPointThreshold?: number;
 };
 ```
 
@@ -77,8 +80,8 @@ Compatibility now lives in `app/frontend/lib/tournamentModel.ts` via `resolveTou
 
 | Old model | Problem | New model |
 | --- | --- | --- |
-| `format = battle_royale` | Mixes mode and scoring; not currently the active backend literal | `engine_key = wsow_classic`, `game = warzone`, `game_mode = br`, `scoring_profile = wsow_like`, `roster_policy = fixed_squad`, `tournament_structure = cumulative` |
-| `format = battle_royale_points` | Assumes kills + placement | `engine_key = wsow_classic`, `game = warzone`, `game_mode = br`, `scoring_profile = wsow_like`, `roster_policy = fixed_squad`, `tournament_structure = cumulative` |
+| `format = battle_royale` | Mixes mode and scoring; not currently the active backend literal | `engine_key = wsow_br`, `game = warzone`, `game_mode = br`, `scoring_profile = wsow_like`, `roster_policy = fixed_squad`, `tournament_structure = cumulative` |
+| `format = battle_royale_points` | Assumes kills + placement | `engine_key = wsow_br`, `game = warzone`, `game_mode = br`, `scoring_profile = wsow_like`, `roster_policy = fixed_squad`, `tournament_structure = cumulative` |
 | `format = roulette_2v2` | Mixes roster + team size + scoring | Legacy fallback resolves to `engine_key = kill_race_bracket`, `scoring_profile = kill_race`, `roster_policy = roulette`, `team_size = 2` only when no `config.engine_key` exists. |
 | `format = roulette_3v3` | Mixes roster + team size + scoring | Legacy fallback resolves to `engine_key = kill_race_bracket`, `scoring_profile = kill_race`, `roster_policy = roulette`, `team_size = 3` only when no `config.engine_key` exists. |
 | `battle_royale_points` scoring | Kills + placement with WSOW-like multiplier | Keep only for `scoring_profile = wsow_like`; do not use generically. |
@@ -88,7 +91,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 
 ## Base Engines
 
-### `wsow_classic`
+### `wsow_br`
 
 - game: `warzone`
 - game_mode: `br`
@@ -98,6 +101,8 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - uses kills + placement
 - placement is relevant
 - placement must be unique per partida
+- lobby_size default: 50 squads
+- matchPointThreshold configurable
 
 ### `rebirth_ws`
 
@@ -109,7 +114,9 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - uses kills + placement
 - placement is relevant
 - placement must be unique per partida
-- official Rebirth scoring/lobby tables remain blocked until verified
+- lobby_size default: 16
+- scoring: 1°x1.6 / 2-5°x1.4 / 6-10°x1.2 / 11-16/17°x1.0
+- matchPointThreshold configurable
 
 ### `roulette_ws`
 
@@ -121,14 +128,15 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - teams are mixed by roulette
 - still uses WSOW-like points
 - placement remains part of scoring
+- matchPointThreshold configurable
 - RESPIN is not implemented
 
 ### `kill_race_bracket`
 
 - game: `warzone` for now; later can support Fortnite or another game
-- game_mode: `custom`
+- game_mode: `kill_race`
 - scoring_profile: `kill_race`
-- roster_policy: `fixed_squad | roulette`
+- roster_policy: `roulette`
 - tournament_structure: `single_elim | double_elim`
 - winner is the team with most kills
 - in `single_elim`, loser is eliminated
@@ -139,19 +147,20 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 
 # Motor -> vista principal
 
-## `wsow_classic`
+## `wsow_br`
 
 - Vista principal: standings acumulativo.
 - Inputs: kills + placement.
 - Valida placement unico por partida.
 - Uso: Battle Royale tipo World Series.
+- Lobby default: 50.
 
 ## `rebirth_ws`
 
 - Vista principal: standings acumulativo.
 - Inputs: kills + placement.
 - Valida placement unico por partida.
-- Pendiente: confirmar tabla oficial Rebirth/Resurgence.
+- Multiplicadores Rebirth confirmados en `TOURNAMENT_RULES.md`.
 
 ## `roulette_ws`
 

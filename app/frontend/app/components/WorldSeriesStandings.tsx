@@ -62,10 +62,16 @@ export default function WorldSeriesStandings({
       </section>
 
       <section className="bf-standings-panel">
-        <StandingsTable
-          entries={standings}
-          scoringProfile={isKillRace ? "kill_race" : "wsow_like"}
-        />
+        {isKillRace ? (
+          <div className="bf-empty">
+            <strong>Bracket pendiente</strong>
+            <p>
+              Kill Race se resuelve por llaves BO3. La vista bracket va en el siguiente sprint.
+            </p>
+          </div>
+        ) : (
+          <StandingsTable entries={standings} scoringProfile="wsow_like" />
+        )}
       </section>
     </main>
   );

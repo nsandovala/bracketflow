@@ -228,6 +228,12 @@ const WSOW_PLACEMENT_BANDS: ReadonlyArray<readonly [number, number]> = [
   [35, 1.2], // 21°-35°
 ];
 const WSOW_MIN_MULTIPLIER = 1.0; // 36°+ — clamp: jamas 0 ni negativo
+const REBIRTH_PLACEMENT_BANDS: ReadonlyArray<readonly [number, number]> = [
+  [1, 1.6],
+  [5, 1.4],
+  [10, 1.2],
+];
+const REBIRTH_MIN_MULTIPLIER = 1.0;
 
 export function getPlacementMultiplier(placement: number): number {
   for (const [maxPlace, multiplier] of WSOW_PLACEMENT_BANDS) {
@@ -238,9 +244,19 @@ export function getPlacementMultiplier(placement: number): number {
   return WSOW_MIN_MULTIPLIER;
 }
 
+export function getRebirthPlacementMultiplier(placement: number): number {
+  for (const [maxPlace, multiplier] of REBIRTH_PLACEMENT_BANDS) {
+    if (placement <= maxPlace) {
+      return multiplier;
+    }
+  }
+  return REBIRTH_MIN_MULTIPLIER;
+}
+
 export function estimateWorldSeriesPoints(
   killsValue: string,
-  placementValue: string
+  placementValue: string,
+  gameMode: "br" | "rebirth" = "br"
 ) {
   const kills = Number(killsValue);
   const placement = Number(placementValue);
@@ -249,6 +265,9 @@ export function estimateWorldSeriesPoints(
     return null;
   }
 
-  const multiplier = getPlacementMultiplier(placement);
+  const multiplier =
+    gameMode === "rebirth"
+      ? getRebirthPlacementMultiplier(placement)
+      : getPlacementMultiplier(placement);
   return (Math.round(kills * multiplier * 10) / 10).toFixed(1);
 }

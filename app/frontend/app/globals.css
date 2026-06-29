@@ -282,6 +282,12 @@ a:focus-visible {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.bf-button-danger {
+  color: var(--bf-danger);
+  background: rgba(255, 127, 150, 0.08);
+  border-color: rgba(255, 127, 150, 0.22);
+}
+
 .bf-field {
   display: grid;
   gap: 6px;

@@ -29,6 +29,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new Error(message);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
 
@@ -39,19 +43,23 @@ export type TournamentFormat =
   | "roulette_3v3";
 
 export type TournamentEngineKey =
-  | "wsow_classic"
+  | "wsow_br"
   | "rebirth_ws"
   | "roulette_ws"
   | "kill_race_bracket";
 
+export type LegacyTournamentEngineKey = "wsow_classic";
+
 export type TournamentConfig = {
-  engine_key?: TournamentEngineKey;
-  game_mode?: "br" | "rebirth" | "custom";
+  engine_key?: TournamentEngineKey | LegacyTournamentEngineKey;
+  game_mode?: "br" | "rebirth" | "kill_race" | "custom";
   roster_policy?: "fixed_squad" | "roulette";
   tournament_structure?: "cumulative" | "single_elim" | "double_elim";
   lobbySize?: number;
   bracketMode?: "single_elim" | "double_elim";
   teamSize?: 1 | 2 | 3 | 4;
+  bestOf?: number;
+  matchPointThreshold?: number;
 };
 
 export type Tournament = {
@@ -168,6 +176,18 @@ export function createTournament(payload: {
   return request<Tournament>("/tournaments", {
     method: "POST",
     body: payload,
+  });
+}
+
+export function archiveTournament(tournamentId: number) {
+  return request<Tournament>(`/tournaments/${tournamentId}/archive`, {
+    method: "POST",
+  });
+}
+
+export function deleteTournament(tournamentId: number) {
+  return request<void>(`/tournaments/${tournamentId}`, {
+    method: "DELETE",
   });
 }
 

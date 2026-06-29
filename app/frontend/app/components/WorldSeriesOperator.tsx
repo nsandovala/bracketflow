@@ -33,6 +33,7 @@ type WorldSeriesOperatorProps = {
   onTeamNameChange: (value: string) => void;
   onTeamRosterChange: (value: string) => void;
   onCreateTeam: FormEventHandler<HTMLFormElement>;
+  onGenerateRoulette: () => void;
   onUpdateDraft: (matchId: number, teamId: number, patch: Partial<ResultDraft>) => void;
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onCreateNextGame: () => void;
@@ -82,6 +83,7 @@ export default function WorldSeriesOperator({
   onTeamNameChange,
   onTeamRosterChange,
   onCreateTeam,
+  onGenerateRoulette,
   onUpdateDraft,
   onSaveTeamReport,
   onCreateNextGame,
@@ -98,6 +100,7 @@ export default function WorldSeriesOperator({
   const visibleTeams = filter === "pending" ? pendingTeams : teams;
   const usesPlacement = selectedEngine?.usesPlacement ?? true;
   const isKillRace = selectedEngine?.scoringProfile === "kill_race";
+  const requiresRoulette = selectedEngine?.rosterPolicy === "roulette";
   const effectiveLobbySize = selectedEngine
     ? getEffectiveLobbySize(selectedEngine, totalTeams)
     : totalTeams;
@@ -190,25 +193,37 @@ export default function WorldSeriesOperator({
       ) : totalTeams === 0 ? (
         <section className="opr-panel">
           <div className="opr-eyebrow">Setup requerido</div>
-          <h2>Agrega equipos o genera una ruleta antes de operar la partida.</h2>
+          <h2>{requiresRoulette ? "Ruleta requerida" : "Agrega equipos antes de operar la partida."}</h2>
           <p className="sub">
-            Primero deja listo el roster del torneo. Despues vuelve a Operator para cargar
-            resultados.
+            {requiresRoulette
+              ? "Este motor arma equipos por ruleta antes de operar. Carga participantes en Equipos y luego genera equipos."
+              : "Primero deja listo el roster del torneo. Despues vuelve a Operator para cargar resultados."}
           </p>
           <div className="bf-hub-form-actions">
-            <button
-              type="button"
-              className="bf-button bf-button-primary"
-              onClick={() => setMode("setup")}
-            >
-              Configurar equipos
-            </button>
+            {requiresRoulette ? (
+              <button
+                type="button"
+                className="bf-button bf-button-primary"
+                onClick={onGenerateRoulette}
+                disabled={submitting}
+              >
+                Generar equipos
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="bf-button bf-button-primary"
+                onClick={() => setMode("setup")}
+              >
+                Configurar equipos
+              </button>
+            )}
             <Link href="/torneos" className="bf-button bf-button-ghost">
               Volver a Torneos
             </Link>
           </div>
 
-          {mode === "setup" ? (
+          {mode === "setup" && !requiresRoulette ? (
             <form className="opr-form" onSubmit={onCreateTeam}>
               <div className="opr-field">
                 <label>Nombre del equipo</label>
@@ -234,7 +249,7 @@ export default function WorldSeriesOperator({
             </form>
           ) : null}
 
-          {teamFormError ? <p className="bf-inline-error">{teamFormError}</p> : null}
+          {!requiresRoulette && teamFormError ? <p className="bf-inline-error">{teamFormError}</p> : null}
         </section>
       ) : isKillRace ? (
         <section className="opr-panel">
@@ -342,7 +357,7 @@ export default function WorldSeriesOperator({
                 <strong>Partida {currentGame}</strong>
               </div>
               <span className="t">{totalTeams} equipos</span>
-              <span className="t">{selectedEngine?.label ?? "World Series Clasico"}</span>
+              <span className="t">{selectedEngine?.label ?? "World Series BR"}</span>
               <span className="t">
                 {selectedEngine?.scoringProfile === "kill_race"
                   ? "Kill race"
@@ -521,7 +536,11 @@ export default function WorldSeriesOperator({
                   const estimatedTotal =
                     savedResult?.total_points.toFixed(1) ??
                     (usesPlacement
-                      ? estimateWorldSeriesPoints(draft.kills, draft.placement)
+                      ? estimateWorldSeriesPoints(
+                          draft.kills,
+                          draft.placement,
+                          selectedEngine?.gameMode === "rebirth" ? "rebirth" : "br"
+                        )
                       : draft.kills);
                   const isSaved = Boolean(savedResult);
                   const hasVal = estimatedTotal != null && estimatedTotal !== "";

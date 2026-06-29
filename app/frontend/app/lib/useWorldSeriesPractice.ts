@@ -9,10 +9,13 @@ import {
   TeamResultDetail,
   Tournament,
   addTeamMember,
+  archiveTournament,
   createBattleRoyaleMatch,
   createPlayer,
   createTeam,
   createTournament,
+  deleteTournament,
+  generateRouletteTeams,
   getHealth,
   getLeaderboard,
   getMatches,
@@ -82,21 +85,6 @@ function normalizeAlias(value: string) {
   return value.trim().toLocaleLowerCase();
 }
 
-function sortStandings(entries: LeaderboardEntry[]) {
-  return [...entries].sort((left, right) => {
-    if (right.total_points !== left.total_points) {
-      return right.total_points - left.total_points;
-    }
-    if (right.kills !== left.kills) {
-      return right.kills - left.kills;
-    }
-    if (left.best_placement !== right.best_placement) {
-      return (left.best_placement ?? Number.MAX_SAFE_INTEGER) - (right.best_placement ?? Number.MAX_SAFE_INTEGER);
-    }
-    return left.team_name.localeCompare(right.team_name);
-  });
-}
-
 function sortKillRaceStandings(entries: LeaderboardEntry[]) {
   return [...entries].sort((left, right) => {
     if (right.kills !== left.kills) {
@@ -157,12 +145,17 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       if (!isOperatorSupportedTournament(tournament)) {
         throw new Error("Selected tournament is not supported by Operator yet");
       }
+      const engine = resolveTournamentEngine(tournament);
+
+      const standingsRequests =
+        engine.primaryView === "standings"
+          ? ([getLeaderboard(tournamentId), getTournamentResults(tournamentId)] as const)
+          : ([Promise.resolve([]), Promise.resolve([])] as const);
 
       const [nextTeams, nextMatches, nextLeaderboard, nextResults, nextPlayers] = await Promise.all([
         getTeams(tournamentId),
         getMatches(tournamentId),
-        getLeaderboard(tournamentId),
-        getTournamentResults(tournamentId),
+        ...standingsRequests,
         getPlayers(tournamentId),
       ]);
 
@@ -311,7 +304,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     const sorted =
       selectedEngine?.scoringProfile === "kill_race"
         ? sortKillRaceStandings(leaderboard)
-        : sortStandings(leaderboard);
+        : leaderboard;
     return sorted.map((entry) => {
       const team = teams.find((candidate) => candidate.id === entry.team_id);
       return {
@@ -361,6 +354,9 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     lobbySize?: number;
     rosterPolicy?: "fixed_squad" | "roulette";
     tournamentStructure?: "cumulative" | "single_elim" | "double_elim";
+    gameMode?: "br" | "rebirth" | "kill_race" | "custom";
+    bestOf?: number;
+    matchPointThreshold?: number;
   }) {
     setSubmitting(true);
     setMessage(null);
@@ -380,12 +376,14 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         scoring_profile: payload.preset.scoring_profile,
         config: {
           engine_key: payload.preset.engineKey,
-          game_mode: payload.preset.game_mode,
+          game_mode: payload.gameMode ?? payload.preset.game_mode,
           roster_policy: payload.rosterPolicy ?? payload.preset.roster_policy,
           tournament_structure:
             payload.tournamentStructure ?? payload.preset.tournament_structure,
           lobbySize: payload.lobbySize,
           teamSize: payload.teamSize,
+          bestOf: payload.bestOf,
+          matchPointThreshold: payload.matchPointThreshold,
           bracketMode:
             payload.preset.engineKey === "kill_race_bracket"
               ? payload.tournamentStructure === "double_elim"
@@ -408,9 +406,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   async function createWorldSeriesTournament(payload: { name: string; game: string }) {
     return createEngineTournament({
       ...payload,
-      preset: ENGINE_PRESETS.wsow_classic,
-      teamSize: 2,
-      lobbySize: 150,
+      preset: ENGINE_PRESETS.wsow_br,
+      teamSize: 3,
+      lobbySize: 50,
+      matchPointThreshold: 125,
     });
   }
 
@@ -489,6 +488,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setMessage(null);
 
     try {
+      if (selectedEngine?.primaryView !== "standings") {
+        setMessage("Kill Race se resuelve por bracket. La creación de partidas BO3 va en el siguiente sprint.");
+        return null;
+      }
       const match = await createBattleRoyaleMatch(selectedTournamentId, { round: nextGameNumber });
       await refreshSelectedTournament(selectedTournamentId, { preferLatestMatch: true });
       setMessage(`Partida ${match.round} creada.`);
@@ -496,6 +499,66 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     } catch {
       setMessage("No se pudo crear la siguiente partida.");
       return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function generateRouletteForSelected() {
+    if (selectedTournamentId === null || !selectedEngine) {
+      return null;
+    }
+    if (selectedEngine.rosterPolicy !== "roulette") {
+      setMessage("Este torneo no requiere ruleta.");
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      const result = await generateRouletteTeams(selectedTournamentId, {
+        team_size: selectedEngine.teamSize,
+        reset: true,
+      });
+      await refreshSelectedTournament(selectedTournamentId);
+      setMessage(`Ruleta generada: ${result.teams_created.length} equipos.`);
+      return result;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo generar la ruleta.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function archiveSelectedTournament(tournamentId: number) {
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      await archiveTournament(tournamentId);
+      const nextId = selectedTournamentId === tournamentId ? null : selectedTournamentId;
+      await refreshTournaments(nextId);
+      setMessage("Torneo archivado.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo archivar el torneo.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function deleteSelectedTournament(tournamentId: number) {
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      await deleteTournament(tournamentId);
+      const nextId = selectedTournamentId === tournamentId ? null : selectedTournamentId;
+      await refreshTournaments(nextId);
+      setMessage("Torneo eliminado.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo eliminar el torneo.");
     } finally {
       setSubmitting(false);
     }
@@ -643,6 +706,9 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     createEngineTournament,
     createWorldSeriesTournament,
     createTeamWithRoster,
+    generateRouletteForSelected,
+    archiveSelectedTournament,
+    deleteSelectedTournament,
     createNextGame,
     saveTeamReport,
   };

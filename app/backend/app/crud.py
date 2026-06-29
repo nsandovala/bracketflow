@@ -10,7 +10,8 @@ from . import models, schemas
 BR_FORMATS = {"battle_royale_points", "roulette_2v2", "roulette_3v3"}
 ROULETTE_FORMATS = {"roulette_2v2", "roulette_3v3"}
 WORLD_SERIES_FORMATS = {"battle_royale_points"}
-WSOW_ENGINE_KEYS = {"wsow_classic", "rebirth_ws", "roulette_ws"}
+WSOW_ENGINE_KEYS = {"wsow_br", "wsow_classic", "rebirth_ws", "roulette_ws"}
+REBIRTH_ENGINE_KEYS = {"rebirth_ws"}
 KILL_RACE_ENGINE_KEYS = {"kill_race_bracket"}
 
 
@@ -44,6 +45,8 @@ def read_tournament_config(tournament: models.Tournament) -> dict:
 def get_engine_key(tournament: models.Tournament) -> str | None:
     config = read_tournament_config(tournament)
     engine_key = config.get("engine_key")
+    if engine_key == "wsow_classic":
+        return "wsow_br"
     return engine_key if isinstance(engine_key, str) else None
 
 
@@ -64,6 +67,18 @@ def requires_unique_placement(tournament: models.Tournament) -> bool:
     )
 
 
+def is_wsow_like_tournament(tournament: models.Tournament) -> bool:
+    return tournament.scoring_profile == "wsow_like" and get_engine_key(tournament) not in KILL_RACE_ENGINE_KEYS
+
+
+def requires_roulette(tournament: models.Tournament) -> bool:
+    config = read_tournament_config(tournament)
+    return config.get("roster_policy") == "roulette" or get_engine_key(tournament) in {
+        "roulette_ws",
+        "kill_race_bracket",
+    }
+
+
 def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> models.Tournament:
     normalized_team_size = normalize_team_size(tournament.format, tournament.team_size)
     db_tournament = models.Tournament(
@@ -82,7 +97,12 @@ def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> mode
 
 
 def get_tournaments(db: Session) -> list[models.Tournament]:
-    return db.query(models.Tournament).order_by(models.Tournament.id.desc()).all()
+    return (
+        db.query(models.Tournament)
+        .filter(models.Tournament.status != "archived")
+        .order_by(models.Tournament.id.desc())
+        .all()
+    )
 
 
 def get_tournament(db: Session, tournament_id: int) -> models.Tournament | None:
@@ -91,6 +111,18 @@ def get_tournament(db: Session, tournament_id: int) -> models.Tournament | None:
         .filter(models.Tournament.id == tournament_id)
         .first()
     )
+
+
+def archive_tournament(db: Session, tournament: models.Tournament) -> models.Tournament:
+    tournament.status = "archived"
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
+def delete_tournament(db: Session, tournament: models.Tournament) -> None:
+    db.delete(tournament)
+    db.commit()
 
 
 def create_team(
@@ -365,6 +397,13 @@ WSOW_PLACEMENT_BANDS: list[tuple[int, float]] = [
 ]
 WSOW_MIN_MULTIPLIER = 1.0  # 36°+ — clamp: jamás 0 ni negativo
 
+REBIRTH_PLACEMENT_BANDS: list[tuple[int, float]] = [
+    (1, 1.6),
+    (5, 1.4),
+    (10, 1.2),
+]
+REBIRTH_MIN_MULTIPLIER = 1.0
+
 
 def get_placement_multiplier(placement: int) -> float:
     if placement < 1:
@@ -375,6 +414,15 @@ def get_placement_multiplier(placement: int) -> float:
     return WSOW_MIN_MULTIPLIER
 
 
+def get_rebirth_placement_multiplier(placement: int) -> float:
+    if placement < 1:
+        raise ValueError("placement must be >= 1")
+    for max_place, multiplier in REBIRTH_PLACEMENT_BANDS:
+        if placement <= max_place:
+            return multiplier
+    return REBIRTH_MIN_MULTIPLIER
+
+
 def get_tournament_team_count(db: Session, tournament_id: int) -> int:
     return db.query(models.Team).filter(models.Team.tournament_id == tournament_id).count()
 
@@ -383,13 +431,18 @@ def calculate_points(
     format_name: str,
     kills: int,
     placement: int,
+    engine_key: str | None = None,
 ) -> tuple[float, float, float]:
     if format_name in ROULETTE_FORMATS:
         total_points = float(kills)
         return float(kills), 0.0, total_points
 
     if format_name in WORLD_SERIES_FORMATS:
-        multiplier = get_placement_multiplier(placement)
+        multiplier = (
+            get_rebirth_placement_multiplier(placement)
+            if engine_key in REBIRTH_ENGINE_KEYS
+            else get_placement_multiplier(placement)
+        )
         total_points = round_points(kills * multiplier)
         return float(kills), multiplier, total_points
 
@@ -400,11 +453,13 @@ def calculate_points(
 def build_team_result_schema(
     result: models.TeamResult,
     format_name: str,
+    engine_key: str | None = None,
 ) -> schemas.TeamResult:
     kill_points, placement_points, total_points = calculate_points(
         format_name,
         result.kills,
         result.placement,
+        engine_key,
     )
     return schemas.TeamResult(
         id=result.id,
@@ -441,10 +496,12 @@ def upsert_team_result(
     payload: schemas.TeamResultUpsert,
 ) -> schemas.TeamResult:
     effective_format = get_effective_format(tournament)
+    engine_key = get_engine_key(tournament)
     kill_points, placement_points, total_points = calculate_points(
         effective_format,
         payload.kills,
         payload.placement,
+        engine_key,
     )
 
     db_result = (
@@ -488,7 +545,7 @@ def upsert_team_result(
     db.commit()
     db.refresh(db_result)
     db.refresh(match)
-    return build_team_result_schema(db_result, effective_format)
+    return build_team_result_schema(db_result, effective_format, engine_key)
 
 
 def get_team_results_by_tournament(
@@ -519,10 +576,12 @@ def get_team_result_details_by_tournament(
     details: list[schemas.TeamResultDetail] = []
     for result, team_name, round_number, match_status in rows:
         effective_format = get_effective_format(tournament)
+        engine_key = get_engine_key(tournament)
         kill_points, placement_points, total_points = calculate_points(
             effective_format,
             result.kills,
             result.placement,
+            engine_key,
         )
         details.append(
             schemas.TeamResultDetail(
@@ -564,10 +623,12 @@ def get_leaderboard(
 
     for result in results:
         effective_format = get_effective_format(tournament)
+        engine_key = get_engine_key(tournament)
         _, _, result_total_points = calculate_points(
             effective_format,
             result.kills,
             result.placement,
+            engine_key,
         )
         summary = summary_by_team[result.team_id]
         summary["kills"] = int(summary["kills"]) + result.kills
