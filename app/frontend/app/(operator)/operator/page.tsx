@@ -3,8 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 
-import WorldSeriesOperator from "../components/WorldSeriesOperator";
-import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
+import WorldSeriesOperator from "../../components/WorldSeriesOperator";
+import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
 
 function parseTournamentId(value: string | null) {
   if (!value) {

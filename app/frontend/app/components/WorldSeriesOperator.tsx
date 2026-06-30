@@ -2,7 +2,7 @@
 
 import { FormEventHandler, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { Match, Player, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
@@ -100,8 +100,6 @@ export default function WorldSeriesOperator({
   onSaveTeamReport,
   onCreateNextGame,
 }: WorldSeriesOperatorProps) {
-  const tournamentQuery = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
-  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [mode, setMode] = useState<OperatorMode>(
@@ -150,69 +148,6 @@ export default function WorldSeriesOperator({
   return (
     <main className="bf-page bf-page-operator">
       <div className="opr-amb" aria-hidden="true" />
-
-      <div className="opr-topbar">
-        <div className="opr-brand">
-          <span className="opr-brand-mark">BF</span>
-          <div className="opr-brand-copy">
-            <div className="opr-brand-name">BracketFlow</div>
-            <div className="opr-brand-sub">
-              {selectedTournament ? selectedTournament.name : "World Series Practice"}
-            </div>
-          </div>
-        </div>
-
-        <nav className="opr-nav" aria-label="Primary">
-          <Link
-            href={`/dashboard${tournamentQuery}`}
-            className={pathname === "/dashboard" ? "is-active" : ""}
-          >
-            Dashboard
-          </Link>
-          <Link href="/operator" className={pathname === "/operator" ? "is-active" : ""}>
-            Operator
-          </Link>
-          <Link
-            href={`/standings${tournamentQuery}`}
-            className={pathname === "/standings" ? "is-active" : ""}
-          >
-            Standings
-          </Link>
-          <Link
-            href={`/stream${tournamentQuery}`}
-            className={pathname === "/stream" ? "is-active" : ""}
-          >
-            Stream
-          </Link>
-        </nav>
-
-        <div className="opr-topbar-side">
-          {tournaments.length > 0 ? (
-            <label className="opr-select">
-              <span>Torneo</span>
-              <select
-                value={selectedTournamentId ?? ""}
-                onChange={(event) => {
-                  onSelectTournament(Number(event.target.value));
-                  setMode("op");
-                }}
-              >
-                {tournaments.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>
-                    {tournament.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <span className="opr-backend is-on">Sin torneo activo</span>
-          )}
-          <span className={`opr-backend ${backendOnline ? "is-on" : "is-off"}`}>
-            <i />
-            {backendOnline ? "EN VIVO" : "SIN CONEXIÓN"}
-          </span>
-        </div>
-      </div>
 
       {message ? <p className="bf-message">{message}</p> : null}
 
@@ -294,11 +229,12 @@ export default function WorldSeriesOperator({
         </section>
       ) : isKillRace ? (
         <section className="opr-panel">
-          <div className="opr-eyebrow">Kill Race</div>
-          <h2>Bracket preparado</h2>
+          <div className="opr-eyebrow">Kill Race · {selectedEngine?.teamSize ?? 2}v{selectedEngine?.teamSize ?? 2}</div>
+          <h2>Bracket</h2>
           <p className="sub">
-            Seed listo con {totalTeams} equipos generados por ruleta. El avance
-            automático single/double elim va en el siguiente sprint.
+            {totalTeams > 0
+              ? `${totalTeams} equipos de ${selectedEngine?.teamSize ?? 2} jugadores. Serie BO3: gana quien tenga más kills por mapa. Primero a 2 mapas avanza.`
+              : "Falta generar equipos. Ve a Setup de ruleta para cargar participantes."}
           </p>
 
           <div className="opr-stats">
@@ -335,14 +271,14 @@ export default function WorldSeriesOperator({
                 className={mode === "bracket" || mode === "op" ? "is-on" : ""}
                 onClick={() => setMode("bracket")}
               >
-                Bracket / Resultados
+                Bracket
               </button>
               <button
                 type="button"
                 className={mode === "setup" ? "is-on" : ""}
                 onClick={() => setMode("setup")}
               >
-                Setup de ruleta
+                Setup
               </button>
             </div>
           </div>
@@ -575,7 +511,7 @@ export default function WorldSeriesOperator({
                       ? estimateWorldSeriesPoints(
                           draft.kills,
                           draft.placement,
-                          selectedEngine?.gameMode === "rebirth" ? "rebirth" : "br"
+                          totalTeams
                         )
                       : draft.kills);
                   const isSaved = Boolean(savedResult);

@@ -30,6 +30,17 @@ function Svg({ size = 18, className, children }: SvgProps) {
   );
 }
 
+export function IconOperator(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8 9h8" />
+      <path d="M8 12h6" />
+      <path d="M8 15h4" />
+    </Svg>
+  );
+}
+
 export function IconDashboard(props: IconProps) {
   return (
     <Svg {...props}>

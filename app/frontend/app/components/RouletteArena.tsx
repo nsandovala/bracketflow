@@ -37,21 +37,51 @@ function cleanParticipantName(value: string) {
     .trim();
 }
 
-function parseParticipants(value: string) {
+function validateParticipantName(name: string): { ok: true } | { ok: false; reason: string } {
+  if (!name || name.length === 0) {
+    return { ok: false, reason: "vacío" };
+  }
+  if (name.length < 2) {
+    return { ok: false, reason: "muy corto" };
+  }
+  if (name.includes(",")) {
+    return { ok: false, reason: "contiene coma interna (probablemente múltiples nombres sin separar)" };
+  }
+  if (name.includes(";")) {
+    return { ok: false, reason: "contiene punto y coma interno" };
+  }
+  if (name.includes("\t")) {
+    return { ok: false, reason: "contiene tab interno" };
+  }
+  return { ok: true };
+}
+
+function parseParticipants(value: string): { names: string[]; rejected: Array<{ raw: string; reason: string }> } {
   const seen = new Set<string>();
   const names: string[] = [];
-  value
-    .split(/[\n,;\t]+/)
-    .map(cleanParticipantName)
-    .filter(Boolean)
-    .forEach((name) => {
-      const key = name.toLocaleLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        names.push(name);
-      }
-    });
-  return names;
+  const rejected: Array<{ raw: string; reason: string }> = [];
+
+  // Split by newlines, commas, semicolons, tabs, OR multiple spaces (2+)
+  const rawParts = value.split(/[\n,;\t]+|\s{2,}/);
+
+  rawParts.forEach((raw) => {
+    const cleaned = cleanParticipantName(raw);
+    if (!cleaned) return;
+
+    const validation = validateParticipantName(cleaned);
+    if (!validation.ok) {
+      rejected.push({ raw: raw.trim(), reason: validation.reason });
+      return;
+    }
+
+    const key = cleaned.toLocaleLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      names.push(cleaned);
+    }
+  });
+
+  return { names, rejected };
 }
 
 function seededRandom(seed: string) {
@@ -119,7 +149,6 @@ export default function RouletteArena({
   const teamSize = engine.teamSize;
   const minimumPlayers = teamSize * 2;
   const missingPlayers = Math.max(minimumPlayers - players.length, 0);
-  const benchCount = players.length >= teamSize ? players.length % teamSize : 0;
   const hasConfirmedTeams = teams.length > 0;
   const isKillRace = engine.engineKey === "kill_race_bracket";
   const modeBadge =
@@ -136,33 +165,37 @@ export default function RouletteArena({
   const resultBench = preview
     ? visiblePreviewBench.map((player) => player.nickname)
     : confirmedBench;
+  const estimatedTeams = Math.floor(players.length / teamSize);
+  const estimatedBench = players.length >= teamSize ? players.length % teamSize : players.length;
   const arenaStatus = hasConfirmedTeams
-    ? `${teams.length} equipos generados`
+    ? `${teams.length} equipos confirmados`
     : preview
       ? `${visiblePreviewTeams.length} equipos en preview`
-      : "Pendiente";
+      : players.length > 0
+        ? `${players.length} cargados · ${estimatedTeams} equipos${estimatedBench > 0 ? ` · ${estimatedBench} banca` : ""}`
+        : "Pendiente";
   const stateCopy = hasConfirmedTeams
     ? {
-        eyebrow: "Seed listo",
-        title: "Seed listo",
-        body: `${teams.length} equipos generados. Ya puedes preparar bracket u operar.`,
+        eyebrow: "Equipos confirmados",
+        title: "Equipos confirmados",
+        body: `${teams.length} equipos de ${teamSize} jugadores. ${isKillRace ? "Prepara el bracket para operar." : "Ya puedes ir a Operator."}`,
       }
     : preview
       ? {
-          eyebrow: "Preview generado",
-          title: "Preview generado",
-          body: "Revisa equipos antes de confirmar.",
+          eyebrow: "Equipos generados",
+          title: "Equipos generados",
+          body: `Revisa los equipos antes de confirmar. ${visiblePreviewBench.length > 0 ? `${visiblePreviewBench.length} en banca.` : ""}`,
         }
       : players.length >= minimumPlayers
         ? {
             eyebrow: "Pool listo",
             title: "Pool listo",
-            body: `${players.length} participantes cargados. Puedes girar la ruleta.`,
+            body: `${players.length} participantes cargados. Equipos estimados: ${estimatedTeams}${estimatedBench > 0 ? ` · Banca: ${estimatedBench}` : ""}.`,
           }
         : {
             eyebrow: "Carga participantes",
             title: "Carga participantes",
-            body: "Importa o pega la lista. La ruleta armará equipos según modalidad.",
+            body: "Pega una lista o importa un archivo .txt/.csv. También puedes copiar y pegar desde Word, Excel, Discord o Google Sheets.",
           };
   const wheelLabels = useMemo(() => {
     const maxLabels = 15;
@@ -175,19 +208,31 @@ export default function RouletteArena({
 
   async function handleBulkImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nicknames = parseParticipants(bulkValue);
+    const { names: nicknames, rejected } = parseParticipants(bulkValue);
     if (nicknames.length === 0) {
+      if (rejected.length > 0) {
+        setFileMessage(`Ningún nombre válido. Revisa: ${rejected.slice(0, 3).map((r) => `"${r.raw}" (${r.reason})`).join(", ")}${rejected.length > 3 ? ` y ${rejected.length - 3} más.` : ""}`);
+      } else {
+        setFileMessage("Pega una lista de participantes antes de cargar.");
+      }
       return;
     }
     await onImportParticipants(nicknames);
     setBulkValue("");
     setPreview(null);
-    setFileMessage(null);
+    const rejectionMsg = rejected.length > 0
+      ? ` · ${rejected.length} rechazado(s): ${rejected.slice(0, 2).map((r) => `"${r.raw}"`).join(", ")}${rejected.length > 2 ? "..." : ""}`
+      : "";
+    setFileMessage(`${nicknames.length} participantes cargados.${rejectionMsg}`);
   }
 
-  async function importNicknames(nicknames: string[], message: string) {
+  async function importNicknames(nicknames: string[], rejected: Array<{ raw: string; reason: string }>, message: string) {
     if (nicknames.length === 0) {
-      setFileMessage("No se detectaron participantes. Pega la lista manualmente.");
+      if (rejected.length > 0) {
+        setFileMessage(`No se detectaron participantes válidos. Revisa: ${rejected.slice(0, 3).map((r) => `"${r.raw}" (${r.reason})`).join(", ")}`);
+      } else {
+        setFileMessage("No se detectaron participantes. Pega la lista manualmente.");
+      }
       return;
     }
     await onImportParticipants(nicknames);
@@ -214,10 +259,14 @@ export default function RouletteArena({
     const reader = new FileReader();
     reader.onload = () => {
       const content = typeof reader.result === "string" ? reader.result : "";
-      const nicknames = parseParticipants(content);
+      const { names: nicknames, rejected } = parseParticipants(content);
+      const rejectionMsg = rejected.length > 0
+        ? ` · ${rejected.length} línea(s) rechazada(s).`
+        : "";
       void importNicknames(
         nicknames,
-        `Archivo importado: ${nicknames.length} participantes detectados.`
+        rejected,
+        `Archivo importado: ${nicknames.length} participantes detectados.${rejectionMsg}`
       );
     };
     reader.onerror = () => {
@@ -252,7 +301,7 @@ export default function RouletteArena({
       <div className="bf-roulette-head">
         <div>
           <span className="opr-eyebrow">{stateCopy.eyebrow}</span>
-          <h2>Setup de ruleta</h2>
+          <h2>{stateCopy.title}</h2>
           <p>{stateCopy.body}</p>
         </div>
         <div className="bf-roulette-head-side">
@@ -265,10 +314,10 @@ export default function RouletteArena({
         <aside className="bf-roulette-panel bf-roulette-pool">
           <div className="bf-roulette-panel-head">
             <div>
-              <span>Pool compacto</span>
-              <strong>{players.length} participantes cargados</strong>
+              <span>Participantes</span>
+              <strong>{players.length} cargados · mínimo {minimumPlayers}</strong>
             </div>
-            <em>mínimo {minimumPlayers}</em>
+            <em>{modeBadge}</em>
           </div>
 
           <form className="bf-roulette-import" onSubmit={handleBulkImport}>
@@ -276,7 +325,7 @@ export default function RouletteArena({
               ref={fileInputRef}
               className="bf-roulette-file-input"
               type="file"
-              accept=".txt,.csv,.docx,text/plain,text/csv"
+              accept=".txt,.csv,text/plain,text/csv"
               onChange={handleFileImport}
               disabled={hasConfirmedTeams || submitting}
             />
@@ -292,7 +341,7 @@ export default function RouletteArena({
             <textarea
               value={bulkValue}
               onChange={(event) => setBulkValue(event.target.value)}
-              placeholder={"player1\nplayer2\nplayer3"}
+              placeholder={"player1\nplayer2\nplayer3\n…También puedes copiar y pegar desde Word, Excel, Discord o Google Sheets."}
               rows={7}
               disabled={hasConfirmedTeams || submitting}
             />
@@ -300,7 +349,7 @@ export default function RouletteArena({
               <button
                 type="submit"
                 className="bf-button bf-button-primary"
-                disabled={submitting || hasConfirmedTeams}
+                disabled={submitting || hasConfirmedTeams || bulkValue.trim().length === 0}
               >
                 Cargar participantes
               </button>
@@ -317,11 +366,11 @@ export default function RouletteArena({
 
           <div className="bf-roulette-counts">
             {missingPlayers > 0 ? (
-              <span>Faltan {missingPlayers} participantes para generar equipos.</span>
-            ) : benchCount > 0 ? (
-              <span>{benchCount} quedarán en banca.</span>
+              <span>Faltan {missingPlayers} participantes para armar {estimatedTeams + 1} equipos de {teamSize}.</span>
+            ) : estimatedBench > 0 ? (
+              <span>Pool listo: {estimatedTeams} equipos de {teamSize} · {estimatedBench} en banca.</span>
             ) : (
-              <span>Pool listo para girar.</span>
+              <span>Pool listo: {estimatedTeams} equipos de {teamSize} · sin banca.</span>
             )}
           </div>
 
@@ -428,10 +477,12 @@ export default function RouletteArena({
           </div>
           <p className="bf-roulette-note">
             {preview
-              ? "Preview generado. Revisa equipos antes de confirmar."
+              ? "Revisa los equipos y confirma para persistirlos."
               : hasConfirmedTeams
-                ? "Seed listo. La llave visual ya puede mostrarse en Operator, Standings y Stream."
-                : stateCopy.body}
+                ? `Equipos confirmados: ${teams.length} de ${teamSize} jugadores.`
+                : players.length >= minimumPlayers
+                  ? "Haz click en Girar ruleta para generar equipos."
+                  : "Carga participantes primero."}
           </p>
         </div>
 
@@ -439,7 +490,15 @@ export default function RouletteArena({
           <div className="bf-roulette-panel-head">
             <div>
               <span>{isKillRace ? "Seed de bracket" : "Equipos generados"}</span>
-              <strong>{hasConfirmedTeams ? "Seed listo" : preview ? "Preview generado" : "Pendiente"}</strong>
+              <strong>
+                {hasConfirmedTeams
+                  ? `${teams.length} equipos confirmados`
+                  : preview
+                    ? `${visiblePreviewTeams.length} equipos en preview`
+                    : players.length > 0
+                      ? `${players.length} participantes cargados`
+                      : "Pendiente"}
+              </strong>
             </div>
             <em>{modeBadge}</em>
           </div>

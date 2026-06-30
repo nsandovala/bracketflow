@@ -36,17 +36,17 @@ export default function WorldSeriesStandings({
 
   return (
     <main className="bf-shell-standings">
-      <section className="bf-standings-toolbar">
+        <section className="bf-standings-toolbar">
         <div>
           <span className="bf-standings-kicker">
-            {isBracket ? "Bracket / Resultados" : "Clasificación general"}
+            {isBracket ? "Bracket" : "Clasificación general"}
           </span>
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
           <p>
             {isBracket
               ? totalTeams > 0
-                ? "Seed listo. La llave BO3 se construye en el siguiente sprint."
-                : "Falta generar bracket. Genera equipos por ruleta para preparar el seed."
+                ? `${teams.length} equipos sembrados. Bracket listo.`
+                : "Falta generar bracket. Carga participantes y confirma equipos."
               : afterGameNumber > 0
                 ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
                 : "Los resultados aparecerán al reportar la primera partida."}

@@ -14,10 +14,10 @@ type BracketViewProps = {
 export default function BracketView({ tournament, engine, teams, mode }: BracketViewProps) {
   const rounds = buildSingleElimBracket(teams, engine?.teamSize ?? 2);
   const hasTeams = teams.length > 0;
-  const title = hasTeams ? "Bracket preparado" : "Falta generar bracket";
+  const title = hasTeams ? "Bracket" : "Falta generar bracket";
   const subtitle = hasTeams
-    ? `${teams.length} equipos sembrados. Ganadores y BO3 llegan en el siguiente sprint.`
-    : "Importa participantes para crear el seed.";
+    ? `${teams.length} equipos sembrados · ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
+    : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
 
   return (
     <section className={`bf-bracket-view is-${mode}`}>

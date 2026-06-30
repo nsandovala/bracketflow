@@ -76,16 +76,40 @@ class Tournament(TournamentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+def _validate_nickname(value: str) -> str:
+    stripped = value.strip()
+    if len(stripped) < 2:
+        raise ValueError("El nickname debe tener al menos 2 caracteres.")
+    if "," in stripped or ";" in stripped or "\t" in stripped:
+        raise ValueError("El nickname no puede contener comas, puntos y coma ni tabs internos.")
+    return stripped
+
+
 class PlayerCreate(BaseModel):
     nickname: str
+
+    @field_validator("nickname")
+    @classmethod
+    def check_nickname(cls, v: str) -> str:
+        return _validate_nickname(v)
 
 
 class PlayerBulkImport(BaseModel):
     nicknames: list[str]
 
+    @field_validator("nicknames")
+    @classmethod
+    def check_nicknames(cls, v: list[str]) -> list[str]:
+        return [_validate_nickname(n) for n in v]
+
 
 class PlayerUpdate(BaseModel):
     nickname: str
+
+    @field_validator("nickname")
+    @classmethod
+    def check_nickname(cls, v: str) -> str:
+        return _validate_nickname(v)
 
 
 class Player(BaseModel):

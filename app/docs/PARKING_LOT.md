@@ -56,6 +56,13 @@
 - Esto impacta backend, estado de torneo, standings y stream.
 - Queda como siguiente bloque relevante despues de unificar operator.
 
+## Bracket BO3 completo
+
+- El avance automatico de bracket single/double elim no esta implementado.
+- Falta backend para crear matches con team_a_id / team_b_id y guardar resultados por mapa.
+- Falta Operator con inputs de kills por equipo A/B, estado de serie (0-0, 1-0, 2-0), y boton "Avanzar ganador".
+- Documentado en NEXT_STEPS.md como siguiente paso recomendado.
+
 ## Agentes de automatizacion
 
 - No se deben crear todavia.

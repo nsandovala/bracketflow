@@ -1,27 +1,28 @@
 # Codex Context
 
 > Handoff persistente para futuras sesiones de Codex.
-> Ultima actualizacion: 2026-06-23.
+> Ultima actualizacion: 2026-06-30.
 
 ## Estado actual
 
-- El repo ya tiene un dashboard visualmente mas fuerte dentro del shell de operator.
-- El problema abierto es de consistencia: `dashboard` vive dentro del shell, pero `/operator` y `/standings` todavia se sienten de otra liga cuando quedan fuera de ese layout.
-- La nav compacta previa fue un parche visual, no la solucion estructural.
+- Parser de participantes robusto: separa por newline, coma, punto y coma, tab, multiples espacios.
+- Validacion anti-comas en frontend y backend: evita nicknames concatenados como `manteca, demain, carlos, lalo, clara`.
+- UI copy anti-duplicidad aplicada en ruleta, bracket, standings y operator.
+- Bracket visual funciona con nombres reales y BYE explicito.
+- Stream bifurca correctamente: Kill Race -> bracket, WSOW/Rebirth -> standings.
+- Operator Kill Race muestra bracket y contexto BO3 (pero avance automatico de ganador no esta implementado).
+- Dashboard unificado dentro del shell de operator: `/operator` y `/standings` ya comparten layout visual.
 
 ## Decision tomada
 
-- El siguiente trabajo de producto y frontend debe ser unificar `dashboard`, `/operator` y `/standings` dentro del mismo shell de operator.
-- El topbar del shell no debe quedar hardcodeado con un mensaje fijo; debe volverse contextual por vista.
-- El objetivo es que toda la experiencia operativa herede el mismo sidebar, ritmo visual y nivel de pulido del dashboard.
+- El siguiente trabajo de producto debe ser implementar el flujo BO3 real para Kill Race: crear matches de bracket, registrar kills por mapa, avanzar ganador.
+- El topbar del shell debe seguir siendo contextual por vista (ya parcialmente implementado).
+- Prioridad: flujo operativo real sobre pulido visual.
 
-## Foco del sprint
+## Foco del sprint vigente (P0.1 completado)
 
-- WS Practice fluido y unificado.
-- `operator` y `standings` migrados dentro del shell.
-- Topbar contextual por pantalla.
-- QA manual del flujo real completo.
-- WS en BR y Rebirth, tratando Rebirth como modo o metadata si el scoring no cambia.
+- Ruleta base MVP completo (cargar participantes -> preview UI -> confirmar -> persistir equipos).
+- Kill Race Bracket MVP parcial (seed listo, bracket visual, falta BO3 operativo).
 
 ## Lo que no entra en este sprint
 
@@ -30,6 +31,7 @@
 - Monetizacion, creditos, RESPIN o planes.
 - Bot de Discord.
 - Agentes de automatizacion para stats prints, overlays o salidas automaticas.
+- Import .docx.
 
 ## Rebirth
 
@@ -41,7 +43,7 @@
 
 - `Clerk` si esta en backlog cercano, pero deliberadamente fuera del sprint actual.
 - El backlog grande de producto, monetizacion y automatizacion ya fue congelado en `docs/PARKING_LOT.md`.
-- Si surge una idea nueva, documentarla primero y no mezclarla con el trabajo del shell unificado.
+- Si surge una idea nueva, documentarla primero y no mezclarla con el trabajo del sprint.
 
 ## Como retomar rapido en otra maquina
 
@@ -53,8 +55,7 @@
 
 ## Siguiente paso recomendado
 
-- Inspeccionar el shell actual del dashboard en frontend.
-- Identificar que layout compartido conviene extraer.
-- Mover `/operator` y `/standings` a ese shell.
-- Hacer el header contextual por ruta o estado de vista.
-- Validar que no se rompa el flujo real de torneo ni la integracion con backend.
+- Implementar backend para matches de bracket Kill Race (crear matches con team_a_id / team_b_id, guardar resultados por mapa).
+- Implementar Operator Kill Race BO3: seleccionar match, inputs de kills A/B, guardar mapa, estado de serie 0-0/1-0/etc.
+- Avance automatico de ganador single-elim (minimo viable: mostrar proximo match, sin automatizar completamente).
+- Validar flujo completo manualmente con un torneo real de 4-8 equipos.

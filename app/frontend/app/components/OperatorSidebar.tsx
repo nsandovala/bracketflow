@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   IconDashboard,
   IconMoon,
+  IconOperator,
   IconSettings,
   IconStandings,
   IconStream,
@@ -21,12 +22,12 @@ type NavItem = {
   Icon: (props: IconProps) => React.JSX.Element;
 };
 
-// Dashboard, Torneos y Equipos/Ajustes viven dentro del shell (route
-// group). Standings y Stream apuntan a las vistas existentes; Stream
-// vive fuera del shell (mundo broadcast) y se abre normal.
+// Todas las vistas operativas viven dentro del shell (route group).
+// Stream vive fuera del shell (mundo broadcast / OBS) y se abre normal.
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", Icon: IconDashboard },
   { href: "/torneos", label: "Torneos", Icon: IconTrophy },
+  { href: "/operator", label: "Operator", Icon: IconOperator },
   { href: "/standings", label: "Standings", Icon: IconStandings },
   { href: "/stream", label: "Stream", Icon: IconStream },
   { href: "/equipos", label: "Setup", Icon: IconTeams },

@@ -31,6 +31,10 @@ const ROUTE_COPY: Record<string, { title: string; subtitle: string }> = {
     title: "Setup",
     subtitle: "Roster y ruleta del torneo activo.",
   },
+  "/operator": {
+    title: "Operator",
+    subtitle: "Carga resultados y opera la partida activa.",
+  },
   "/ajustes": {
     title: "Ajustes",
     subtitle: "Preferencias del entorno operator.",

@@ -1,21 +1,48 @@
 # BracketFlow — Contexto de QA y Recomendaciones
 
 > Documento de continuidad para sesiones futuras.
-> Fecha: 2026-06-02
-> Estado: MVP validado, sin bugs críticos, optimizaciones pendientes documentadas.
+> Fecha: 2026-06-30 (actualizado)
+> Estado: MVP validado, bugs críticos de ruleta corregidos, optimizaciones pendientes documentadas.
 
 ---
 
 ## 1. Resumen del QA realizado
 
-### Validaciones técnicas
+### Sprint P0.1 — Ruleta Real + Kill Race Seed (2026-06-30)
+
+#### Validaciones técnicas
+| Check | Comando | Resultado |
+|-------|---------|-----------|
+| Backend syntax | `cd backend && python -m compileall app` | Sin errores |
+| Frontend lint | `cd frontend && npm run lint` | 0 errores, 9 warnings preexistentes |
+| Frontend build | `cd frontend && npm run build` | Build exitoso (Next.js 16.2.7) |
+| Backend QA script | `python qa_killrace.py` | PASO |
+
+#### Bugs corregidos en P0.1
+1. **Nickname con comas internas aceptado** → Ahora frontend y backend rechazan nicknames con `, ; \t` internos (422). Evita equipos como `fede / manteca, demain, carlos, lalo, clara`.
+2. **Duplicidad de textos UI** → Aplicada regla anti-duplicidad en RouletteArena, BracketView, Standings, Operator.
+3. **Mensajes de "siguiente sprint"** → Quitados de BracketView y Operator Kill Race.
+4. **Parser debil** → Ahora soporta separadores: newline, coma, punto y coma, tab, multiples espacios.
+
+#### Flujo funcional validado (script `qa_killrace.py`)
+1. ✅ Crear torneo Kill Race 2v2.
+2. ✅ Intentar importar nickname con comas → rechazado 422.
+3. ✅ Importar 4 jugadores validos → 201.
+4. ✅ Generar ruleta → 2 equipos de 2 jugadores exactos, 0 banca.
+5. ✅ Agregar 1 jugador extra, regenerar → 2 equipos, 1 banca.
+6. ✅ Bracket visual muestra nombres reales y BYE.
+7. ✅ Stream bifurca: Kill Race → bracket, WSOW → standings.
+
+### Sprint anterior (2026-06-02)
+
+#### Validaciones técnicas
 | Check | Comando | Resultado |
 |-------|---------|-----------|
 | Backend syntax | `cd backend && python -m compileall app` | Sin errores |
 | Frontend lint | `cd frontend && npm run lint` | Sin errores |
 | Frontend build | `cd frontend && npm run build` | Build exitoso (Next.js 16.2.7) |
 
-### Flujo funcional validado (vía API REST, script `qa_flow.py`)
+#### Flujo funcional validado (vía API REST, script `qa_flow.py`)
 1. ✅ Crear torneo formato `roulette_2v2`.
 2. ✅ Agregar 4 jugadores manualmente.
 3. ✅ Generar ruleta 2v2 (2 equipos creados, 0 en bench).
@@ -30,8 +57,8 @@
 8. ✅ Actualizar resultado existente (8 → 9 kills) sin duplicar registros.
 9. ✅ Persistencia confirmada en `backend/bracketflow.db` tras detener el backend.
 
-### Bugs encontrados
-**Ninguno.** El flujo happy path del MVP se comporta según especificación.
+### Bugs encontrados (historico)
+**Ninguno crítico.** El flujo happy path del MVP se comporta según especificación.
 
 ### Archivos modificados durante el QA
 **Ninguno.** Solo se usó un script temporal externo (`qa_flow.py` en temp) que no quedó en el repo.
