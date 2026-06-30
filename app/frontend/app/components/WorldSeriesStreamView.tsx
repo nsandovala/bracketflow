@@ -3,10 +3,12 @@
 import { useEffect } from "react";
 
 import BackgroundParticles from "./BackgroundParticles";
+import BracketStreamView from "./BracketStreamView";
 import StreamOverlayLowerThird from "./StreamOverlayLowerThird";
 import StreamOverlaySidebar from "./StreamOverlaySidebar";
 import StreamStandingsBoard from "./StreamStandingsBoard";
 import { useStreamLeaderboard } from "../lib/useStreamLeaderboard";
+import { resolveTournamentEngine } from "../../lib/tournamentModel";
 
 type WorldSeriesStreamViewProps = {
   tournamentId: number | null;
@@ -23,8 +25,13 @@ export default function WorldSeriesStreamView({
   brand,
   layout,
 }: WorldSeriesStreamViewProps) {
-  const { tournament, standings, afterGameNumber, connected } =
+  const { tournament, teams, standings, afterGameNumber, connected } =
     useStreamLeaderboard(tournamentId);
+  const engine = tournament ? resolveTournamentEngine(tournament) : null;
+  const isBracket =
+    engine?.scoringProfile === "kill_race" ||
+    engine?.tournamentStructure === "single_elim" ||
+    engine?.tournamentStructure === "double_elim";
 
   useEffect(() => {
     const body = document.body;
@@ -46,6 +53,20 @@ export default function WorldSeriesStreamView({
       body.style.background = prevBodyBg;
     };
   }, [transparent]);
+
+  if (isBracket) {
+    return (
+      <BracketStreamView
+        tournament={tournament}
+        engine={engine}
+        teams={teams}
+        connected={connected}
+        obs={obs || layout === "sidebar" || layout === "lower"}
+        transparent={transparent}
+        brand={brand}
+      />
+    );
+  }
 
   // Overlay modes (sidebar / lower) render a fixed transparent canvas with just the overlay chip.
   if (layout === "sidebar" || layout === "lower") {

@@ -55,6 +55,11 @@ type TournamentConfig = {
   teamSize?: TeamSize;
   bestOf?: number;
   matchPointThreshold?: number;
+  rouletteGeneratedAt?: string;
+  rouletteSeed?: string;
+  rouletteTeamSize?: TeamSize;
+  rouletteBench?: string[];
+  rouletteStatus?: "generated" | "confirmed";
 };
 ```
 
@@ -101,6 +106,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - uses kills + placement
 - placement is relevant
 - placement must be unique per partida
+- team_size: 4 jugadores por equipo en BracketFlow/Gedeon
 - lobby_size default: 50 squads
 - matchPointThreshold configurable
 
@@ -114,6 +120,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - uses kills + placement
 - placement is relevant
 - placement must be unique per partida
+- team_size: 3 jugadores por equipo
 - lobby_size default: 16
 - scoring: 1°x1.6 / 2-5°x1.4 / 6-10°x1.2 / 11-16/17°x1.0
 - matchPointThreshold configurable
@@ -126,6 +133,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - roster_policy: `roulette`
 - tournament_structure: `cumulative`
 - teams are mixed by roulette
+- team_size: 4 si `game_mode=br`, 3 si `game_mode=rebirth`
 - still uses WSOW-like points
 - placement remains part of scoring
 - matchPointThreshold configurable
@@ -168,7 +176,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - Inputs: kills + placement.
 - Roster policy: roulette.
 - Requiere ruleta real antes de operar.
-- Ruleta real va en sprint propio.
+- Flujo: pool de participantes -> ruleta -> equipos confirmados -> Operator.
 
 ## `kill_race_bracket`
 
@@ -177,9 +185,32 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - No usa placement.
 - Single elim: perdedor eliminado.
 - Double elim: perdedor baja a losers bracket.
-- Hoy queda como "Bracket pendiente".
+- Hoy muestra bracket visual MVP con seed generado; el avance BO3 real queda pendiente.
 
-Kill Race no debe renderizarse como World Series. Si no existe bracket real, la UI debe decir "Bracket pendiente" en vez de mostrar una tabla WSOW falsa.
+Kill Race no debe renderizarse como World Series. Si no existe seed, la UI debe decir "Falta generar bracket" en vez de mostrar una tabla WSOW falsa.
+
+## PlayerIdentity roadmap
+
+Hoy el jugador se identifica por `nickname`, que tambien funciona como `displayName`.
+
+Modelo futuro:
+
+```ts
+type PlayerIdentity = {
+  nickname: string;
+  activisionId?: string;
+  platform?: "battle_net" | "psn" | "xbox" | "steam" | "ea" | "epic" | "other";
+  gameIds?: Array<{
+    game: string;
+    value: string;
+  }>;
+};
+```
+
+- `displayName = nickname` por ahora.
+- Torneos casuales pueden operar solo con nickname.
+- Torneos competitivos/legales deben poder exigir ID oficial del juego cuando aplique.
+- No bloquear la ruleta ni el bracket MVP por este roadmap.
 
 ## Operator Guardrails
 

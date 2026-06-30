@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/torneos", label: "Torneos", Icon: IconTrophy },
   { href: "/standings", label: "Standings", Icon: IconStandings },
   { href: "/stream", label: "Stream", Icon: IconStream },
-  { href: "/equipos", label: "Equipos", Icon: IconTeams },
+  { href: "/equipos", label: "Setup", Icon: IconTeams },
   { href: "/ajustes", label: "Ajustes", Icon: IconSettings },
 ];
 

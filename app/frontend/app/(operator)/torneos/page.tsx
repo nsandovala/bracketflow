@@ -6,8 +6,10 @@ import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
 import { IconDashboard, IconStandings, IconTeams, IconTrophy } from "../../components/icons";
 import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
+import type { Tournament } from "../../../lib/api";
 import {
   ENGINE_PRESETS,
+  resolveTournamentEngine,
   type TournamentEngineKey,
   type TournamentStructure,
   type TeamSize,
@@ -18,7 +20,7 @@ const TOURNAMENT_MOTORS = [
     id: "world-series",
     engineKey: "wsow_br",
     name: "World Series BR",
-    tags: ["BR", "WSOW", "Acumulativo"],
+    tags: ["BR", "4v4", "WSOW"],
     status: "Disponible",
     tone: "available",
   },
@@ -34,7 +36,7 @@ const TOURNAMENT_MOTORS = [
     id: "roulette",
     engineKey: "roulette_ws",
     name: "Gedeon Roulette WS",
-    tags: ["Ruleta", "Rebirth", "WSOW-like"],
+    tags: ["Ruleta", "BR/Rebirth", "WSOW-like"],
     status: "Disponible",
     tone: "available",
   },
@@ -66,8 +68,8 @@ export default function TorneosPage() {
     tournaments,
     selectedTournamentId,
     selectedTournament,
-    selectTournament,
     createEngineTournament,
+    updateEngineTournament,
     archiveSelectedTournament,
     deleteSelectedTournament,
   } = useWorldSeriesPractice();
@@ -76,7 +78,7 @@ export default function TorneosPage() {
   const [tournamentGame, setTournamentGame] = useState("Warzone");
   const [selectedEngineKey, setSelectedEngineKey] =
     useState<TournamentEngineKey>("wsow_br");
-  const [teamSize, setTeamSize] = useState<TeamSize>(3);
+  const [teamSize, setTeamSize] = useState<TeamSize>(4);
   const [lobbySize, setLobbySize] = useState("50");
   const [rouletteGameMode, setRouletteGameMode] = useState<"br" | "rebirth">("rebirth");
   const [matchPointPreset, setMatchPointPreset] = useState<"125" | "150" | "custom">("125");
@@ -85,11 +87,21 @@ export default function TorneosPage() {
   const [killRaceStructure, setKillRaceStructure] =
     useState<TournamentStructure>("single_elim");
   const [showForm, setShowForm] = useState(false);
+  const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
   const [motorsVisible, setMotorsVisible] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const motorsRef = useRef<HTMLElement>(null);
   const selectedPreset = ENGINE_PRESETS[selectedEngineKey];
   const isKillRace = selectedEngineKey === "kill_race_bracket";
+  const formTitle = editingTournament ? "Editar torneo" : "Crear torneo";
+  const motorSummary = {
+    "Cómo se arma": selectedPreset.roster_policy === "roulette" ? "Ruleta" : "Squad fijo",
+    "Vista final": selectedPreset.primaryView === "bracket" ? "Bracket" : "Standings",
+    "Team size": `${teamSize} jugadores por equipo`,
+    "Reglas clave": isKillRace
+      ? "BO3 por kills, sin placement"
+      : "Kills + placement, match point configurable",
+  };
 
   useEffect(() => {
     const section = motorsRef.current;
@@ -138,7 +150,29 @@ export default function TorneosPage() {
   }
 
   function revealTournamentForm(engineKey: TournamentEngineKey = selectedEngineKey) {
+    setEditingTournament(null);
     selectEngine(engineKey);
+    setShowForm(true);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  function revealEditForm(tournament: Tournament) {
+    const engine = resolveTournamentEngine(tournament);
+    const preset = ENGINE_PRESETS[engine.engineKey];
+    setEditingTournament(tournament);
+    setSelectedEngineKey(engine.engineKey);
+    setTournamentName(tournament.name);
+    setTournamentGame(tournament.game || "Warzone");
+    setTeamSize(engine.teamSize);
+    setLobbySize(engine.config.lobbySize ? String(engine.config.lobbySize) : preset.defaultLobbySize ? String(preset.defaultLobbySize) : "");
+    setRouletteGameMode(engine.gameMode === "br" ? "br" : "rebirth");
+    const matchPoint = engine.matchPointThreshold ?? preset.defaultMatchPoint;
+    setMatchPointThreshold(matchPoint ? String(matchPoint) : "");
+    setMatchPointPreset(matchPoint === 150 ? "150" : matchPoint === 125 ? "125" : "custom");
+    setBestOf(engine.bestOf ? String(engine.bestOf) : preset.bestOf ? String(preset.bestOf) : "3");
+    setKillRaceStructure(engine.tournamentStructure);
     setShowForm(true);
     requestAnimationFrame(() => {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -152,7 +186,7 @@ export default function TorneosPage() {
     const parsedBestOf = Number(bestOf);
     const gameMode =
       selectedEngineKey === "roulette_ws" ? rouletteGameMode : selectedPreset.game_mode;
-    const created = await createEngineTournament({
+    const payload = {
       name: tournamentName,
       game: tournamentGame,
       preset: selectedPreset,
@@ -171,18 +205,19 @@ export default function TorneosPage() {
         !isKillRace && Number.isFinite(parsedMatchPoint) && parsedMatchPoint > 0
           ? parsedMatchPoint
           : undefined,
-    });
-    if (created) {
+    };
+    const saved = editingTournament
+      ? await updateEngineTournament(editingTournament.id, payload)
+      : await createEngineTournament(payload);
+    if (saved) {
       setTournamentName("");
       setTournamentGame("Warzone");
+      setEditingTournament(null);
       setShowForm(false);
-      router.push(`/operator?tournamentId=${created.id}`);
+      if (!editingTournament) {
+        router.push(`/operator?tournamentId=${saved.id}`);
+      }
     }
-  }
-
-  function handleSelectTournament(tournamentId: number) {
-    selectTournament(tournamentId);
-    router.push(`/operator?tournamentId=${tournamentId}`);
   }
 
   function handleArchiveTournament(tournamentId: number) {
@@ -203,11 +238,12 @@ export default function TorneosPage() {
     <main className="bf-tournaments-page">
       {message ? <p className="bf-message">{message}</p> : null}
 
+      {/* No duplicar el H1 en titulos internos. */}
       <section className="bf-tournaments-hero">
         <div>
-          <span className="bf-dash-section-label">Hub operativo</span>
-          <h2>Torneos</h2>
-          <p>Crea, selecciona y opera torneos desde un solo lugar.</p>
+          <span className="bf-dash-section-label">Arena activa</span>
+          <h2>Próxima acción</h2>
+          <p>Elige motor, crea torneo o vuelve al torneo seleccionado.</p>
         </div>
         <button
           type="button"
@@ -218,74 +254,10 @@ export default function TorneosPage() {
         </button>
       </section>
 
-      <section className="bf-tournaments-list">
-        {loading ? (
-          <p className="bf-empty">Cargando torneos...</p>
-        ) : tournaments.length > 0 ? (
-          tournaments.map((tournament) => {
-            const isSelected = tournament.id === selectedTournamentId;
-            return (
-              <article
-                key={tournament.id}
-                className={`bf-hub-tournament-card${isSelected ? " is-active" : ""}`}
-              >
-                <div className="bf-hub-tournament-info">
-                  <strong className="bf-hub-tournament-name">{tournament.name}</strong>
-                  <span className="bf-hub-tournament-meta">
-                    <span className="bf-hub-tournament-game">{tournament.game}</span>
-                    <span className="bf-hub-tournament-status">
-                      {isSelected ? "Activo" : tournament.status}
-                    </span>
-                  </span>
-                </div>
-                <div className="bf-hub-tournament-actions">
-                  <button
-                    type="button"
-                    className="bf-button bf-button-primary"
-                    onClick={() => handleSelectTournament(tournament.id)}
-                  >
-                    Operar
-                  </button>
-                  <Link href={`/dashboard?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                    Dashboard
-                  </Link>
-                  <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                    Standings
-                  </Link>
-                  <Link href={`/stream?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                    Stream
-                  </Link>
-                  <button
-                    type="button"
-                    className="bf-button bf-button-ghost"
-                    onClick={() => handleArchiveTournament(tournament.id)}
-                    disabled={submitting}
-                  >
-                    Archivar
-                  </button>
-                  <button
-                    type="button"
-                    className="bf-button bf-button-danger"
-                    onClick={() => handleDeleteTournament(tournament.id)}
-                    disabled={submitting}
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </article>
-            );
-          })
-        ) : (
-          <p className="bf-empty">
-            No hay torneos creados. Abre Nuevo torneo para elegir formato competitivo.
-          </p>
-        )}
-      </section>
-
       <section className="bf-hub-motors bf-tournaments-motors" ref={motorsRef}>
         <div className="bf-home-section-head">
-          <span className="bf-hub-section-kicker">Selector visual</span>
-          <h3>Motores de torneo</h3>
+          <span className="bf-hub-section-kicker">Entrada principal</span>
+          <h3>Motores disponibles</h3>
         </div>
         <div className="bf-hub-motor-grid">
           {TOURNAMENT_MOTORS.map((motor, index) => {
@@ -323,31 +295,122 @@ export default function TorneosPage() {
         </div>
       </section>
 
+      <section className="bf-tournaments-list">
+        <div className="bf-home-section-head">
+          <span className="bf-hub-section-kicker">Arena</span>
+          <h3>Torneos activos</h3>
+        </div>
+        {loading ? (
+          <p className="bf-empty">Cargando torneos...</p>
+        ) : tournaments.length > 0 ? (
+          tournaments.map((tournament) => {
+            const isSelected = tournament.id === selectedTournamentId;
+            const engine = resolveTournamentEngine(tournament);
+            const needsRoulette =
+              engine.rosterPolicy === "roulette" &&
+              tournament.config?.rouletteStatus !== "confirmed";
+            const isKillRaceTournament = engine.engineKey === "kill_race_bracket";
+            const primaryHref = needsRoulette
+              ? `/operator?tournamentId=${tournament.id}&roulette=1`
+              : isKillRaceTournament
+                ? `/standings?tournamentId=${tournament.id}`
+                : `/operator?tournamentId=${tournament.id}`;
+            const primaryLabel = needsRoulette
+              ? "Ruleta"
+              : isKillRaceTournament
+                ? "Ver bracket"
+                : "Operar";
+            return (
+              <article
+                key={tournament.id}
+                className={`bf-hub-tournament-card${isSelected ? " is-active" : ""}`}
+              >
+                <div className="bf-hub-tournament-info">
+                  <strong className="bf-hub-tournament-name">{tournament.name}</strong>
+                  <span className="bf-hub-tournament-meta">
+                    <span className="bf-hub-tournament-game">{tournament.game}</span>
+                    <span className="bf-hub-tournament-status">
+                      {needsRoulette ? "Setup requerido" : isSelected ? "Activo" : tournament.status}
+                    </span>
+                  </span>
+                </div>
+                <div className="bf-hub-tournament-actions">
+                  <Link href={primaryHref} className="bf-button bf-button-primary">
+                    {primaryLabel}
+                  </Link>
+                  <Link href={`/dashboard?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                    Dashboard
+                  </Link>
+                  <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                    Standings
+                  </Link>
+                  <Link href={`/stream?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                    Stream
+                  </Link>
+                  <button
+                    type="button"
+                    className="bf-button bf-button-ghost"
+                    onClick={() => revealEditForm(tournament)}
+                    disabled={submitting}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="bf-button bf-button-ghost"
+                    onClick={() => handleArchiveTournament(tournament.id)}
+                    disabled={submitting}
+                  >
+                    Archivar
+                  </button>
+                  <button
+                    type="button"
+                    className="bf-button bf-button-danger"
+                    onClick={() => handleDeleteTournament(tournament.id)}
+                    disabled={submitting}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <p className="bf-empty">
+            No hay torneos creados. Abre Nuevo torneo para elegir formato competitivo.
+          </p>
+        )}
+      </section>
+
       {showForm ? (
         <section className="bf-tournaments-create">
           <div>
-            <span className="bf-dash-section-label">Nuevo torneo</span>
-            <h3>Nuevo torneo</h3>
-            <p>Elige el formato competitivo y luego completa los detalles.</p>
+            <span className="bf-dash-section-label">{editingTournament ? "Edición" : "Nuevo torneo"}</span>
+            <h3>{formTitle}</h3>
+            <p>
+              Motor: <strong>{selectedPreset.label}</strong>{" "}
+              {!editingTournament ? (
+                <button
+                  type="button"
+                  className="bf-hub-motor-cta"
+                  onClick={() => setShowForm(false)}
+                >
+                  Cambiar motor
+                </button>
+              ) : (
+                <span>Los campos estructurales quedan protegidos si ya existen resultados.</span>
+              )}
+            </p>
+            <dl className="bf-engine-summary">
+              {Object.entries(motorSummary).map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
           <form className="bf-hub-form" onSubmit={handleCreateTournament} ref={formRef}>
-            <div className="bf-field">
-              <span>Elige el formato competitivo</span>
-              <div className="bf-hub-format-chips">
-                {TOURNAMENT_MOTORS.map((motor) => (
-                  <button
-                    key={motor.engineKey}
-                    type="button"
-                    className={`bf-hub-format-chip${
-                      selectedEngineKey === motor.engineKey ? " is-active" : ""
-                    }`}
-                    onClick={() => selectEngine(motor.engineKey)}
-                  >
-                    {motor.name}
-                  </button>
-                ))}
-              </div>
-            </div>
             <label className="bf-field">
               <span>Nombre del torneo</span>
               <input
@@ -356,15 +419,6 @@ export default function TorneosPage() {
                 placeholder="WS Practice LATAM"
                 required
                 autoFocus
-              />
-            </label>
-            <label className="bf-field">
-              <span>Juego</span>
-              <input
-                value={tournamentGame}
-                onChange={(event) => setTournamentGame(event.target.value)}
-                placeholder="Warzone"
-                required
               />
             </label>
             {isKillRace ? (
@@ -396,7 +450,7 @@ export default function TorneosPage() {
                   <span>Best of</span>
                   <input
                     type="number"
-                    min={1}
+                    min={3}
                     step={2}
                     value={bestOf}
                     onChange={(event) => setBestOf(event.target.value)}
@@ -421,26 +475,29 @@ export default function TorneosPage() {
                     </select>
                   </label>
                 ) : null}
-                <label className="bf-field">
+                <div className="bf-field">
                   <span>Team size</span>
-                  <select
-                    value={teamSize}
-                    onChange={(event) => setTeamSize(Number(event.target.value) as TeamSize)}
-                  >
-                    <option value={2}>2v2</option>
-                    <option value={3}>3v3</option>
-                    <option value={4}>4v4</option>
-                  </select>
-                </label>
+                  <strong>{teamSize} jugadores por equipo</strong>
+                </div>
                 <label className="bf-field">
                   <span>Lobby size</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={lobbySize}
-                    onChange={(event) => setLobbySize(event.target.value)}
-                    required
-                  />
+                  {selectedEngineKey === "rebirth_ws" ? (
+                    <select
+                      value={lobbySize}
+                      onChange={(event) => setLobbySize(event.target.value)}
+                    >
+                      <option value="16">16</option>
+                      <option value="17">17</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      min={1}
+                      value={lobbySize}
+                      onChange={(event) => setLobbySize(event.target.value)}
+                      required
+                    />
+                  )}
                 </label>
                 <p className="bf-empty">
                   Placement se valida contra lobby size, no contra equipos registrados.
@@ -482,12 +539,15 @@ export default function TorneosPage() {
                 className="bf-button bf-button-primary bf-button-hero"
                 disabled={submitting}
               >
-                {submitting ? "Creando..." : "Crear torneo"}
+                {submitting ? "Guardando..." : editingTournament ? "Guardar cambios" : "Crear torneo"}
               </button>
               <button
                 type="button"
                 className="bf-button bf-button-ghost"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingTournament(null);
+                }}
               >
                 Cancelar
               </button>

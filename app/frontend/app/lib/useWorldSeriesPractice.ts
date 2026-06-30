@@ -10,10 +10,13 @@ import {
   Tournament,
   addTeamMember,
   archiveTournament,
+  bulkImportPlayers,
+  clearPlayers,
   createBattleRoyaleMatch,
   createPlayer,
   createTeam,
   createTournament,
+  deletePlayer,
   deleteTournament,
   generateRouletteTeams,
   getHealth,
@@ -25,6 +28,7 @@ import {
   getTournaments,
   getTeams,
   saveMatchResult,
+  updateTournament,
 } from "../../lib/api";
 import {
   ENGINE_PRESETS,
@@ -403,14 +407,141 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     }
   }
 
+  async function updateEngineTournament(
+    tournamentId: number,
+    payload: {
+      name: string;
+      game: string;
+      preset: EnginePreset;
+      teamSize: 1 | 2 | 3 | 4;
+      lobbySize?: number;
+      rosterPolicy?: "fixed_squad" | "roulette";
+      tournamentStructure?: "cumulative" | "single_elim" | "double_elim";
+      gameMode?: "br" | "rebirth" | "kill_race" | "custom";
+      bestOf?: number;
+      matchPointThreshold?: number;
+    }
+  ) {
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      const legacyFormat =
+        payload.preset.engineKey === "kill_race_bracket"
+          ? payload.teamSize === 3
+            ? "roulette_3v3"
+            : "roulette_2v2"
+          : payload.preset.format;
+      const tournament = await updateTournament(tournamentId, {
+        name: payload.name,
+        game: payload.game,
+        format: legacyFormat,
+        team_size: payload.teamSize,
+        scoring_profile: payload.preset.scoring_profile,
+        config: {
+          engine_key: payload.preset.engineKey,
+          game_mode: payload.gameMode ?? payload.preset.game_mode,
+          roster_policy: payload.rosterPolicy ?? payload.preset.roster_policy,
+          tournament_structure:
+            payload.tournamentStructure ?? payload.preset.tournament_structure,
+          lobbySize: payload.lobbySize,
+          teamSize: payload.teamSize,
+          bestOf: payload.bestOf,
+          matchPointThreshold: payload.matchPointThreshold,
+          bracketMode:
+            payload.preset.engineKey === "kill_race_bracket"
+              ? payload.tournamentStructure === "double_elim"
+                ? "double_elim"
+                : "single_elim"
+              : undefined,
+        },
+      });
+      await refreshTournaments(tournament.id);
+      setMessage(`Torneo actualizado: ${tournament.name}`);
+      return tournament;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo actualizar el torneo.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function createWorldSeriesTournament(payload: { name: string; game: string }) {
     return createEngineTournament({
       ...payload,
       preset: ENGINE_PRESETS.wsow_br,
-      teamSize: 3,
+      teamSize: 4,
       lobbySize: 50,
       matchPointThreshold: 125,
     });
+  }
+
+  async function importParticipants(nicknames: string[]) {
+    if (selectedTournamentId === null) {
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      const created = await bulkImportPlayers(selectedTournamentId, { nicknames });
+      await refreshSelectedTournament(selectedTournamentId);
+      setMessage(
+        created.length > 0
+          ? `Participantes cargados: ${created.length}.`
+          : "No se cargaron participantes nuevos."
+      );
+      return created;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudieron cargar participantes.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function removeParticipant(playerId: number) {
+    if (selectedTournamentId === null) {
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      await deletePlayer(playerId);
+      await refreshSelectedTournament(selectedTournamentId);
+      setMessage("Participante eliminado.");
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo eliminar el participante.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function clearParticipants() {
+    if (selectedTournamentId === null) {
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      await clearPlayers(selectedTournamentId);
+      await refreshSelectedTournament(selectedTournamentId);
+      setMessage("Participantes limpiados.");
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudieron limpiar participantes.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function createTeamWithRoster(payload: { name: string; roster: string }) {
@@ -504,7 +635,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     }
   }
 
-  async function generateRouletteForSelected() {
+  async function generateRouletteForSelected(shuffleSeed?: string | number) {
     if (selectedTournamentId === null || !selectedEngine) {
       return null;
     }
@@ -518,8 +649,9 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
     try {
       const result = await generateRouletteTeams(selectedTournamentId, {
-        team_size: selectedEngine.teamSize,
+        shuffle_seed: shuffleSeed,
         reset: true,
+        confirm: true,
       });
       await refreshSelectedTournament(selectedTournamentId);
       setMessage(`Ruleta generada: ${result.teams_created.length} equipos.`);
@@ -704,7 +836,11 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     selectTournament,
     updateResultDraft,
     createEngineTournament,
+    updateEngineTournament,
     createWorldSeriesTournament,
+    importParticipants,
+    removeParticipant,
+    clearParticipants,
     createTeamWithRoster,
     generateRouletteForSelected,
     archiveSelectedTournament,

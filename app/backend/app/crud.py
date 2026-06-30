@@ -1,6 +1,7 @@
 import json
 import random
 import re
+from datetime import UTC, datetime
 from collections import defaultdict
 
 from sqlalchemy.orm import Session, selectinload
@@ -13,6 +14,15 @@ WORLD_SERIES_FORMATS = {"battle_royale_points"}
 WSOW_ENGINE_KEYS = {"wsow_br", "wsow_classic", "rebirth_ws", "roulette_ws"}
 REBIRTH_ENGINE_KEYS = {"rebirth_ws"}
 KILL_RACE_ENGINE_KEYS = {"kill_race_bracket"}
+STRUCTURAL_CONFIG_FIELDS = {
+    "engine_key",
+    "scoring_profile",
+    "roster_policy",
+    "teamSize",
+    "game_mode",
+    "tournament_structure",
+    "bracketMode",
+}
 
 
 def normalize_team_size(format_name: str, requested_team_size: int) -> int:
@@ -32,6 +42,12 @@ def serialize_config(config: schemas.TournamentConfig | None) -> str | None:
     return json.dumps(data) if data else None
 
 
+def normalize_config_dict(config: schemas.TournamentConfig | None) -> dict:
+    if config is None:
+        return {}
+    return config.model_dump(exclude_none=True)
+
+
 def read_tournament_config(tournament: models.Tournament) -> dict:
     if not tournament.config:
         return {}
@@ -48,6 +64,136 @@ def get_engine_key(tournament: models.Tournament) -> str | None:
     if engine_key == "wsow_classic":
         return "wsow_br"
     return engine_key if isinstance(engine_key, str) else None
+
+
+def get_payload_engine_key(tournament: schemas.TournamentBase) -> str | None:
+    if tournament.config is None:
+        return None
+    engine_key = tournament.config.engine_key
+    if engine_key == "wsow_classic":
+        return "wsow_br"
+    return engine_key
+
+
+def validate_tournament_contract(
+    *,
+    engine_key: str | None,
+    scoring_profile: str,
+    team_size: int,
+    config: dict,
+) -> None:
+    game_mode = config.get("game_mode")
+    roster_policy = config.get("roster_policy")
+    tournament_structure = config.get("tournament_structure")
+    has_lobby_size = config.get("lobbySize") is not None
+    has_match_point = config.get("matchPointThreshold") is not None
+
+    if engine_key == "wsow_br":
+        if scoring_profile != "wsow_like":
+            raise ValueError("World Series BR requires scoring_profile=wsow_like")
+        if roster_policy not in {None, "fixed_squad"}:
+            raise ValueError("World Series BR requires roster_policy=fixed_squad")
+        if game_mode not in {None, "br"}:
+            raise ValueError("World Series BR requires game_mode=br")
+        if tournament_structure not in {None, "cumulative"}:
+            raise ValueError("WSOW/Rebirth engines cannot use single/double elimination")
+        if team_size != 4 or config.get("teamSize") not in {None, 4}:
+            raise ValueError("World Series BR requires team_size=4")
+
+    if engine_key == "rebirth_ws":
+        if scoring_profile != "wsow_like":
+            raise ValueError("Rebirth WS requires scoring_profile=wsow_like")
+        if roster_policy not in {None, "fixed_squad"}:
+            raise ValueError("Rebirth WS requires roster_policy=fixed_squad")
+        if game_mode not in {None, "rebirth"}:
+            raise ValueError("Rebirth WS requires game_mode=rebirth")
+        if tournament_structure not in {None, "cumulative"}:
+            raise ValueError("WSOW/Rebirth engines cannot use single/double elimination")
+        if team_size != 3 or config.get("teamSize") not in {None, 3}:
+            raise ValueError("Rebirth WS requires team_size=3")
+        if config.get("lobbySize") not in {None, 16, 17}:
+            raise ValueError("Rebirth WS lobbySize must be 16 or 17")
+
+    if engine_key == "roulette_ws":
+        if scoring_profile != "wsow_like":
+            raise ValueError("Gedeon Roulette WS requires scoring_profile=wsow_like")
+        if roster_policy not in {None, "roulette"}:
+            raise ValueError("Gedeon Roulette WS requires roster_policy=roulette")
+        if game_mode not in {None, "br", "rebirth"}:
+            raise ValueError("Gedeon Roulette WS requires game_mode=br or rebirth")
+        if tournament_structure not in {None, "cumulative"}:
+            raise ValueError("Gedeon Roulette WS cannot use single/double elimination")
+        expected_team_size = 4 if game_mode == "br" else 3
+        if team_size != expected_team_size or config.get("teamSize") not in {None, expected_team_size}:
+            raise ValueError(
+                "Gedeon Roulette WS requires team_size=4 for BR and team_size=3 for Rebirth"
+            )
+
+    if engine_key == "kill_race_bracket":
+        if scoring_profile != "kill_race":
+            raise ValueError("Kill Race requires scoring_profile=kill_race")
+        if roster_policy not in {None, "roulette"}:
+            raise ValueError("Kill Race requires roster_policy=roulette")
+        if game_mode not in {None, "kill_race"}:
+            raise ValueError("Kill Race requires game_mode=kill_race")
+        if tournament_structure not in {None, "single_elim", "double_elim"}:
+            raise ValueError("Kill Race requires single_elim or double_elim")
+        if has_lobby_size or has_match_point:
+            raise ValueError("Kill Race cannot receive lobbySize or matchPointThreshold")
+        if team_size not in {1, 2, 3} or config.get("teamSize") not in {None, 1, 2, 3}:
+            raise ValueError("Kill Race team mode must be 1v1, 2v2 or 3v3")
+
+
+def has_results(db: Session, tournament_id: int) -> bool:
+    return (
+        db.query(models.TeamResult.id)
+        .filter(models.TeamResult.tournament_id == tournament_id)
+        .first()
+        is not None
+    )
+
+
+def get_effective_lobby_size(tournament: models.Tournament) -> int | None:
+    config = read_tournament_config(tournament)
+    lobby_size = config.get("lobbySize")
+    if isinstance(lobby_size, int) and lobby_size > 0:
+        return lobby_size
+    engine_key = get_engine_key(tournament)
+    if engine_key == "rebirth_ws":
+        return 16
+    if engine_key in {"wsow_br", "roulette_ws"}:
+        return 50 if config.get("game_mode") == "br" else 16
+    return None
+
+
+def resolve_roulette_team_size(tournament: models.Tournament) -> int:
+    config = read_tournament_config(tournament)
+    engine_key = get_engine_key(tournament)
+    if engine_key == "roulette_ws":
+        return 4 if config.get("game_mode") == "br" else 3
+    if engine_key == "kill_race_bracket":
+        team_size = config.get("teamSize")
+        return int(team_size) if team_size in {1, 2, 3} else tournament.team_size
+    raise ValueError("This tournament does not use roulette roster generation")
+
+
+def assert_structural_fields_unmodified(
+    current: models.Tournament,
+    payload: schemas.TournamentUpdate,
+) -> None:
+    current_config = read_tournament_config(current)
+    next_config = normalize_config_dict(payload.config) if payload.config is not None else current_config
+
+    if payload.format is not None and payload.format != current.format:
+        raise ValueError("format cannot be changed after results exist")
+    if payload.team_size is not None and payload.team_size != current.team_size:
+        raise ValueError("team_size cannot be changed after results exist")
+    if payload.scoring_profile is not None and payload.scoring_profile != current.scoring_profile:
+        raise ValueError("scoring_profile cannot be changed after results exist")
+
+    for field in STRUCTURAL_CONFIG_FIELDS:
+        if current_config.get(field) != next_config.get(field):
+            raise ValueError(f"{field} cannot be changed after results exist")
 
 
 def get_effective_format(tournament: models.Tournament) -> str:
@@ -81,6 +227,13 @@ def requires_roulette(tournament: models.Tournament) -> bool:
 
 def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> models.Tournament:
     normalized_team_size = normalize_team_size(tournament.format, tournament.team_size)
+    config = normalize_config_dict(tournament.config)
+    validate_tournament_contract(
+        engine_key=get_payload_engine_key(tournament),
+        scoring_profile=tournament.scoring_profile,
+        team_size=normalized_team_size,
+        config=config,
+    )
     db_tournament = models.Tournament(
         name=tournament.name,
         game=tournament.game,
@@ -94,6 +247,54 @@ def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> mode
     db.commit()
     db.refresh(db_tournament)
     return db_tournament
+
+
+def update_tournament(
+    db: Session,
+    current: models.Tournament,
+    payload: schemas.TournamentUpdate,
+) -> models.Tournament:
+    if has_results(db, current.id):
+        assert_structural_fields_unmodified(current, payload)
+
+    next_name = payload.name if payload.name is not None else current.name
+    next_game = payload.game if payload.game is not None else current.game
+    next_format = payload.format if payload.format is not None else current.format
+    next_team_size = (
+        normalize_team_size(next_format, payload.team_size)
+        if payload.team_size is not None
+        else current.team_size
+    )
+    next_scoring_profile = (
+        payload.scoring_profile
+        if payload.scoring_profile is not None
+        else current.scoring_profile
+    )
+    next_config = (
+        normalize_config_dict(payload.config)
+        if payload.config is not None
+        else read_tournament_config(current)
+    )
+    engine_key = next_config.get("engine_key")
+    if engine_key == "wsow_classic":
+        engine_key = "wsow_br"
+
+    validate_tournament_contract(
+        engine_key=engine_key if isinstance(engine_key, str) else None,
+        scoring_profile=next_scoring_profile,
+        team_size=next_team_size,
+        config=next_config,
+    )
+
+    current.name = next_name
+    current.game = next_game
+    current.format = next_format
+    current.team_size = next_team_size
+    current.scoring_profile = next_scoring_profile
+    current.config = json.dumps(next_config) if next_config else None
+    db.commit()
+    db.refresh(current)
+    return current
 
 
 def get_tournaments(db: Session) -> list[models.Tournament]:
@@ -177,11 +378,102 @@ def create_player(
     return db_player
 
 
+def normalize_nickname(value: str) -> str:
+    return " ".join(value.strip().split())
+
+
+def create_players_bulk(
+    db: Session,
+    tournament_id: int,
+    nicknames: list[str],
+) -> list[models.Player]:
+    existing = {
+        normalize_nickname(player.nickname).casefold()
+        for player in get_players_by_tournament(db, tournament_id)
+    }
+    seen: set[str] = set()
+    created: list[models.Player] = []
+    for raw_nickname in nicknames:
+        nickname = normalize_nickname(raw_nickname)
+        if not nickname:
+            continue
+        key = nickname.casefold()
+        if key in existing or key in seen:
+            continue
+        db_player = models.Player(nickname=nickname, tournament_id=tournament_id)
+        db.add(db_player)
+        created.append(db_player)
+        seen.add(key)
+    db.commit()
+    for player in created:
+        db.refresh(player)
+    return created
+
+
+def update_player(
+    db: Session,
+    player: models.Player,
+    payload: schemas.PlayerUpdate,
+) -> models.Player:
+    nickname = normalize_nickname(payload.nickname)
+    if not nickname:
+        raise ValueError("Nickname is required")
+    duplicate = (
+        db.query(models.Player)
+        .filter(
+            models.Player.tournament_id == player.tournament_id,
+            models.Player.id != player.id,
+        )
+        .all()
+    )
+    if any(normalize_nickname(candidate.nickname).casefold() == nickname.casefold() for candidate in duplicate):
+        raise ValueError("Ese participante ya existe en el torneo.")
+    player.nickname = nickname
+    db.commit()
+    db.refresh(player)
+    return player
+
+
+def delete_player(db: Session, player: models.Player) -> None:
+    membership = (
+        db.query(models.TeamMember)
+        .filter(models.TeamMember.player_id == player.id)
+        .first()
+    )
+    if membership is not None:
+        raise ValueError("No se puede eliminar un participante que ya tiene equipo.")
+    db.delete(player)
+    db.commit()
+
+
+def clear_players_if_unlocked(db: Session, tournament: models.Tournament) -> None:
+    if has_results(db, tournament.id):
+        raise ValueError("No se pueden limpiar participantes si ya existen resultados.")
+    if get_teams_by_tournament(db, tournament.id):
+        raise ValueError("No se pueden limpiar participantes si ya existen equipos.")
+    db.query(models.Player).filter(models.Player.tournament_id == tournament.id).delete(
+        synchronize_session=False
+    )
+    db.commit()
+
+
 def add_player_to_team(
     db: Session,
     team: models.Team,
     player: models.Player,
 ) -> models.Team:
+    tournament = get_tournament(db, team.tournament_id)
+    if tournament is not None:
+        member_count = (
+            db.query(models.TeamMember)
+            .filter(models.TeamMember.team_id == team.id)
+            .count()
+        )
+        if member_count >= tournament.team_size:
+            raise ValueError(
+                f"Team roster is capped at {tournament.team_size} players for this engine"
+            )
+
     existing_membership = (
         db.query(models.TeamMember)
         .join(models.Team, models.Team.id == models.TeamMember.team_id)
@@ -298,22 +590,37 @@ def generate_roulette_teams(
     tournament: models.Tournament,
     payload: schemas.RouletteGenerationRequest,
 ) -> tuple[list[models.Team], list[models.Player], models.Tournament]:
+    if has_results(db, tournament.id):
+        raise ValueError("No se puede regenerar ruleta si ya existen resultados.")
+    team_size = resolve_roulette_team_size(tournament)
+    minimum_players = team_size * 2
     if payload.reset:
         _cleanup_roulette_teams(db, tournament.id)
 
     players = get_players_by_tournament(db, tournament.id)
+    if len(players) < minimum_players:
+        raise ValueError(
+            f"Faltan participantes para generar equipos: tienes {len(players)}, necesitas mínimo {minimum_players}."
+        )
+
     assigned_player_ids = _get_assigned_player_ids(db, tournament.id)
     available_players = [player for player in players if player.id not in assigned_player_ids]
+    if len(available_players) < minimum_players:
+        raise ValueError(
+            f"Faltan participantes para generar equipos: tienes {len(available_players)}, necesitas mínimo {minimum_players}."
+        )
 
-    rng = random.Random(payload.seed)
+    seed = payload.shuffle_seed if payload.shuffle_seed is not None else payload.seed
+    seed_value = str(seed) if seed is not None else str(datetime.now(tz=UTC).timestamp())
+    rng = random.Random(seed_value)
     rng.shuffle(available_players)
 
     created_team_ids: list[int] = []
     next_team_index = _next_roulette_team_index(db, tournament.id)
 
-    for index in range(0, len(available_players), payload.team_size):
-        chunk = available_players[index : index + payload.team_size]
-        if len(chunk) < payload.team_size:
+    for index in range(0, len(available_players), team_size):
+        chunk = available_players[index : index + team_size]
+        if len(chunk) < team_size:
             break
 
         team = models.Team(
@@ -329,15 +636,28 @@ def generate_roulette_teams(
             db.add(models.TeamMember(team_id=team.id, player_id=player.id))
         created_team_ids.append(team.id)
 
-    bench_start = len(created_team_ids) * payload.team_size
+    bench_start = len(created_team_ids) * team_size
     bench = available_players[bench_start:]
 
-    tournament.team_size = payload.team_size
-    if payload.team_size == 2:
+    tournament.team_size = team_size
+    if team_size == 2:
         tournament.format = "roulette_2v2"
-    elif payload.team_size == 3:
+    elif team_size == 3:
         tournament.format = "roulette_3v3"
+    elif team_size == 4:
+        tournament.format = "battle_royale_points"
     tournament.status = "teams_generated"
+    config = read_tournament_config(tournament)
+    config.update(
+        {
+            "rouletteGeneratedAt": datetime.now(tz=UTC).isoformat(),
+            "rouletteSeed": seed_value,
+            "rouletteTeamSize": team_size,
+            "rouletteBench": [player.nickname for player in bench],
+            "rouletteStatus": "confirmed" if payload.confirm else "generated",
+        }
+    )
+    tournament.config = json.dumps(config) if config else None
     db.commit()
 
     created_teams = (

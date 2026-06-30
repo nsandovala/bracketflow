@@ -2,12 +2,14 @@
 
 import { FormEventHandler, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
-import { Match, Team, TeamResultDetail, Tournament } from "../../lib/api";
+import { Match, Player, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
 import { ResultDraft } from "../lib/useWorldSeriesPractice";
+import BracketView from "./BracketView";
+import RouletteArena from "./RouletteArena";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
@@ -16,11 +18,13 @@ type WorldSeriesOperatorProps = {
   selectedTournamentId: number | null;
   selectedTournament: Tournament | null;
   teams: Team[];
+  players: Player[];
   activeMatch: Match | null;
   activeMatchResults: TeamResultDetail[];
   pendingTeams: Team[];
   reportsLoaded: number;
   totalTeams: number;
+  latestReportedRound: number;
   canCreateNextGame: boolean;
   selectedEngine: ResolvedTournamentEngine | null;
   nextGameNumber: number;
@@ -33,13 +37,16 @@ type WorldSeriesOperatorProps = {
   onTeamNameChange: (value: string) => void;
   onTeamRosterChange: (value: string) => void;
   onCreateTeam: FormEventHandler<HTMLFormElement>;
-  onGenerateRoulette: () => void;
+  onImportParticipants: (nicknames: string[]) => Promise<unknown>;
+  onRemoveParticipant: (playerId: number) => Promise<unknown>;
+  onClearParticipants: () => Promise<unknown>;
+  onGenerateRoulette: (shuffleSeed?: string | number) => Promise<unknown>;
   onUpdateDraft: (matchId: number, teamId: number, patch: Partial<ResultDraft>) => void;
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onCreateNextGame: () => void;
 };
 
-type OperatorMode = "op" | "setup";
+type OperatorMode = "op" | "setup" | "bracket";
 type ResultFilter = "all" | "pending";
 
 function getDraftKey(matchId: number, teamId: number) {
@@ -66,11 +73,13 @@ export default function WorldSeriesOperator({
   selectedTournamentId,
   selectedTournament,
   teams,
+  players,
   activeMatch,
   activeMatchResults,
   pendingTeams,
   reportsLoaded,
   totalTeams,
+  latestReportedRound,
   canCreateNextGame,
   selectedEngine,
   nextGameNumber,
@@ -83,6 +92,9 @@ export default function WorldSeriesOperator({
   onTeamNameChange,
   onTeamRosterChange,
   onCreateTeam,
+  onImportParticipants,
+  onRemoveParticipant,
+  onClearParticipants,
   onGenerateRoulette,
   onUpdateDraft,
   onSaveTeamReport,
@@ -90,8 +102,15 @@ export default function WorldSeriesOperator({
 }: WorldSeriesOperatorProps) {
   const tournamentQuery = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [mode, setMode] = useState<OperatorMode>("op");
+  const [mode, setMode] = useState<OperatorMode>(
+    searchParams.get("roulette") === "1"
+      ? "setup"
+      : searchParams.get("tab") === "bracket"
+        ? "bracket"
+        : "op"
+  );
   const [filter, setFilter] = useState<ResultFilter>("all");
 
   const currentGame = activeMatch ? activeMatch.round : nextGameNumber;
@@ -101,6 +120,7 @@ export default function WorldSeriesOperator({
   const usesPlacement = selectedEngine?.usesPlacement ?? true;
   const isKillRace = selectedEngine?.scoringProfile === "kill_race";
   const requiresRoulette = selectedEngine?.rosterPolicy === "roulette";
+  const canRegenerateRoulette = latestReportedRound === 0;
   const effectiveLobbySize = selectedEngine
     ? getEffectiveLobbySize(selectedEngine, totalTeams)
     : totalTeams;
@@ -143,8 +163,11 @@ export default function WorldSeriesOperator({
         </div>
 
         <nav className="opr-nav" aria-label="Primary">
-          <Link href="/" className={pathname === "/" ? "is-active" : ""}>
-            Hub
+          <Link
+            href={`/dashboard${tournamentQuery}`}
+            className={pathname === "/dashboard" ? "is-active" : ""}
+          >
+            Dashboard
           </Link>
           <Link href="/operator" className={pathname === "/operator" ? "is-active" : ""}>
             Operator
@@ -169,7 +192,10 @@ export default function WorldSeriesOperator({
               <span>Torneo</span>
               <select
                 value={selectedTournamentId ?? ""}
-                onChange={(event) => onSelectTournament(Number(event.target.value))}
+                onChange={(event) => {
+                  onSelectTournament(Number(event.target.value));
+                  setMode("op");
+                }}
               >
                 {tournaments.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
@@ -178,7 +204,9 @@ export default function WorldSeriesOperator({
                 ))}
               </select>
             </label>
-          ) : null}
+          ) : (
+            <span className="opr-backend is-on">Sin torneo activo</span>
+          )}
           <span className={`opr-backend ${backendOnline ? "is-on" : "is-off"}`}>
             <i />
             {backendOnline ? "EN VIVO" : "SIN CONEXIÓN"}
@@ -190,34 +218,47 @@ export default function WorldSeriesOperator({
 
       {!selectedTournament ? (
         <p className="bf-empty">No hay torneo seleccionado.</p>
+      ) : totalTeams === 0 && requiresRoulette && selectedEngine ? (
+        <>
+          {/* No duplicar el H1 en titulos internos. */}
+          <div className="opr-controls bf-roulette-tabs">
+            <div className="opr-seg">
+              <button type="button" className="is-on">
+                Setup de ruleta
+              </button>
+              <button type="button" disabled>
+                Operación
+              </button>
+            </div>
+          </div>
+          <RouletteArena
+            tournament={selectedTournament}
+            engine={selectedEngine}
+            players={players}
+            teams={teams}
+            submitting={submitting}
+            onImportParticipants={onImportParticipants}
+            onRemoveParticipant={onRemoveParticipant}
+            onClearParticipants={onClearParticipants}
+            onConfirmRoulette={onGenerateRoulette}
+            canRegenerate={canRegenerateRoulette}
+          />
+        </>
       ) : totalTeams === 0 ? (
         <section className="opr-panel">
           <div className="opr-eyebrow">Setup requerido</div>
-          <h2>{requiresRoulette ? "Ruleta requerida" : "Agrega equipos antes de operar la partida."}</h2>
+          <h2>Agrega equipos antes de operar la partida.</h2>
           <p className="sub">
-            {requiresRoulette
-              ? "Este motor arma equipos por ruleta antes de operar. Carga participantes en Equipos y luego genera equipos."
-              : "Primero deja listo el roster del torneo. Despues vuelve a Operator para cargar resultados."}
+            Primero deja listo el roster del torneo. Despues vuelve a Operator para cargar resultados.
           </p>
           <div className="bf-hub-form-actions">
-            {requiresRoulette ? (
-              <button
-                type="button"
-                className="bf-button bf-button-primary"
-                onClick={onGenerateRoulette}
-                disabled={submitting}
-              >
-                Generar equipos
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="bf-button bf-button-primary"
-                onClick={() => setMode("setup")}
-              >
-                Configurar equipos
-              </button>
-            )}
+            <button
+              type="button"
+              className="bf-button bf-button-primary"
+              onClick={() => setMode("setup")}
+            >
+              Configurar equipos
+            </button>
             <Link href="/torneos" className="bf-button bf-button-ghost">
               Volver a Torneos
             </Link>
@@ -254,9 +295,9 @@ export default function WorldSeriesOperator({
       ) : isKillRace ? (
         <section className="opr-panel">
           <div className="opr-eyebrow">Kill Race</div>
-          <h2>Bracket pendiente</h2>
+          <h2>Bracket preparado</h2>
           <p className="sub">
-            Este formato se resolverá por llaves. Hoy puedes preparar equipos; el avance
+            Seed listo con {totalTeams} equipos generados por ruleta. El avance
             automático single/double elim va en el siguiente sprint.
           </p>
 
@@ -277,7 +318,7 @@ export default function WorldSeriesOperator({
               </span>
               <div className="opr-stat-body">
                 <div className="opr-stat-label">Formato</div>
-                <div className="opr-stat-value">Bracket pendiente</div>
+                <div className="opr-stat-value">Seed listo</div>
                 <div className="opr-stat-sub">
                   {selectedEngine?.tournamentStructure === "double_elim"
                     ? "Double elim"
@@ -291,65 +332,60 @@ export default function WorldSeriesOperator({
             <div className="opr-seg">
               <button
                 type="button"
+                className={mode === "bracket" || mode === "op" ? "is-on" : ""}
+                onClick={() => setMode("bracket")}
+              >
+                Bracket / Resultados
+              </button>
+              <button
+                type="button"
                 className={mode === "setup" ? "is-on" : ""}
                 onClick={() => setMode("setup")}
               >
-                Equipos & Roster
+                Setup de ruleta
               </button>
-              <Link href={`/standings${tournamentQuery}`} className="bf-button bf-button-ghost">
-                Bracket / Resultados
-              </Link>
             </div>
           </div>
 
+          {mode === "bracket" || mode === "op" ? (
+            <BracketView
+              tournament={selectedTournament}
+              engine={selectedEngine}
+              teams={teams}
+              mode="operator"
+            />
+          ) : null}
+
           {mode === "setup" ? (
-            <>
-              <form className="opr-form" onSubmit={onCreateTeam}>
-                <div className="opr-field">
-                  <label>Nombre del equipo</label>
-                  <input
-                    value={teamName}
-                    onChange={(event) => onTeamNameChange(event.target.value)}
-                    placeholder="Team Alpha"
-                    required
-                  />
-                </div>
-                <div className="opr-field">
-                  <label>Roster</label>
-                  <input
-                    value={teamRoster}
-                    onChange={(event) => onTeamRosterChange(event.target.value)}
-                    placeholder="player1, player2, player3"
-                    required
-                  />
-                </div>
-                <button type="submit" className="opr-save" disabled={submitting}>
-                  Agregar equipo
-                </button>
-              </form>
-
-              {teamFormError ? <p className="bf-inline-error">{teamFormError}</p> : null}
-
-              <div className="opr-teamgrid">
-                {teams.map((team) => (
-                  <div key={team.id} className="opr-teamcard">
-                    <div className="h">
-                      <span className="n">{team.name}</span>
-                      <span className="opr-tag t-saved">
-                        <i />
-                        {team.members.length} players
-                      </span>
-                    </div>
-                    <span className="r">{rosterText(team)}</span>
-                  </div>
-                ))}
-              </div>
-            </>
+            selectedEngine ? (
+              <RouletteArena
+                tournament={selectedTournament}
+                engine={selectedEngine}
+                players={players}
+                teams={teams}
+                submitting={submitting}
+                onImportParticipants={onImportParticipants}
+                onRemoveParticipant={onRemoveParticipant}
+                onClearParticipants={onClearParticipants}
+                onConfirmRoulette={onGenerateRoulette}
+                canRegenerate={canRegenerateRoulette}
+              />
+            ) : null
           ) : null}
         </section>
       ) : (
         <>
           {/* ---- Command bar ---- */}
+          {requiresRoulette ? (
+            <section className="opr-panel">
+              <div className="opr-eyebrow">Equipos generados por ruleta</div>
+              <h2>Listo para operar</h2>
+              <p className="sub">
+                La ruleta confirmó {totalTeams} equipos. Ya puedes crear partida y cargar resultados.
+              </p>
+            </section>
+          ) : null}
+
           <section className="opr-command">
             <div className="opr-game">
               <div>
@@ -476,7 +512,7 @@ export default function WorldSeriesOperator({
                 className={mode === "setup" ? "is-on" : ""}
                 onClick={() => setMode("setup")}
               >
-                Equipos & Roster
+                {requiresRoulette ? "Setup de ruleta" : "Equipos & Roster"}
               </button>
             </div>
 
@@ -618,6 +654,20 @@ export default function WorldSeriesOperator({
 
           {/* ---- SETUP: equipos ---- */}
           {mode === "setup" ? (
+            requiresRoulette && selectedEngine ? (
+              <RouletteArena
+                tournament={selectedTournament}
+                engine={selectedEngine}
+                players={players}
+                teams={teams}
+                submitting={submitting}
+                onImportParticipants={onImportParticipants}
+                onRemoveParticipant={onRemoveParticipant}
+                onClearParticipants={onClearParticipants}
+                onConfirmRoulette={onGenerateRoulette}
+                canRegenerate={canRegenerateRoulette}
+              />
+            ) : (
             <div className="opr-panel">
               <div className="opr-eyebrow">Equipos</div>
               <h2>Agregar equipo real</h2>
@@ -669,6 +719,7 @@ export default function WorldSeriesOperator({
                 </div>
               ) : null}
             </div>
+            )
           ) : null}
         </>
       )}

@@ -25,11 +25,11 @@ const ROUTE_COPY: Record<string, { title: string; subtitle: string }> = {
   },
   "/torneos": {
     title: "Torneos",
-    subtitle: "Hub operativo para listar, seleccionar y crear torneos.",
+    subtitle: "Crea, selecciona y administra la arena activa.",
   },
   "/equipos": {
-    title: "Equipos",
-    subtitle: "Gestiona equipos y rosters del torneo.",
+    title: "Setup",
+    subtitle: "Roster y ruleta del torneo activo.",
   },
   "/ajustes": {
     title: "Ajustes",

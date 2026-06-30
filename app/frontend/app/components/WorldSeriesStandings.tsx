@@ -1,6 +1,7 @@
 import StandingsTable from "./StandingsTable";
+import BracketView from "./BracketView";
 
-import { Tournament } from "../../lib/api";
+import { Team, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 
@@ -10,6 +11,8 @@ type WorldSeriesStandingsProps = {
   selectedTournament: Tournament | null;
   standings: WorldSeriesStanding[];
   afterGameNumber: number;
+  totalTeams: number;
+  teams: Team[];
   onSelectTournament: (tournamentId: number) => void;
 };
 
@@ -19,26 +22,31 @@ export default function WorldSeriesStandings({
   selectedTournament,
   standings,
   afterGameNumber,
+  totalTeams,
+  teams,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
   const selectedEngine = selectedTournament
     ? resolveTournamentEngine(selectedTournament)
     : null;
-  const isKillRace = selectedEngine?.scoringProfile === "kill_race";
+  const isBracket = selectedEngine
+    ? selectedEngine.scoringProfile === "kill_race" ||
+      selectedEngine.tournamentStructure !== "cumulative"
+    : false;
 
   return (
     <main className="bf-shell-standings">
       <section className="bf-standings-toolbar">
         <div>
           <span className="bf-standings-kicker">
-            {isKillRace ? "Bracket / Resultados" : "Clasificación general"}
+            {isBracket ? "Bracket / Resultados" : "Clasificación general"}
           </span>
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
           <p>
-            {isKillRace
-              ? standings.length > 0
-                ? "Kill Race se resolverá por llaves. La tabla actual es solo resumen temporal por kills."
-                : "Vista bracket pendiente. Los resultados aparecerán cuando se implemente la llave de eliminación."
+            {isBracket
+              ? totalTeams > 0
+                ? "Seed listo. La llave BO3 se construye en el siguiente sprint."
+                : "Falta generar bracket. Genera equipos por ruleta para preparar el seed."
               : afterGameNumber > 0
                 ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
                 : "Los resultados aparecerán al reportar la primera partida."}
@@ -62,13 +70,13 @@ export default function WorldSeriesStandings({
       </section>
 
       <section className="bf-standings-panel">
-        {isKillRace ? (
-          <div className="bf-empty">
-            <strong>Bracket pendiente</strong>
-            <p>
-              Kill Race se resuelve por llaves BO3. La vista bracket va en el siguiente sprint.
-            </p>
-          </div>
+        {isBracket ? (
+          <BracketView
+            tournament={selectedTournament}
+            engine={selectedEngine}
+            teams={teams}
+            mode="standings"
+          />
         ) : (
           <StandingsTable entries={standings} scoringProfile="wsow_like" />
         )}

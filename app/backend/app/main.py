@@ -45,7 +45,10 @@ def create_tournament(
     tournament: schemas.TournamentCreate,
     db: Session = Depends(get_db),
 ) -> schemas.Tournament:
-    return crud.create_tournament(db, tournament)
+    try:
+        return crud.create_tournament(db, tournament)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.get("/tournaments", response_model=list[schemas.Tournament])
@@ -59,6 +62,19 @@ def get_tournament(
     db: Session = Depends(get_db),
 ) -> schemas.Tournament:
     return get_tournament_or_404(db, tournament_id)
+
+
+@app.patch("/tournaments/{tournament_id}", response_model=schemas.Tournament)
+def update_tournament(
+    tournament_id: int,
+    payload: schemas.TournamentUpdate,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.update_tournament(db, tournament, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @app.post("/tournaments/{tournament_id}/archive", response_model=schemas.Tournament)
@@ -145,7 +161,27 @@ def create_player(
     db: Session = Depends(get_db),
 ) -> schemas.Player:
     get_tournament_or_404(db, tournament_id)
-    return crud.create_player(db, tournament_id, player)
+    try:
+        created = crud.create_players_bulk(db, tournament_id, [player.nickname])
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    if not created:
+        raise HTTPException(status_code=400, detail="Ese participante ya existe en el torneo.")
+    return created[0]
+
+
+@app.post(
+    "/tournaments/{tournament_id}/players/bulk",
+    response_model=list[schemas.Player],
+    status_code=status.HTTP_201_CREATED,
+)
+def bulk_import_players(
+    tournament_id: int,
+    payload: schemas.PlayerBulkImport,
+    db: Session = Depends(get_db),
+) -> list[schemas.Player]:
+    get_tournament_or_404(db, tournament_id)
+    return crud.create_players_bulk(db, tournament_id, payload.nicknames)
 
 
 @app.get("/tournaments/{tournament_id}/players", response_model=list[schemas.Player])
@@ -155,6 +191,49 @@ def list_players(
 ) -> list[schemas.Player]:
     get_tournament_or_404(db, tournament_id)
     return crud.get_players_by_tournament(db, tournament_id)
+
+
+@app.delete("/tournaments/{tournament_id}/players", status_code=status.HTTP_204_NO_CONTENT)
+def clear_players(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        crud.clear_players_if_unlocked(db, tournament)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return None
+
+
+@app.patch("/players/{player_id}", response_model=schemas.Player)
+def update_player(
+    player_id: int,
+    payload: schemas.PlayerUpdate,
+    db: Session = Depends(get_db),
+) -> schemas.Player:
+    player = crud.get_player(db, player_id)
+    if player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    try:
+        return crud.update_player(db, player, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.delete("/players/{player_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_player(
+    player_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    player = crud.get_player(db, player_id)
+    if player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    try:
+        crud.delete_player(db, player)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return None
 
 
 @app.post(
@@ -209,21 +288,16 @@ def generate_roulette_teams(
             detail="Roulette teams are only available for roulette tournament engines",
         )
 
-    if payload.team_size not in {1, 2, 3, 4}:
-        raise HTTPException(status_code=400, detail="team_size must be 1, 2, 3 or 4")
-
-    players = crud.get_players_by_tournament(db, tournament_id)
-    if len(players) < payload.team_size:
-        raise HTTPException(
-            status_code=400,
-            detail="Not enough players to generate roulette teams",
-        )
-
-    teams_created, bench, _ = crud.generate_roulette_teams(db, tournament, payload)
+    try:
+        teams_created, bench, _ = crud.generate_roulette_teams(db, tournament, payload)
+        team_size = crud.resolve_roulette_team_size(tournament)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return schemas.RouletteGenerationResult(
-        team_size=payload.team_size,
+        team_size=team_size,
         teams_created=teams_created,
         bench=bench,
+        status="confirmed" if payload.confirm else "generated",
     )
 
 
@@ -239,6 +313,11 @@ def create_match(
 ) -> schemas.Match:
     tournament = get_tournament_or_404(db, tournament_id)
     ensure_battle_royale_tournament(tournament)
+    if crud.requires_roulette(tournament) and not crud.get_teams_by_tournament(db, tournament_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Ruleta requerida: carga participantes para generar equipos antes de operar.",
+        )
     return crud.create_battle_royale_match(db, tournament, match)
 
 
@@ -263,6 +342,12 @@ def upsert_match_result(
         )
 
     if crud.requires_unique_placement(tournament):
+        lobby_size = crud.get_effective_lobby_size(tournament)
+        if lobby_size is not None and payload.placement > lobby_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Placement must be between 1 and {lobby_size}",
+            )
         conflict = crud.get_conflicting_placement(
             db, match.id, payload.placement, payload.team_id
         )

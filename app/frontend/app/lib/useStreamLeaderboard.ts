@@ -12,6 +12,7 @@ import {
   getTournamentResults,
   getTournaments,
 } from "../../lib/api";
+import { resolveTournamentEngine } from "../../lib/tournamentModel";
 
 // Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
 export const STREAM_POLL_INTERVAL_MS = 7000;
@@ -22,6 +23,7 @@ export type StreamStanding = LeaderboardEntry & {
 
 export type StreamLeaderboardState = {
   tournament: Tournament | null;
+  teams: Team[];
   standings: StreamStanding[];
   afterGameNumber: number;
   connected: boolean;
@@ -60,16 +62,23 @@ function buildStandings(leaderboard: LeaderboardEntry[], teams: Team[]): StreamS
 // Firma estable para comparar fetch nuevo vs actual y evitar re-render/parpadeo.
 function buildSignature(
   tournament: Tournament | null,
+  teams: Team[],
   standings: StreamStanding[],
   afterGameNumber: number
 ) {
+  const roster = teams
+    .map(
+      (team) =>
+        `${team.id}:${team.name}:${team.members.map((member) => member.player.nickname).join(",")}`
+    )
+    .join("|");
   const rows = standings
     .map(
       (entry) =>
         `${entry.team_id}:${entry.total_points}:${entry.kills}:${entry.best_placement ?? "-"}:${entry.matches_played}:${entry.players.join(",")}`
     )
     .join("|");
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${afterGameNumber}:${rows}`;
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${afterGameNumber}:${roster}:${rows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
@@ -89,6 +98,7 @@ export function useStreamLeaderboard(
 ): StreamLeaderboardState {
   const [state, setState] = useState<StreamLeaderboardState>({
     tournament: null,
+    teams: [],
     standings: [],
     afterGameNumber: 0,
     connected: false,
@@ -115,19 +125,23 @@ export function useStreamLeaderboard(
           return;
         }
 
-        const [tournament, teams, leaderboard, results] = await Promise.all([
+        const [tournament, teams, results] = await Promise.all([
           getTournament(tournamentId),
           getTeams(tournamentId),
-          getLeaderboard(tournamentId),
           getTournamentResults(tournamentId),
         ]);
+        const engine = resolveTournamentEngine(tournament);
+        const isBracket =
+          engine.scoringProfile === "kill_race" ||
+          engine.tournamentStructure !== "cumulative";
+        const leaderboard = isBracket ? [] : await getLeaderboard(tournamentId);
 
         if (!active) return;
 
         const standings = buildStandings(leaderboard, teams);
         const afterGameNumber =
           results.length === 0 ? 0 : Math.max(...results.map((result) => result.round));
-        const nextSignature = buildSignature(tournament, standings, afterGameNumber);
+        const nextSignature = buildSignature(tournament, teams, standings, afterGameNumber);
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.
         setState((current) => {
@@ -141,6 +155,7 @@ export function useStreamLeaderboard(
           signatureRef.current = nextSignature;
           return {
             tournament,
+            teams,
             standings,
             afterGameNumber,
             connected: true,

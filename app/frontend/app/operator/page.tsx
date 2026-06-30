@@ -26,18 +26,23 @@ function OperatorPageClient() {
     selectedTournamentId,
     selectedTournament,
     teams,
+    players,
     activeMatch,
     activeMatchResults,
     pendingTeams,
     reportsLoaded,
     totalTeams,
+    latestReportedRound,
     canCreateNextGame,
     selectedEngine,
     nextGameNumber,
     submitting,
     resultDrafts,
-    selectTournament,
     updateResultDraft,
+    selectTournament,
+    importParticipants,
+    removeParticipant,
+    clearParticipants,
     createTeamWithRoster,
     generateRouletteForSelected,
     createNextGame,
@@ -79,11 +84,13 @@ function OperatorPageClient() {
       selectedTournamentId={selectedTournamentId}
       selectedTournament={selectedTournament}
       teams={teams}
+      players={players}
       activeMatch={activeMatch}
       activeMatchResults={activeMatchResults}
       pendingTeams={pendingTeams}
       reportsLoaded={reportsLoaded}
       totalTeams={totalTeams}
+      latestReportedRound={latestReportedRound}
       canCreateNextGame={canCreateNextGame}
       selectedEngine={selectedEngine}
       nextGameNumber={nextGameNumber}
@@ -99,9 +106,10 @@ function OperatorPageClient() {
       onTeamNameChange={setTeamName}
       onTeamRosterChange={setTeamRoster}
       onCreateTeam={handleCreateTeam}
-      onGenerateRoulette={() => {
-        void generateRouletteForSelected();
-      }}
+      onImportParticipants={importParticipants}
+      onRemoveParticipant={removeParticipant}
+      onClearParticipants={clearParticipants}
+      onGenerateRoulette={generateRouletteForSelected}
       onUpdateDraft={updateResultDraft}
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);

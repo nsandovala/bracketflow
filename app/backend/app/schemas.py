@@ -20,6 +20,11 @@ class TournamentConfig(BaseModel):
     teamSize: Literal[1, 2, 3, 4] | None = None
     bestOf: int | None = Field(default=None, ge=1)
     matchPointThreshold: int | None = Field(default=None, ge=1)
+    rouletteGeneratedAt: str | None = None
+    rouletteSeed: str | None = None
+    rouletteTeamSize: Literal[1, 2, 3, 4] | None = None
+    rouletteBench: list[str] | None = None
+    rouletteStatus: Literal["generated", "confirmed"] | None = None
 
 
 class TournamentBase(BaseModel):
@@ -50,6 +55,20 @@ class TournamentCreate(TournamentBase):
     pass
 
 
+class TournamentUpdate(BaseModel):
+    name: str | None = None
+    game: str | None = None
+    format: str | None = None
+    team_size: int | None = None
+    scoring_profile: str | None = None
+    config: TournamentConfig | None = None
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def parse_config(cls, value):
+        return TournamentBase.parse_config(value)
+
+
 class Tournament(TournamentBase):
     id: int
     status: str
@@ -58,6 +77,14 @@ class Tournament(TournamentBase):
 
 
 class PlayerCreate(BaseModel):
+    nickname: str
+
+
+class PlayerBulkImport(BaseModel):
+    nicknames: list[str]
+
+
+class PlayerUpdate(BaseModel):
     nickname: str
 
 
@@ -153,15 +180,17 @@ class BracketGenerationResult(BaseModel):
 
 
 class RouletteGenerationRequest(BaseModel):
-    team_size: int = 2
-    seed: str | None = None
+    shuffle_seed: str | int | None = None
+    seed: str | int | None = None
     reset: bool = True
+    confirm: bool = True
 
 
 class RouletteGenerationResult(BaseModel):
     team_size: int
     teams_created: list[Team]
     bench: list[Player]
+    status: str = "confirmed"
 
 
 class LeaderboardEntry(BaseModel):

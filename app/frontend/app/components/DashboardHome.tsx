@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
 import {
   IconArrowRight,
   IconDashboard,
-  IconStandings,
   IconStream,
   IconTeams,
   IconTrophy,
 } from "./icons";
+import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import { buildSingleElimBracket } from "../../lib/bracketDisplay";
 
 function parseTournamentId(value: string | null) {
   if (!value) {
@@ -23,34 +24,8 @@ function parseTournamentId(value: string | null) {
 
 const DASH = "—";
 
-const DASHBOARD_MOTORS = [
-  {
-    name: "World Series Clásico",
-    axes: "BR · WSOW · Squad fijo",
-    status: "Disponible",
-    Icon: IconTrophy,
-  },
-  {
-    name: "Resurgence / Rebirth WS",
-    axes: "Rebirth · WSOW · Squad fijo",
-    status: "Experimental",
-    Icon: IconDashboard,
-  },
-  {
-    name: "Gedeon Style / Roulette WS",
-    axes: "Rebirth · WSOW · Ruleta",
-    status: "Experimental",
-    Icon: IconTeams,
-  },
-  {
-    name: "Challonge Competitivo",
-    axes: "Kill Race · Single/Double Elim",
-    status: "Próximamente",
-    Icon: IconStandings,
-  },
-] as const;
-
 export default function DashboardHome() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const preferredTournamentId = parseTournamentId(searchParams.get("tournamentId"));
 
@@ -65,6 +40,8 @@ export default function DashboardHome() {
     currentGameNumber,
     reportsLoaded,
     totalTeams,
+    selectedEngine,
+    selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
 
   const query = selectedTournamentId ? `?tournamentId=${selectedTournamentId}` : "";
@@ -78,6 +55,25 @@ export default function DashboardHome() {
   const gameNumber = currentGameNumber || latestReportedRound;
   const leader = top3[0];
   const streamReady = Boolean(selectedTournament);
+  const engine = selectedTournament ? selectedEngine ?? resolveTournamentEngine(selectedTournament) : null;
+  const needsRoulette = engine?.rosterPolicy === "roulette" && totalTeams === 0;
+  const isKillRace = engine?.engineKey === "kill_race_bracket";
+  const bracketPreview = isKillRace ? buildSingleElimBracket(teams, engine?.teamSize ?? 2)[0] : null;
+  const setupMissing = Boolean(selectedTournament && totalTeams === 0);
+  const cta = !selectedTournament
+    ? { label: "Completar setup", href: "/torneos" }
+    : needsRoulette
+      ? { label: "Abrir Ruleta", href: `/operator${query}&roulette=1` }
+      : isKillRace
+        ? { label: "Preparar bracket", href: `/operator${query}&tab=bracket` }
+        : setupMissing
+          ? { label: "Completar setup", href: `/operator${query}` }
+          : { label: "Ir a Operator · cargar partida", href: `/operator${query}` };
+
+  function handleSelectTournament(tournamentId: number) {
+    selectTournament(tournamentId);
+    router.replace(`/dashboard?tournamentId=${tournamentId}`);
+  }
 
   return (
     <div className="bf-dash bf-dash-v2">
@@ -85,10 +81,33 @@ export default function DashboardHome() {
         <div className="bf-dash-active-main">
           <span className="bf-dash-section-label">Práctica activa</span>
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
+          {tournaments.length > 0 ? (
+            <label className="bf-standings-selector">
+              <span>Torneo activo</span>
+              <select
+                value={selectedTournamentId ?? ""}
+                onChange={(event) => handleSelectTournament(Number(event.target.value))}
+              >
+                {tournaments.map((tournament) => (
+                  <option key={tournament.id} value={tournament.id}>
+                    {tournament.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="bf-dash-active-meta">
-            <span>{selectedTournament?.game ?? "Selecciona o crea una práctica"}</span>
+            <span>{engine?.label ?? selectedTournament?.game ?? "Selecciona o crea una práctica"}</span>
             <span aria-hidden="true">·</span>
-            <span>{gameNumber > 0 ? `Partida ${gameNumber}` : "Sin partida abierta"}</span>
+            <span>
+              {isKillRace
+                ? totalTeams > 0
+                  ? "Seed listo"
+                  : "Falta generar bracket"
+                : gameNumber > 0
+                  ? `Partida ${gameNumber}`
+                  : "Sin partida abierta"}
+            </span>
             <span aria-hidden="true">·</span>
             <span>
               {leader ? (
@@ -105,10 +124,12 @@ export default function DashboardHome() {
         <div className="bf-dash-active-side">
           <span className="bf-dash-results-state">
             <i className="bf-op-dot" />
-            {selectedTournament ? `${reportsLoaded}/${totalTeams} resultados cargados` : "Sistema listo"}
+            {selectedTournament
+              ? `${totalTeams} equipos · ${reportsLoaded} resultados cargados`
+              : "Sistema listo"}
           </span>
-          <Link href={`/operator${query}`} className="bf-dash-operator-cta">
-            Ir a Operator · cargar {gameNumber > 0 ? `Partida ${gameNumber}` : "Partida 1"}
+          <Link href={cta.href} className="bf-dash-operator-cta">
+            {cta.label}
             <IconArrowRight size={17} />
           </Link>
         </div>
@@ -134,7 +155,7 @@ export default function DashboardHome() {
             <span className="bf-dash-stat-label">Equipos registrados</span>
             <span className="bf-dash-stat-value">{stat(teamsCount)}</span>
             <span className="bf-dash-stat-sub">
-              {selectedTournament ? selectedTournament.name : "Sin torneo activo"}
+              {selectedTournament ? "Contexto heredado por Operator y Standings" : "Sin torneo activo"}
             </span>
           </div>
         </article>
@@ -144,9 +165,11 @@ export default function DashboardHome() {
             <IconDashboard size={22} />
           </span>
           <div className="bf-dash-stat-body">
-            <span className="bf-dash-stat-label">Partidas jugadas</span>
+            <span className="bf-dash-stat-label">{isKillRace ? "Ronda actual" : "Partidas jugadas"}</span>
             <span className="bf-dash-stat-value">{stat(gamesCount)}</span>
-            <span className="bf-dash-stat-sub">Partidas con resultados</span>
+            <span className="bf-dash-stat-sub">
+              {isKillRace ? "Bracket real pendiente" : "Partidas con resultados"}
+            </span>
           </div>
         </article>
 
@@ -195,45 +218,33 @@ export default function DashboardHome() {
                 </article>
               ))}
             </div>
+          ) : isKillRace && bracketPreview ? (
+            <div className="bf-dash-seed-preview">
+              {bracketPreview.matches.slice(0, 4).map((match) => (
+                <article key={match.id} className="bf-dash-seed-row">
+                  <span>{match.label}</span>
+                  <strong>{match.left}</strong>
+                  <em>vs</em>
+                  <strong>{match.right}</strong>
+                </article>
+              ))}
+            </div>
           ) : (
             <p className="bf-dash-empty">
-              {loading ? "Cargando clasificación…" : "Todavía no hay resultados cargados."}
+              {loading
+                ? "Cargando clasificación…"
+                : isKillRace
+                  ? "Falta generar bracket. No hay tabla WSOW para Kill Race."
+                  : "Todavía no hay resultados cargados."}
             </p>
           )}
 
-          <Link href={`/standings${query}`} className="bf-dash-cta">
-            Ver clasificación completa
+          <Link href={isKillRace ? `/operator${query}&tab=bracket` : `/standings${query}`} className="bf-dash-cta">
+            {isKillRace ? "Preparar bracket" : "Ver clasificación completa"}
             <IconArrowRight size={16} />
           </Link>
         </div>
 
-      </section>
-
-      <section className="bf-dash-motors">
-        <div className="bf-dash-panel-heading">
-          <div>
-            <span className="bf-dash-section-label">Taxonomía operativa</span>
-            <h3>Motores de torneo</h3>
-          </div>
-          <span className="bf-dash-motors-note">Informativo</span>
-        </div>
-
-        <div className="bf-dash-motors-grid">
-          {DASHBOARD_MOTORS.map(({ name, axes, status, Icon }) => (
-            <article key={name} className="bf-dash-motor">
-              <span className="bf-dash-motor-icon">
-                <Icon size={18} />
-              </span>
-              <span className="bf-dash-motor-copy">
-                <strong>{name}</strong>
-                <small>{axes}</small>
-              </span>
-              <span className={`bf-dash-motor-status${status === "Disponible" ? " is-ready" : ""}`}>
-                {status}
-              </span>
-            </article>
-          ))}
-        </div>
       </section>
     </div>
   );

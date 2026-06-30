@@ -63,7 +63,7 @@ export const TOURNAMENT_ENGINES: Record<TournamentEngineKey, EnginePreset> = {
     game_mode: "br",
     roster_policy: "fixed_squad",
     tournament_structure: "cumulative",
-    team_size: 3,
+    team_size: 4,
     requiresPlacement: true,
     requiresUniquePlacement: true,
     defaultLobbySize: 50,
@@ -197,6 +197,8 @@ function readConfig(tournament: Tournament): TournamentConfig {
   const teamSize = config.teamSize;
   const bestOf = config.bestOf;
   const matchPointThreshold = config.matchPointThreshold;
+  const rouletteTeamSize = config.rouletteTeamSize;
+  const rouletteBench = config.rouletteBench;
   const rawEngineKey =
     config.engine_key === "wsow_classic" ? "wsow_br" : config.engine_key;
   return {
@@ -240,6 +242,24 @@ function readConfig(tournament: Tournament): TournamentConfig {
       Number.isFinite(matchPointThreshold) &&
       matchPointThreshold > 0
         ? matchPointThreshold
+        : undefined,
+    rouletteGeneratedAt:
+      typeof config.rouletteGeneratedAt === "string" ? config.rouletteGeneratedAt : undefined,
+    rouletteSeed:
+      typeof config.rouletteSeed === "string" ? config.rouletteSeed : undefined,
+    rouletteTeamSize:
+      rouletteTeamSize === 1 ||
+      rouletteTeamSize === 2 ||
+      rouletteTeamSize === 3 ||
+      rouletteTeamSize === 4
+        ? rouletteTeamSize
+        : undefined,
+    rouletteBench: Array.isArray(rouletteBench)
+      ? rouletteBench.filter((value): value is string => typeof value === "string")
+      : undefined,
+    rouletteStatus:
+      config.rouletteStatus === "generated" || config.rouletteStatus === "confirmed"
+        ? config.rouletteStatus
         : undefined,
   };
 }

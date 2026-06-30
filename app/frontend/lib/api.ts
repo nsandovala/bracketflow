@@ -60,6 +60,11 @@ export type TournamentConfig = {
   teamSize?: 1 | 2 | 3 | 4;
   bestOf?: number;
   matchPointThreshold?: number;
+  rouletteGeneratedAt?: string;
+  rouletteSeed?: string;
+  rouletteTeamSize?: 1 | 2 | 3 | 4;
+  rouletteBench?: string[];
+  rouletteStatus?: "generated" | "confirmed";
 };
 
 export type Tournament = {
@@ -141,6 +146,7 @@ export type RouletteGenerationResult = {
   team_size: number;
   teams_created: Team[];
   bench: Player[];
+  status: string;
 };
 
 export type LeaderboardEntry = {
@@ -175,6 +181,23 @@ export function createTournament(payload: {
 }) {
   return request<Tournament>("/tournaments", {
     method: "POST",
+    body: payload,
+  });
+}
+
+export function updateTournament(
+  tournamentId: number,
+  payload: Partial<{
+    name: string;
+    game: string;
+    format: TournamentFormat;
+    team_size: number;
+    scoring_profile: string;
+    config: TournamentConfig;
+  }>
+) {
+  return request<Tournament>(`/tournaments/${tournamentId}`, {
+    method: "PATCH",
     body: payload,
   });
 }
@@ -220,6 +243,32 @@ export function createPlayer(tournamentId: number, payload: { nickname: string }
   });
 }
 
+export function bulkImportPlayers(tournamentId: number, payload: { nicknames: string[] }) {
+  return request<Player[]>(`/tournaments/${tournamentId}/players/bulk`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updatePlayer(playerId: number, payload: { nickname: string }) {
+  return request<Player>(`/players/${playerId}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function deletePlayer(playerId: number) {
+  return request<void>(`/players/${playerId}`, {
+    method: "DELETE",
+  });
+}
+
+export function clearPlayers(tournamentId: number) {
+  return request<void>(`/tournaments/${tournamentId}/players`, {
+    method: "DELETE",
+  });
+}
+
 export function generateBracket(tournamentId: number) {
   return request<BracketGenerationResult>(
     `/tournaments/${tournamentId}/generate-bracket`,
@@ -231,7 +280,7 @@ export function generateBracket(tournamentId: number) {
 
 export function generateRouletteTeams(
   tournamentId: number,
-  payload: { team_size: number; seed?: string; reset?: boolean }
+  payload: { shuffle_seed?: string | number; seed?: string | number; reset?: boolean; confirm?: boolean }
 ) {
   return request<RouletteGenerationResult>(
     `/tournaments/${tournamentId}/generate-roulette-teams`,

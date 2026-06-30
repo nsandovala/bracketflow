@@ -24,8 +24,8 @@ Frase dura: Kill Race NO es un standing, es una llave. El standing puede existir
 - scoring: `wsow_like`
 - Vista principal: standings acumulativos.
 - Input por partida: kills + placement.
-- `team_size`: configurable, default 3.
-- `lobby_size`: default 50 squads. No usar 150 como lobby size; 150 son jugadores en trios.
+- `team_size`: 4 jugadores por equipo. En BracketFlow/Gedeon, BR opera con 4 jugadores por equipo; Rebirth opera con 3.
+- `lobby_size`: default 50 squads.
 - Placement: obligatorio, unico por partida, validado contra `lobby_size`.
 
 Multiplicadores BR:
@@ -49,7 +49,7 @@ Multiplicadores BR:
 - scoring: `wsow_like`
 - Vista principal: standings.
 - Input por partida: kills + placement.
-- `team_size`: default 3, editable.
+- `team_size`: 3 jugadores por equipo.
 - `lobby_size`: default 16, editable 16-17.
 - Placement: obligatorio, unico por partida, menor o igual a `lobby_size`.
 
@@ -73,7 +73,7 @@ Multiplicadores Rebirth:
 - Vista principal: standings.
 - La ruleta solo arma rosters; el scoring sigue siendo WSOW-like.
 - Flujo: crear torneo, cargar lista de participantes, definir mode/team_size/lobby_size, generar equipos aleatorios, cargar kills + placement, ver standings.
-- `team_size`: default 3 si Rebirth, 4 si BR; editable.
+- `team_size`: 3 si Rebirth, 4 si BR.
 - No es Kill Race.
 
 ## Kill Race Bracket
@@ -90,7 +90,7 @@ Multiplicadores Rebirth:
 - Cada cruce BO3: mapa 1, mapa 2, mapa 3 si la serie va 1-1.
 - Gana mapa quien tenga mas kills; gana serie el primero a 2 mapas.
 - Single elim: perdedor eliminado. Double elim: perdedor baja a losers bracket.
-- Si el bracket aun no existe, la UI dice "Bracket pendiente"; nunca mostrar tabla WSOW falsa.
+- Si el seed aun no existe, la UI dice "Falta generar bracket"; nunca mostrar tabla WSOW falsa.
 
 ## Match Point
 
