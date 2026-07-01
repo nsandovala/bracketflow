@@ -14,6 +14,7 @@ import {
   type TournamentStructure,
   type TeamSize,
 } from "../../../lib/tournamentModel";
+import { getTournamentStatusLabel } from "../../../lib/tournamentStatus";
 
 const TOURNAMENT_MOTORS = [
   {
@@ -89,6 +90,8 @@ export default function TorneosPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
   const [motorsVisible, setMotorsVisible] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const motorsRef = useRef<HTMLElement>(null);
   const selectedPreset = ENGINE_PRESETS[selectedEngineKey];
@@ -220,6 +223,65 @@ export default function TorneosPage() {
     }
   }
 
+  function toggleSelection(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    const visibleIds = tournaments.map((t) => t.id);
+    const allSelected = visibleIds.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkArchive() {
+    if (selectedIds.size === 0) return;
+    const confirmed = window.confirm(
+      `¿Archivar ${selectedIds.size} torneo(s)? No aparecerán en la lista activa.`
+    );
+    if (!confirmed) return;
+    for (const id of selectedIds) {
+      await archiveSelectedTournament(id);
+    }
+    clearSelection();
+  }
+
+  function handleBulkDeleteInit() {
+    if (selectedIds.size === 0) return;
+    setShowBulkDeleteConfirm(true);
+  }
+
+  async function handleBulkDeleteConfirm() {
+    for (const id of selectedIds) {
+      await deleteSelectedTournament(id);
+    }
+    setShowBulkDeleteConfirm(false);
+    clearSelection();
+  }
+
   function handleArchiveTournament(tournamentId: number) {
     const confirmed = window.confirm("¿Archivar este torneo? No aparecerá en la lista activa.");
     if (confirmed) {
@@ -300,6 +362,75 @@ export default function TorneosPage() {
           <span className="bf-hub-section-kicker">Arena</span>
           <h3>Torneos activos</h3>
         </div>
+
+        {selectedIds.size > 0 && (
+          <div className="bf-bulk-bar">
+            <div className="bf-bulk-info">
+              <input
+                type="checkbox"
+                checked={tournaments.length > 0 && tournaments.every((t) => selectedIds.has(t.id))}
+                onChange={toggleSelectAllVisible}
+                aria-label="Seleccionar todos los visibles"
+              />
+              <strong>{selectedIds.size} seleccionado(s)</strong>
+            </div>
+            <div className="bf-bulk-actions">
+              <button
+                type="button"
+                className="bf-button bf-button-ghost"
+                onClick={handleBulkArchive}
+                disabled={submitting}
+              >
+                Archivar seleccionados
+              </button>
+              <button
+                type="button"
+                className="bf-button bf-button-danger"
+                onClick={handleBulkDeleteInit}
+                disabled={submitting}
+              >
+                Eliminar seleccionados
+              </button>
+              <button
+                type="button"
+                className="bf-button bf-button-ghost"
+                onClick={clearSelection}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showBulkDeleteConfirm && (
+          <div className="bf-bulk-confirm">
+            <div className="bf-bulk-confirm-panel">
+              <strong>Borrar {selectedIds.size} torneo(s)</strong>
+              <p>
+                Se eliminarán torneos, equipos, matches, mapas y resultados asociados.
+                Esta acción no se puede deshacer.
+              </p>
+              <div className="bf-hub-form-actions">
+                <button
+                  type="button"
+                  className="bf-button bf-button-danger"
+                  onClick={handleBulkDeleteConfirm}
+                  disabled={submitting}
+                >
+                  Borrar {selectedIds.size} torneo(s)
+                </button>
+                <button
+                  type="button"
+                  className="bf-button bf-button-ghost"
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <p className="bf-empty">Cargando torneos...</p>
         ) : tournaments.length > 0 ? (
@@ -320,18 +451,28 @@ export default function TorneosPage() {
               : isKillRaceTournament
                 ? "Ver bracket"
                 : "Operar";
+            const isChecked = selectedIds.has(tournament.id);
+            const statusLabel = needsRoulette
+              ? "Setup requerido"
+              : isSelected
+                ? "Activo"
+                : getTournamentStatusLabel(tournament.status);
             return (
               <article
                 key={tournament.id}
-                className={`bf-hub-tournament-card${isSelected ? " is-active" : ""}`}
+                className={`bf-hub-tournament-card${isSelected ? " is-active" : ""}${isChecked ? " is-checked" : ""}`}
               >
                 <div className="bf-hub-tournament-info">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleSelection(tournament.id)}
+                    aria-label={`Seleccionar ${tournament.name}`}
+                  />
                   <strong className="bf-hub-tournament-name">{tournament.name}</strong>
                   <span className="bf-hub-tournament-meta">
                     <span className="bf-hub-tournament-game">{tournament.game}</span>
-                    <span className="bf-hub-tournament-status">
-                      {needsRoulette ? "Setup requerido" : isSelected ? "Activo" : tournament.status}
-                    </span>
+                    <span className="bf-hub-tournament-status">{statusLabel}</span>
                   </span>
                 </div>
                 <div className="bf-hub-tournament-actions">

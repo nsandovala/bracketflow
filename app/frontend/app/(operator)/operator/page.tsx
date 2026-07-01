@@ -85,6 +85,21 @@ function OperatorPageClient() {
     }
   }
 
+  async function handleBulkImportTeams(teamsToImport: Array<{ name: string; roster: string }>) {
+    setTeamFormError(null);
+    const errors: string[] = [];
+    for (const team of teamsToImport) {
+      try {
+        await createTeamWithRoster(team);
+      } catch {
+        errors.push(team.name);
+      }
+    }
+    if (errors.length > 0) {
+      setTeamFormError(`No se pudieron importar: ${errors.join(", ")}`);
+    }
+  }
+
   return (
     <WorldSeriesOperator
       backendOnline={backendOnline}
@@ -137,6 +152,7 @@ function OperatorPageClient() {
       onCreateNextGame={() => {
         void createNextGame();
       }}
+      onBulkImportTeams={handleBulkImportTeams}
     />
   );
 }

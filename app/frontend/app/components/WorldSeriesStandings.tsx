@@ -3,6 +3,7 @@ import BracketView from "./BracketView";
 
 import { Match, Team, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import { findChampion, isTournamentCompleted } from "../../lib/tournamentStatus";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 
 type WorldSeriesStandingsProps = {
@@ -35,20 +36,24 @@ export default function WorldSeriesStandings({
     ? selectedEngine.scoringProfile === "kill_race" ||
       selectedEngine.tournamentStructure !== "cumulative"
     : false;
+  const champion = isBracket ? findChampion(matches, teams) : null;
+  const isCompleted = isBracket ? isTournamentCompleted(matches) : false;
 
   return (
     <main className="bf-shell-standings">
         <section className="bf-standings-toolbar">
         <div>
           <span className="bf-standings-kicker">
-            {isBracket ? "Bracket" : "Clasificación general"}
+            {isBracket ? "Bracket / Resultados" : "Clasificación general"}
           </span>
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
           <p>
             {isBracket
-              ? totalTeams > 0
-                ? `${teams.length} equipos sembrados. Bracket listo.`
-                : "Falta generar bracket. Carga participantes y confirma equipos."
+              ? isCompleted
+                ? `Campeón: ${champion?.team.name ?? "—"} · Serie final ${champion?.finalScore ?? "—"}.`
+                : totalTeams > 0
+                  ? `${teams.length} equipos sembrados. Bracket listo.`
+                  : "Falta generar bracket. Carga participantes y confirma equipos."
               : afterGameNumber > 0
                 ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
                 : "Los resultados aparecerán al reportar la primera partida."}

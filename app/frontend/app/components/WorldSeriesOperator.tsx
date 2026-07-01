@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEventHandler, useEffect, useMemo, useState } from "react";
+import { FormEventHandler, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Match, Player, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
+import { getTournamentPhase, isTournamentCompleted, findChampion } from "../../lib/tournamentStatus";
 import { KillRaceMapDraft, ResultDraft } from "../lib/useWorldSeriesPractice";
 import BracketView from "./BracketView";
 import RouletteArena from "./RouletteArena";
@@ -53,6 +54,7 @@ type WorldSeriesOperatorProps = {
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onSaveKillRaceMap: (matchId: number) => void;
   onCreateNextGame: () => void;
+  onBulkImportTeams?: (teams: Array<{ name: string; roster: string }>) => Promise<unknown>;
 };
 
 type OperatorMode = "op" | "setup" | "bracket";
@@ -131,6 +133,7 @@ export default function WorldSeriesOperator({
   onSaveTeamReport,
   onSaveKillRaceMap,
   onCreateNextGame,
+  onBulkImportTeams,
 }: WorldSeriesOperatorProps) {
   const searchParams = useSearchParams();
   const [now, setNow] = useState(0);
@@ -148,6 +151,8 @@ export default function WorldSeriesOperator({
         : "op"
   );
   const [filter, setFilter] = useState<ResultFilter>("all");
+  const [teamImportMessage, setTeamImportMessage] = useState<string | null>(null);
+  const teamFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentGame = activeMatch ? activeMatch.round : nextGameNumber;
   const pendingCount = pendingTeams.length;
@@ -287,6 +292,42 @@ export default function WorldSeriesOperator({
           {!requiresRoulette && teamFormError ? <p className="bf-inline-error">{teamFormError}</p> : null}
         </section>
       ) : isKillRace ? (
+        <>
+          {/* ---- Context bar sticky ---- */}
+          <div className="opr-context-bar">
+            <div className="opr-context-main">
+              <button
+                type="button"
+                className="opr-context-back"
+                onClick={() => {
+                  if (mode === "bracket" || mode === "op") {
+                    // Si ya estamos en bracket, ir a standings
+                    window.location.href = `/standings?tournamentId=${selectedTournament?.id ?? ""}`;
+                  } else {
+                    setMode("bracket");
+                  }
+                }}
+              >
+                ← Volver al bracket
+              </button>
+              <div className="opr-context-info">
+                <strong>{selectedTournament?.name ?? "Torneo"}</strong>
+                <span className="opr-context-sep">·</span>
+                <span className="opr-context-phase">
+                  {getTournamentPhase(matches, selectedTournament?.status)}
+                </span>
+                {isTournamentCompleted(matches) ? (
+                  <>
+                    <span className="opr-context-sep">·</span>
+                    <span className="opr-context-champion">
+                      Campeón: {findChampion(matches, teams)?.team.name ?? "—"}
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
         <section className="opr-panel">
           <div className="opr-eyebrow">Kill Race · {selectedEngine?.teamSize ?? 2}v{selectedEngine?.teamSize ?? 2}</div>
           <h2>Bracket</h2>
@@ -520,14 +561,26 @@ export default function WorldSeriesOperator({
               </section>
             ) : (
               <section className="opr-panel">
-                <div className="opr-eyebrow">Serie actual</div>
-                <h2>Bracket listo para operar</h2>
-                <p className="sub">
-                  {matches.length === 0
-                    ? "Genera la llave para habilitar el BO3."
-                    : "No hay un match con dos equipos listos en este momento."}
-                </p>
-                {matches.length === 0 ? (
+                {isTournamentCompleted(matches) ? (
+                  <>
+                    <div className="opr-eyebrow">Torneo finalizado</div>
+                    <h2>Campeón: {findChampion(matches, teams)?.team.name ?? "—"}</h2>
+                    <p className="sub">
+                      No quedan series pendientes. El bracket está completo.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="opr-eyebrow">Serie actual</div>
+                    <h2>Bracket listo para operar</h2>
+                    <p className="sub">
+                      {matches.length === 0
+                        ? "Genera la llave para habilitar el BO3."
+                        : "No hay un match con dos equipos listos en este momento."}
+                    </p>
+                  </>
+                )}
+                {matches.length === 0 && !isTournamentCompleted(matches) ? (
                   <div className="bf-hub-form-actions">
                     <span className="bf-empty">
                       Abre respin de bracket para generar la llave.
@@ -557,6 +610,7 @@ export default function WorldSeriesOperator({
             ) : null
           ) : null}
         </section>
+        </>
       ) : (
         <>
           {/* ---- Command bar ---- */}
@@ -858,9 +912,50 @@ export default function WorldSeriesOperator({
               <div className="opr-eyebrow">Equipos</div>
               <h2>Agregar equipo real</h2>
               <p className="sub">
-                Carga nombre del equipo y roster real en una sola acción. Setup previo — no lo
-                necesitas durante el live.
+                Carga nombre del equipo y roster real en una sola acción. O importa un archivo .txt/.csv con el formato: Equipo,Jugador1,Jugador2,Jugador3,Jugador4
               </p>
+
+              <input
+                ref={teamFileInputRef}
+                type="file"
+                accept=".txt,.csv,text/plain,text/csv"
+                className="bf-roulette-file-input"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file || !onBulkImportTeams) return;
+                  const text = await file.text();
+                  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+                  const parsed: Array<{ name: string; roster: string }> = [];
+                  for (const line of lines) {
+                    const parts = line.split(/,\s*|,/);
+                    if (parts.length < 2) continue;
+                    const name = parts[0].trim();
+                    const roster = parts.slice(1).map((p) => p.trim()).filter(Boolean).join(", ");
+                    if (name && roster) parsed.push({ name, roster });
+                  }
+                  if (parsed.length === 0) {
+                    setTeamImportMessage("No se detectaron equipos válidos. Formato esperado: Equipo,Jugador1,Jugador2...");
+                    return;
+                  }
+                  await onBulkImportTeams(parsed);
+                  setTeamImportMessage(`${parsed.length} equipo(s) importado(s).`);
+                  if (teamFileInputRef.current) teamFileInputRef.current.value = "";
+                }}
+                disabled={submitting}
+              />
+              <div className="bf-hub-form-actions" style={{ marginBottom: 14 }}>
+                <button
+                  type="button"
+                  className="bf-button bf-button-ghost"
+                  onClick={() => teamFileInputRef.current?.click()}
+                  disabled={submitting || !onBulkImportTeams}
+                >
+                  Importar equipos .txt/.csv
+                </button>
+                {teamImportMessage ? (
+                  <span className="bf-inline-note">{teamImportMessage}</span>
+                ) : null}
+              </div>
 
               <form className="opr-form" onSubmit={onCreateTeam}>
                 <div className="opr-field">

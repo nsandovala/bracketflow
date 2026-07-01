@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useRef, useState } from "react";
 import {
   Bracket,
   Seed,
@@ -10,6 +11,7 @@ import {
 
 import type { Match, Team, Tournament } from "../../lib/api";
 import type { ResolvedTournamentEngine } from "../../lib/tournamentModel";
+import { findChampion, isTournamentCompleted } from "../../lib/tournamentStatus";
 import {
   type ReactBracketSeed,
   toBracketRounds,
@@ -88,6 +90,73 @@ function renderRoundTitle(title: ReactNode) {
   return <div className="bf-rb-round-title">{title}</div>;
 }
 
+function ChampionBlock({
+  champion,
+  tournament,
+  mode,
+}: {
+  champion: ReturnType<typeof findChampion>;
+  tournament: Tournament | null;
+  mode: BracketViewProps["mode"];
+}) {
+  if (!champion) return null;
+
+  return (
+    <div className="bf-champion-block">
+      <div className="bf-champion-glow" aria-hidden="true" />
+      <div className="bf-champion-content">
+        <div className="bf-champion-kicker">Campeón coronado</div>
+        <h3 className="bf-champion-name">{champion.team.name}</h3>
+        <p className="bf-champion-roster">{champion.rosterText}</p>
+        <div className="bf-champion-meta">
+          <span className="bf-champion-score">Serie final: {champion.finalScore}</span>
+          <span className="bf-champion-division">·</span>
+          <span className="bf-champion-format">BO3 Single Elim</span>
+        </div>
+        {mode !== "stream" ? (
+          <div className="bf-champion-actions">
+            <a
+              href={`/standings?tournamentId=${tournament?.id ?? ""}`}
+              className="bf-button bf-button-ghost"
+            >
+              Ver bracket final
+            </a>
+            <a
+              href={`/stream?tournamentId=${tournament?.id ?? ""}&obs=1`}
+              className="bf-button bf-button-ghost"
+            >
+              Ir a Stream
+            </a>
+            <a href="/torneos" className="bf-button bf-button-ghost">
+              Volver a Torneos
+            </a>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function BracketToolbar({
+  onFit,
+  onReset,
+}: {
+  onFit: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="bf-bracket-toolbar">
+      <span className="bf-bracket-toolbar-label">Vista</span>
+      <button type="button" className="bf-bracket-toolbar-btn" onClick={onFit} title="Ajustar al ancho">
+        Fit
+      </button>
+      <button type="button" className="bf-bracket-toolbar-btn" onClick={onReset} title="Tamaño original">
+        Reset
+      </button>
+    </div>
+  );
+}
+
 export default function BracketView({
   tournament,
   engine,
@@ -95,15 +164,38 @@ export default function BracketView({
   matches,
   mode,
 }: BracketViewProps) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
   const rounds = toBracketRounds(matches, teams, engine?.teamSize ?? 2);
   const hasTeams = teams.length > 0;
   const hasMatches = matches.length > 0;
-  const title = hasMatches ? "Bracket" : "Falta generar bracket";
-  const subtitle = hasMatches
-    ? `${teams.length} equipos sembrados - ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
-    : hasTeams
-      ? "Los equipos ya existen. Genera la llave para empezar a operar el BO3."
-      : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
+  const champion = findChampion(matches, teams);
+  const isCompleted = isTournamentCompleted(matches);
+
+  const title = isCompleted ? "Torneo finalizado" : hasMatches ? "Bracket" : "Falta generar bracket";
+  const subtitle = isCompleted
+    ? `Campeón: ${champion?.team.name ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
+    : hasMatches
+      ? `${teams.length} equipos sembrados - ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
+      : hasTeams
+        ? "Los equipos ya existen. Genera la llave para empezar a operar el BO3."
+        : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
+
+  function handleFit() {
+    const board = boardRef.current;
+    if (!board) return;
+    const contentWidth = board.scrollWidth;
+    const containerWidth = board.clientWidth;
+    if (contentWidth > containerWidth) {
+      setScale(Math.max(0.55, containerWidth / contentWidth));
+    } else {
+      setScale(1);
+    }
+  }
+
+  function handleReset() {
+    setScale(1);
+  }
 
   return (
     <section className={`bf-bracket-view is-${mode}`}>
@@ -114,9 +206,17 @@ export default function BracketView({
           <p>{subtitle}</p>
         </div>
         <span className="bf-bracket-badge">
-          {engine?.tournamentStructure === "double_elim" ? "Double elim pendiente" : "Single elim"}
+          {isCompleted
+            ? "Finalizado"
+            : engine?.tournamentStructure === "double_elim"
+              ? "Double elim"
+              : "Single elim"}
         </span>
       </div>
+
+      {champion && isCompleted ? (
+        <ChampionBlock champion={champion} tournament={tournament} mode={mode} />
+      ) : null}
 
       {rounds.length === 0 ? (
         <div className="bf-bracket-empty">
@@ -128,16 +228,27 @@ export default function BracketView({
           </p>
         </div>
       ) : (
-        <div className="bf-bracket-board">
-          <Bracket
-            rounds={rounds}
-            mobileBreakpoint={0}
-            bracketClassName="bf-rb-root"
-            roundClassName="bf-rb-round"
-            roundTitleComponent={renderRoundTitle}
-            renderSeedComponent={renderSeed}
-          />
-        </div>
+        <>
+          {mode !== "stream" ? <BracketToolbar onFit={handleFit} onReset={handleReset} /> : null}
+          <div className="bf-bracket-board" ref={boardRef}>
+            <div
+              className="bf-bracket-canvas"
+              style={{
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+              }}
+            >
+              <Bracket
+                rounds={rounds}
+                mobileBreakpoint={0}
+                bracketClassName="bf-rb-root"
+                roundClassName="bf-rb-round"
+                roundTitleComponent={renderRoundTitle}
+                renderSeedComponent={renderSeed}
+              />
+            </div>
+          </div>
+        </>
       )}
     </section>
   );
