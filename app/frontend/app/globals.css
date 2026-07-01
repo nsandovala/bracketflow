@@ -4788,21 +4788,31 @@ a:focus-visible {
 }
 
 .bf-bracket-board {
-  display: grid;
-  grid-template-columns: repeat(var(--rounds), minmax(220px, 1fr));
-  gap: 18px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(97, 242, 163, .34) rgba(255, 255, 255, .04);
 }
 
-.bf-bracket-round {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 12px;
-  min-width: 220px;
+.bf-rb-root {
+  display: flex;
+  gap: 4px;
+  min-width: max-content;
+  padding-right: 12px;
 }
 
-.bf-bracket-round-title {
+.bf-rb-round {
+  min-width: 268px;
+}
+
+.bf-rb-seed-shell {
+  min-width: 268px !important;
+  width: 268px !important;
+}
+
+.bf-rb-round-title {
+  margin-bottom: 10px;
   color: var(--amon-faint);
   font-size: .72rem;
   font-weight: 800;
@@ -4810,37 +4820,44 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
-.bf-bracket-match-list {
+.bf-rb-seed {
   display: grid;
-  align-content: space-around;
-  gap: 14px;
-}
-
-.bf-bracket-match {
-  position: relative;
-  display: grid;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
   padding: 12px;
   border: 1px solid var(--amon-line);
-  border-radius: var(--amon-radius-md);
-  background: rgba(6, 10, 18, .52);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .14);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .035), transparent 36%),
+    rgba(6, 10, 18, .72);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, .16);
 }
 
-.bf-bracket-match::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -19px;
-  width: 18px;
-  border-top: 1px solid rgba(97, 242, 163, .22);
+.bf-rb-seed--completed {
+  border-color: rgba(97, 242, 163, .2);
 }
 
-.bf-bracket-round:last-child .bf-bracket-match::after {
-  display: none;
+.bf-rb-seed--live {
+  border-color: rgba(255, 211, 110, .24);
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, .16),
+    0 0 0 1px rgba(255, 211, 110, .1);
 }
 
-.bf-bracket-match-label {
+.bf-rb-seed-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bf-rb-seed-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.bf-rb-seed-match,
+.bf-rb-seed-format {
   color: var(--amon-accent);
   font-size: .66rem;
   font-weight: 800;
@@ -4848,44 +4865,154 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
-.bf-bracket-slot {
-  display: grid;
-  gap: 2px;
-  min-height: 52px;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, .07);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .035);
+.bf-rb-seed-format {
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: .84rem;
+  letter-spacing: .08em;
 }
 
-.bf-bracket-slot strong {
+.bf-rb-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  color: var(--amon-faint);
+  background: rgba(255, 255, 255, .035);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bf-rb-status--completed {
+  border-color: rgba(97, 242, 163, .24);
+  color: var(--amon-text);
+  background: rgba(97, 242, 163, .1);
+}
+
+.bf-rb-status--live {
+  border-color: rgba(255, 211, 110, .26);
+  color: #ffe8a8;
+  background: rgba(255, 211, 110, .08);
+}
+
+.bf-rb-team-list {
+  display: grid;
+  gap: 8px;
+}
+
+.bf-rb-team {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .035);
+  transition: opacity .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.bf-rb-team.is-winner {
+  border-color: rgba(97, 242, 163, .3);
+  background:
+    linear-gradient(180deg, rgba(97, 242, 163, .1), rgba(97, 242, 163, .03)),
+    rgba(255, 255, 255, .04);
+}
+
+.bf-rb-team.is-loser {
+  opacity: .58;
+}
+
+.bf-rb-team.is-neutral {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .02);
+}
+
+.bf-rb-team-main,
+.bf-rb-team-side {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bf-rb-team-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bf-rb-team-name {
   min-width: 0;
   overflow: hidden;
   color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: .98rem;
+  font-weight: 700;
+  letter-spacing: .02em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.bf-bracket-slot em {
-  color: var(--amon-faint);
-  font-size: .68rem;
-  font-style: normal;
+.bf-rb-team-roster,
+.bf-rb-team-state {
+  overflow: hidden;
+  color: var(--amon-muted);
+  font-size: .7rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.bf-bracket-slot.is-bye strong {
-  color: var(--amon-muted);
+.bf-rb-team-side {
+  justify-items: end;
+  text-align: right;
+}
+
+.bf-rb-team-score {
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-rb-team-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(97, 242, 163, .14);
+  color: var(--amon-text);
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bf-rb-team.is-neutral .bf-rb-team-name,
+.bf-rb-team.is-neutral .bf-rb-team-score {
+  color: var(--amon-cream-soft);
 }
 
 .bf-bracket-view.is-stream {
   min-height: 0;
 }
 
-.bf-bracket-view.is-stream .bf-bracket-board {
-  grid-template-columns: repeat(var(--rounds), minmax(260px, 1fr));
-}
-
-.bf-bracket-view.is-stream .bf-bracket-match {
-  background: rgba(4, 8, 14, .68);
+.bf-bracket-view.is-stream .bf-rb-seed {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .028), transparent 36%),
+    rgba(4, 8, 14, .82);
 }
 
 .bf-dash-seed-preview {
@@ -4989,8 +5116,9 @@ a:focus-visible {
   .bf-bracket-head {
     display: grid;
   }
-  .bf-bracket-board {
-    grid-template-columns: repeat(var(--rounds), minmax(220px, 82vw));
+  .bf-rb-seed-shell {
+    min-width: 82vw !important;
+    width: 82vw !important;
   }
   .opr-command { grid-template-columns: 1fr; gap: 16px; }
   .opr-progress { max-width: none; }

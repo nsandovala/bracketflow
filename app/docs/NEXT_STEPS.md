@@ -1,5 +1,51 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - BRACKET-UI react-brackets
+
+**Fecha:** 2026-06-30
+
+**Que se hizo:**
+- `frontend/app/components/BracketView.tsx` dejo de dibujar la llave con el grid manual y ahora usa `react-brackets@0.4.7`.
+- Nuevo mapper puro `frontend/lib/toBracketRounds.ts` transforma `matches` + `teams` del backend al shape real de la libreria instalada.
+- El seed custom ahora muestra nombre real del equipo si existe, roster debajo, score BO3 por lado, badge `Avanza` en el ganador, perdedor con menor opacidad y estado visible por match (`Pendiente`, `En vivo`, `Completado`, `Slot futuro`).
+- Los slots futuros vacios muestran `Ganador M#` solo cuando el feeder match todavia no resolvio ganador.
+- El scroll horizontal queda encapsulado dentro del bracket y no obliga a romper el shell completo.
+- No se tocaron contratos API, scoring, persistencia de mapas, `winner_id` ni avance al siguiente match.
+
+**Que NO se hizo:**
+- No se toco `backend/`.
+- No se toco scoring WSOW / Rebirth.
+- No se toco persistencia BO3.
+- No se ejecuto smoke manual con navegador/F5 en esta sesion.
+- No se instalo `@g-loot/react-tournament-brackets`; una busqueda local en `package.json` y `package-lock.json` no encontro ese paquete en este workspace al 2026-06-30.
+
+**QA ejecutado:**
+- `cd backend && python -m pytest` -> `39 passed`
+- `cd backend && python qa_killrace.py` -> FALLA
+- `cd frontend && npm run lint` -> `0 errors, 8 warnings` preexistentes
+- `cd frontend && npm run build` -> OK
+
+**Error exacto de QA fallido:**
+- `python qa_killrace.py` corto en `POST /tournaments/23/roster-respin/open -> 404`
+- Mensaje: `ERROR: No se pudo abrir respin de roster`
+
+**Resultado de smoke manual del sprint:**
+- Pendiente en esta sesion. No hay validacion honesta de F5 / pantalla coherente sin ejecutar navegador real.
+
+**Bugs / riesgos encontrados:**
+- `react-brackets` esta instalado en el workspace raiz, no en `frontend/package.json`. El build actual resuelve bien, pero conviene normalizar esa dependencia en un sprint tecnico aparte si el repo se va a mantener asi.
+- Git en esta maquina requiere `safe.directory` inline por ownership dubitativo del repo.
+- `qa_killrace.py` no quedo verde, asi que no hay cierre funcional completo del flujo pedido.
+
+**Que NO se debe tocar en el proximo sprint:**
+- No tocar backend para forzar un renderer.
+- No mezclar este trabajo con scoring WSOW / Rebirth.
+- No reabrir `winner_id`, `next_match_id`, `/matches/{id}/maps` ni persistencia BO3 al hacer pulido visual.
+
+**Proximo sprint sugerido:**
+- Evaluar migracion a `@g-loot/react-tournament-brackets` solo despues de instalarlo realmente en el workspace y validar su API local.
+- Ejecutar smoke manual completo con F5 sobre Import, BO3 avance, navegacion y stream antes de considerar cerrado este bloque visual.
+
 ## ULTIMO SPRINT EJECUTADO - Sprint B Respins / Import / Stream
 
 **Fecha:** 2026-06-30
