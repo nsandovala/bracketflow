@@ -33,6 +33,7 @@ export default function DashboardHome() {
     loading,
     tournaments,
     teams,
+    matches,
     selectedTournament,
     selectedTournamentId,
     sortedStandings,
@@ -58,7 +59,7 @@ export default function DashboardHome() {
   const engine = selectedTournament ? selectedEngine ?? resolveTournamentEngine(selectedTournament) : null;
   const needsRoulette = engine?.rosterPolicy === "roulette" && totalTeams === 0;
   const isKillRace = engine?.engineKey === "kill_race_bracket";
-  const bracketPreview = isKillRace ? buildSingleElimBracket(teams, engine?.teamSize ?? 2)[0] : null;
+  const bracketPreview = isKillRace ? buildSingleElimBracket(matches, teams, engine?.teamSize ?? 2)[0] : null;
   const setupMissing = Boolean(selectedTournament && totalTeams === 0);
   const cta = !selectedTournament
     ? { label: "Completar setup", href: "/torneos" }

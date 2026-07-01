@@ -245,10 +245,17 @@ def generate_bracket(
     db: Session = Depends(get_db),
 ) -> schemas.BracketGenerationResult:
     tournament = get_tournament_or_404(db, tournament_id)
-    if tournament.format != "single_elimination":
+    engine_key = crud.get_engine_key(tournament)
+    bracket_mode = crud.read_tournament_config(tournament).get("bracketMode")
+    if engine_key != "kill_race_bracket":
         raise HTTPException(
             status_code=400,
-            detail="Bracket generation is only available for single_elimination tournaments",
+            detail="Bracket generation is only available for Kill Race tournaments",
+        )
+    if bracket_mode == "double_elim":
+        raise HTTPException(
+            status_code=400,
+            detail="Double elimination todavia no esta implementado para Kill Race.",
         )
 
     teams = crud.get_teams_by_tournament(db, tournament_id)
@@ -265,7 +272,64 @@ def generate_bracket(
             detail="Bracket already generated for this tournament",
         )
 
-    created_matches, updated_tournament = crud.generate_bracket(db, tournament)
+    try:
+        created_matches, updated_tournament = crud.generate_bracket(db, tournament)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return schemas.BracketGenerationResult(
+        matches_created=len(created_matches),
+        status=updated_tournament.status,
+    )
+
+
+@app.post("/tournaments/{tournament_id}/roster-respin/open", response_model=schemas.Tournament)
+def open_roster_respin(
+    tournament_id: int,
+    payload: schemas.RespinWindowOpen,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.open_roster_respin(db, tournament, payload.duration_minutes)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/tournaments/{tournament_id}/roster-respin/lock", response_model=schemas.Tournament)
+def lock_roster_respin(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.lock_roster(db, tournament)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/tournaments/{tournament_id}/bracket-respin/open", response_model=schemas.Tournament)
+def open_bracket_respin(
+    tournament_id: int,
+    payload: schemas.RespinWindowOpen,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.open_bracket_respin(db, tournament, payload.duration_minutes)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/tournaments/{tournament_id}/bracket-respin/lock", response_model=schemas.Tournament)
+def lock_bracket_respin(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.lock_bracket(db, tournament)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     return schemas.BracketGenerationResult(
         matches_created=len(created_matches),
         status=updated_tournament.status,
@@ -318,7 +382,7 @@ def create_match(
             status_code=400,
             detail="Ruleta requerida: carga participantes para generar equipos antes de operar.",
         )
-    return crud.create_battle_royale_match(db, tournament, match)
+    return crud.build_match_schema(crud.create_battle_royale_match(db, tournament, match))
 
 
 @app.post("/matches/{match_id}/results", response_model=schemas.TeamResult)
@@ -360,6 +424,29 @@ def upsert_match_result(
     return crud.upsert_team_result(db, tournament, match, payload)
 
 
+@app.post("/matches/{match_id}/maps", response_model=schemas.Match)
+def upsert_match_map(
+    match_id: int,
+    payload: schemas.MapResultUpsert,
+    db: Session = Depends(get_db),
+) -> schemas.Match:
+    match = crud.get_match(db, match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    tournament = get_tournament_or_404(db, match.tournament_id)
+    if crud.get_engine_key(tournament) != "kill_race_bracket":
+        raise HTTPException(
+            status_code=400,
+            detail="This endpoint is only available for Kill Race tournaments",
+        )
+
+    try:
+        return crud.upsert_map_result(db, tournament, match, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @app.get(
     "/tournaments/{tournament_id}/results",
     response_model=list[schemas.TeamResultDetail],
@@ -379,7 +466,7 @@ def list_matches(
     db: Session = Depends(get_db),
 ) -> list[schemas.Match]:
     get_tournament_or_404(db, tournament_id)
-    return crud.get_matches_by_tournament(db, tournament_id)
+    return [crud.build_match_schema(match) for match in crud.get_matches_by_tournament(db, tournament_id)]
 
 
 @app.get(

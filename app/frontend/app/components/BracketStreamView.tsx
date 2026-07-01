@@ -2,13 +2,14 @@
 
 import BackgroundParticles from "./BackgroundParticles";
 import BracketView from "./BracketView";
-import type { Team, Tournament } from "../../lib/api";
+import type { Match, Team, Tournament } from "../../lib/api";
 import type { ResolvedTournamentEngine } from "../../lib/tournamentModel";
 
 type BracketStreamViewProps = {
   tournament: Tournament | null;
   engine: ResolvedTournamentEngine | null;
   teams: Team[];
+  matches: Match[];
   connected: boolean;
   obs: boolean;
   transparent: boolean;
@@ -19,6 +20,7 @@ export default function BracketStreamView({
   tournament,
   engine,
   teams,
+  matches,
   connected,
   obs,
   transparent,
@@ -59,7 +61,7 @@ export default function BracketStreamView({
           </div>
         </header>
 
-        <BracketView tournament={tournament} engine={engine} teams={teams} mode="stream" />
+        <BracketView tournament={tournament} engine={engine} teams={teams} matches={matches} mode="stream" />
 
         {!obs && (
           <footer className="bf-stream-strip">

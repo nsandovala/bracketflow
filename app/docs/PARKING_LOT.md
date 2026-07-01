@@ -58,10 +58,20 @@
 
 ## Bracket BO3 completo
 
-- El avance automatico de bracket single/double elim no esta implementado.
-- Falta backend para crear matches con team_a_id / team_b_id y guardar resultados por mapa.
-- Falta Operator con inputs de kills por equipo A/B, estado de serie (0-0, 1-0, 2-0), y boton "Avanzar ganador".
-- Documentado en NEXT_STEPS.md como siguiente paso recomendado.
+- Single elim BO3 ya quedo persistente en backend y operator.
+- Sigue pendiente para Sprint B:
+  - double elimination real
+  - flujo UI de desempate manual cuando un mapa termina empatado en kills
+  - cualquier RESPIN / locks de bracket
+  - pulidos visuales menores de bracket/operator si aparecen roces
+- No reabrir cambios de scoring WSOW ni placement al trabajar estas piezas.
+
+## Sprint B cerrado, pendientes visuales y de UX
+
+- El flujo de respin/lock ya vive en DB, pero la UX de countdown todavia necesita una pasada visual fina en operator y stream.
+- Validar en navegador real si algun layout de `/stream?obs=1` genera overflow horizontal o vertical en 1920x1080.
+- Revisar copy de botones `Locked roster ahora` / `Locked bracket ahora`; funcionalmente estan bien, pero puede mejorarse el texto final.
+- Si aparecen problemas visuales en la ruleta al alternar preview/import/bracket, documentarlos aqui y no redisenar en caliente.
 
 ## Agentes de automatizacion
 

@@ -1,7 +1,8 @@
 import json
 import random
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from math import ceil, log2
 from collections import defaultdict
 
 from sqlalchemy.orm import Session, selectinload
@@ -23,6 +24,15 @@ STRUCTURAL_CONFIG_FIELDS = {
     "tournament_structure",
     "bracketMode",
 }
+
+ROSTER_RESPIN_OPEN = "respin_open"
+ROSTER_LOCKED = "locked"
+ROSTER_PENDING = "participants_pending"
+BRACKET_PENDING = "pending"
+BRACKET_RESPIN_OPEN = "respin_open"
+BRACKET_LOCKED = "locked"
+BRACKET_RUNNING = "running"
+BRACKET_COMPLETED = "completed"
 
 
 def normalize_team_size(format_name: str, requested_team_size: int) -> int:
@@ -73,6 +83,22 @@ def get_payload_engine_key(tournament: schemas.TournamentBase) -> str | None:
     if engine_key == "wsow_classic":
         return "wsow_br"
     return engine_key
+
+
+def utc_now_iso() -> str:
+    return datetime.now(tz=UTC).isoformat()
+
+
+def parse_utc_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def validate_tournament_contract(
@@ -144,10 +170,53 @@ def validate_tournament_contract(
             raise ValueError("Kill Race team mode must be 1v1, 2v2 or 3v3")
 
 
+def _set_bracket_completed_if_needed(tournament: models.Tournament) -> None:
+    if tournament.bracket_status == BRACKET_RUNNING:
+        completed_match = (
+            tournament.matches[-1]
+            if tournament.matches
+            else None
+        )
+        if completed_match is not None and completed_match.winner_id is not None:
+            tournament.bracket_status = BRACKET_COMPLETED
+
+
+def apply_tournament_windows(db: Session, tournament: models.Tournament) -> models.Tournament:
+    changed = False
+    now = datetime.now(tz=UTC)
+
+    roster_deadline = parse_utc_iso(tournament.roster_respin_deadline_at)
+    if tournament.roster_status == ROSTER_RESPIN_OPEN and roster_deadline is not None and now >= roster_deadline:
+        tournament.roster_status = ROSTER_LOCKED
+        tournament.roster_locked_at = tournament.roster_respin_deadline_at
+        tournament.roster_respin_deadline_at = None
+        changed = True
+
+    bracket_deadline = parse_utc_iso(tournament.bracket_respin_deadline_at)
+    if tournament.bracket_status == BRACKET_RESPIN_OPEN and bracket_deadline is not None and now >= bracket_deadline:
+        tournament.bracket_locked_at = tournament.bracket_respin_deadline_at
+        tournament.bracket_respin_deadline_at = None
+        tournament.bracket_status = BRACKET_LOCKED
+        changed = True
+
+    if changed:
+        db.commit()
+        db.refresh(tournament)
+    return tournament
+
+
 def has_results(db: Session, tournament_id: int) -> bool:
-    return (
+    if (
         db.query(models.TeamResult.id)
         .filter(models.TeamResult.tournament_id == tournament_id)
+        .first()
+        is not None
+    ):
+        return True
+    return (
+        db.query(models.MatchMap.id)
+        .join(models.Match, models.Match.id == models.MatchMap.match_id)
+        .filter(models.Match.tournament_id == tournament_id)
         .first()
         is not None
     )
@@ -241,6 +310,8 @@ def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> mode
         format=tournament.format,
         team_size=normalized_team_size,
         scoring_profile=tournament.scoring_profile,
+        roster_status=ROSTER_PENDING,
+        bracket_status=BRACKET_PENDING,
         config=serialize_config(tournament.config),
     )
     db.add(db_tournament)
@@ -294,24 +365,26 @@ def update_tournament(
     current.config = json.dumps(next_config) if next_config else None
     db.commit()
     db.refresh(current)
-    return current
+    return apply_tournament_windows(db, current)
 
 
 def get_tournaments(db: Session) -> list[models.Tournament]:
-    return (
+    tournaments = (
         db.query(models.Tournament)
         .filter(models.Tournament.status != "archived")
         .order_by(models.Tournament.id.desc())
         .all()
     )
+    return [apply_tournament_windows(db, tournament) for tournament in tournaments]
 
 
 def get_tournament(db: Session, tournament_id: int) -> models.Tournament | None:
-    return (
+    tournament = (
         db.query(models.Tournament)
         .filter(models.Tournament.id == tournament_id)
         .first()
     )
+    return apply_tournament_windows(db, tournament) if tournament is not None else None
 
 
 def archive_tournament(db: Session, tournament: models.Tournament) -> models.Tournament:
@@ -324,6 +397,70 @@ def archive_tournament(db: Session, tournament: models.Tournament) -> models.Tou
 def delete_tournament(db: Session, tournament: models.Tournament) -> None:
     db.delete(tournament)
     db.commit()
+
+
+def open_roster_respin(
+    db: Session,
+    tournament: models.Tournament,
+    duration_minutes: int,
+) -> models.Tournament:
+    tournament = apply_tournament_windows(db, tournament)
+    if tournament.roster_status == ROSTER_LOCKED:
+        raise ValueError("El roster ya esta locked. No se puede abrir respin.")
+    deadline = datetime.now(tz=UTC) + timedelta(minutes=duration_minutes)
+    tournament.roster_status = ROSTER_RESPIN_OPEN
+    tournament.roster_respin_deadline_at = deadline.isoformat()
+    tournament.roster_locked_at = None
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
+def lock_roster(db: Session, tournament: models.Tournament) -> models.Tournament:
+    tournament = apply_tournament_windows(db, tournament)
+    if tournament.roster_status == ROSTER_LOCKED:
+        return tournament
+    if not get_teams_by_tournament(db, tournament.id):
+        raise ValueError("No se puede locked el roster sin equipos generados.")
+    tournament.roster_status = ROSTER_LOCKED
+    tournament.roster_locked_at = utc_now_iso()
+    tournament.roster_respin_deadline_at = None
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
+def open_bracket_respin(
+    db: Session,
+    tournament: models.Tournament,
+    duration_minutes: int,
+) -> models.Tournament:
+    tournament = apply_tournament_windows(db, tournament)
+    if tournament.roster_status != ROSTER_LOCKED:
+        raise ValueError("Solo se puede abrir respin de bracket con roster locked.")
+    if tournament.bracket_status in {BRACKET_LOCKED, BRACKET_RUNNING, BRACKET_COMPLETED}:
+        raise ValueError("El bracket ya esta corriendo o completado. No se puede abrir respin.")
+    deadline = datetime.now(tz=UTC) + timedelta(minutes=duration_minutes)
+    tournament.bracket_status = BRACKET_RESPIN_OPEN
+    tournament.bracket_respin_deadline_at = deadline.isoformat()
+    tournament.bracket_locked_at = None
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
+def lock_bracket(db: Session, tournament: models.Tournament) -> models.Tournament:
+    tournament = apply_tournament_windows(db, tournament)
+    if tournament.bracket_status in {BRACKET_LOCKED, BRACKET_RUNNING, BRACKET_COMPLETED}:
+        return tournament
+    if not get_matches_by_tournament(db, tournament.id):
+        raise ValueError("No se puede locked el bracket sin matches generados.")
+    tournament.bracket_status = BRACKET_LOCKED
+    tournament.bracket_locked_at = utc_now_iso()
+    tournament.bracket_respin_deadline_at = None
+    db.commit()
+    db.refresh(tournament)
+    return tournament
 
 
 def create_team(
@@ -447,6 +584,9 @@ def delete_player(db: Session, player: models.Player) -> None:
 
 
 def clear_players_if_unlocked(db: Session, tournament: models.Tournament) -> None:
+    tournament = apply_tournament_windows(db, tournament)
+    if tournament.roster_status == ROSTER_LOCKED:
+        raise ValueError("No se pueden limpiar participantes con roster locked.")
     if has_results(db, tournament.id):
         raise ValueError("No se pueden limpiar participantes si ya existen resultados.")
     if get_teams_by_tournament(db, tournament.id):
@@ -494,6 +634,7 @@ def add_player_to_team(
 def get_matches_by_tournament(db: Session, tournament_id: int) -> list[models.Match]:
     return (
         db.query(models.Match)
+        .options(selectinload(models.Match.maps))
         .filter(models.Match.tournament_id == tournament_id)
         .order_by(models.Match.round.asc(), models.Match.id.asc())
         .all()
@@ -501,38 +642,162 @@ def get_matches_by_tournament(db: Session, tournament_id: int) -> list[models.Ma
 
 
 def get_match(db: Session, match_id: int) -> models.Match | None:
-    return db.query(models.Match).filter(models.Match.id == match_id).first()
+    return (
+        db.query(models.Match)
+        .options(selectinload(models.Match.maps))
+        .filter(models.Match.id == match_id)
+        .first()
+    )
+
+
+def get_match_maps_won(match: models.Match) -> tuple[int, int]:
+    maps_won_a = 0
+    maps_won_b = 0
+    for item in match.maps:
+        if item.map_winner_id == match.team_a_id:
+            maps_won_a += 1
+        elif item.map_winner_id == match.team_b_id:
+            maps_won_b += 1
+    return maps_won_a, maps_won_b
+
+
+def build_match_schema(match: models.Match) -> schemas.Match:
+    maps_won_a, maps_won_b = get_match_maps_won(match)
+    return schemas.Match(
+        id=match.id,
+        round=match.round,
+        status=match.status,
+        team_a_id=match.team_a_id,
+        team_b_id=match.team_b_id,
+        winner_id=match.winner_id,
+        best_of=match.best_of,
+        next_match_id=match.next_match_id,
+        next_slot=match.next_slot,
+        tournament_id=match.tournament_id,
+        maps=sorted(match.maps, key=lambda item: item.map_number),
+        maps_won_a=maps_won_a,
+        maps_won_b=maps_won_b,
+    )
+
+
+def _assign_match_slot(match: models.Match, slot: str | None, team_id: int | None) -> None:
+    if slot == "a":
+        match.team_a_id = team_id
+    elif slot == "b":
+        match.team_b_id = team_id
+
+
+def _refresh_match_status(match: models.Match) -> None:
+    if match.winner_id is not None:
+        match.status = "completed"
+    elif match.team_a_id is not None and match.team_b_id is not None:
+        match.status = "ready"
+    elif match.team_a_id is not None or match.team_b_id is not None:
+        match.status = "waiting_opponent"
+    else:
+        match.status = "pending"
+
+
+def _propagate_bye_winners(db: Session, matches_by_id: dict[int, models.Match]) -> None:
+    changed = True
+    while changed:
+        changed = False
+        for match in sorted(matches_by_id.values(), key=lambda item: (item.round, item.id)):
+            if match.winner_id is not None:
+                continue
+            if match.round == 1 and match.team_a_id is not None and match.team_b_id is None:
+                match.winner_id = match.team_a_id
+                match.status = "completed"
+            elif match.round == 1 and match.team_b_id is not None and match.team_a_id is None:
+                match.winner_id = match.team_b_id
+                match.status = "completed"
+            else:
+                _refresh_match_status(match)
+                continue
+
+            if match.next_match_id is not None:
+                next_match = matches_by_id[match.next_match_id]
+                before = (next_match.team_a_id, next_match.team_b_id)
+                _assign_match_slot(next_match, match.next_slot, match.winner_id)
+                _refresh_match_status(next_match)
+                after = (next_match.team_a_id, next_match.team_b_id)
+                if after != before:
+                    changed = True
 
 
 def generate_bracket(
     db: Session, tournament: models.Tournament
 ) -> tuple[list[models.Match], models.Tournament]:
+    tournament = apply_tournament_windows(db, tournament)
     teams = get_teams_by_tournament(db, tournament.id)
-    matches: list[models.Match] = []
+    bracket_mode = read_tournament_config(tournament).get("bracketMode")
+    if bracket_mode == "double_elim":
+        raise ValueError("Double elimination todavia no esta implementado para Kill Race.")
+    if tournament.roster_status != ROSTER_LOCKED:
+        raise ValueError("Solo se puede generar bracket con roster locked.")
+    if tournament.bracket_status in {BRACKET_LOCKED, BRACKET_RUNNING, BRACKET_COMPLETED}:
+        raise ValueError("El bracket ya esta locked. No se puede regenerar.")
+    if tournament.bracket_status != BRACKET_RESPIN_OPEN:
+        raise ValueError("Abre la ventana de respin de bracket antes de generar la llave.")
 
-    for index in range(0, len(teams), 2):
-        team_a = teams[index]
-        team_b = teams[index + 1] if index + 1 < len(teams) else None
-        matches.append(
+    if len(teams) < 2:
+        raise ValueError("At least 2 teams are required to generate a bracket")
+
+    total_slots = 1 << ceil(log2(len(teams)))
+    total_rounds = int(log2(total_slots))
+    best_of = read_tournament_config(tournament).get("bestOf")
+    resolved_best_of = int(best_of) if isinstance(best_of, int) and best_of > 0 else 3
+    _cleanup_bracket_matches(db, tournament.id)
+
+    rounds: list[list[models.Match]] = []
+    for round_number in range(1, total_rounds + 1):
+        match_count = total_slots // (2**round_number)
+        round_matches = [
             models.Match(
-                round=1,
+                round=round_number,
                 status="pending",
-                team_a_id=team_a.id,
-                team_b_id=team_b.id if team_b else None,
+                team_a_id=None,
+                team_b_id=None,
                 winner_id=None,
+                best_of=resolved_best_of,
+                next_match_id=None,
+                next_slot=None,
                 tournament_id=tournament.id,
             )
-        )
+            for _ in range(match_count)
+        ]
+        rounds.append(round_matches)
 
-    db.add_all(matches)
+    all_matches = [match for round_matches in rounds for match in round_matches]
+    db.add_all(all_matches)
+    db.flush()
+
+    for round_index in range(len(rounds) - 1):
+        current_round = rounds[round_index]
+        next_round = rounds[round_index + 1]
+        for match_index, match in enumerate(current_round):
+            parent = next_round[match_index // 2]
+            match.next_match_id = parent.id
+            match.next_slot = "a" if match_index % 2 == 0 else "b"
+
+    first_round = rounds[0]
+    seeded_team_ids = [team.id for team in teams] + [None] * (total_slots - len(teams))
+    for match_index, match in enumerate(first_round):
+        match.team_a_id = seeded_team_ids[match_index * 2]
+        match.team_b_id = seeded_team_ids[match_index * 2 + 1]
+        _refresh_match_status(match)
+
+    matches_by_id = {match.id: match for match in all_matches}
+    _propagate_bye_winners(db, matches_by_id)
+
     tournament.status = "bracket_generated"
     db.commit()
 
-    for match in matches:
+    for match in all_matches:
         db.refresh(match)
     db.refresh(tournament)
 
-    return matches, tournament
+    return all_matches, tournament
 
 
 def _get_assigned_player_ids(db: Session, tournament_id: int) -> set[int]:
@@ -546,6 +811,23 @@ def _get_assigned_player_ids(db: Session, tournament_id: int) -> set[int]:
 
 
 def _cleanup_roulette_teams(db: Session, tournament_id: int) -> None:
+    match_ids = [
+        match_id
+        for (match_id,) in db.query(models.Match.id)
+        .filter(models.Match.tournament_id == tournament_id)
+        .all()
+    ]
+    if match_ids:
+        db.query(models.MatchMap).filter(
+            models.MatchMap.match_id.in_(match_ids)
+        ).delete(synchronize_session=False)
+        db.query(models.TeamResult).filter(
+            models.TeamResult.match_id.in_(match_ids)
+        ).delete(synchronize_session=False)
+        db.query(models.Match).filter(models.Match.id.in_(match_ids)).delete(
+            synchronize_session=False
+        )
+
     roulette_teams = (
         db.query(models.Team)
         .filter(
@@ -590,8 +872,13 @@ def generate_roulette_teams(
     tournament: models.Tournament,
     payload: schemas.RouletteGenerationRequest,
 ) -> tuple[list[models.Team], list[models.Player], models.Tournament]:
+    tournament = apply_tournament_windows(db, tournament)
     if has_results(db, tournament.id):
         raise ValueError("No se puede regenerar ruleta si ya existen resultados.")
+    if tournament.roster_status == ROSTER_LOCKED:
+        raise ValueError("El roster ya esta locked. No se puede regenerar equipos.")
+    if tournament.roster_status != ROSTER_RESPIN_OPEN:
+        raise ValueError("Abre la ventana de respin de roster antes de generar equipos.")
     team_size = resolve_roulette_team_size(tournament)
     minimum_players = team_size * 2
     if payload.reset:
@@ -647,6 +934,9 @@ def generate_roulette_teams(
     elif team_size == 4:
         tournament.format = "battle_royale_points"
     tournament.status = "teams_generated"
+    tournament.bracket_status = BRACKET_PENDING
+    tournament.bracket_respin_deadline_at = None
+    tournament.bracket_locked_at = None
     config = read_tournament_config(tournament)
     config.update(
         {
@@ -866,6 +1156,98 @@ def upsert_team_result(
     db.refresh(db_result)
     db.refresh(match)
     return build_team_result_schema(db_result, effective_format, engine_key)
+
+
+def upsert_map_result(
+    db: Session,
+    tournament: models.Tournament,
+    match: models.Match,
+    payload: schemas.MapResultUpsert,
+) -> schemas.Match:
+    if get_engine_key(tournament) not in KILL_RACE_ENGINE_KEYS:
+        raise ValueError("This endpoint is only available for Kill Race tournaments")
+    if payload.match_id != match.id:
+        raise ValueError("Payload match_id does not match path match_id")
+    if match.team_a_id is None or match.team_b_id is None:
+        raise ValueError("El match todavia no tiene dos equipos listos.")
+    if match.winner_id is not None:
+        raise ValueError("La serie ya esta cerrada.")
+    if payload.map_number > match.best_of:
+        raise ValueError(f"El BO{match.best_of} no admite mapa {payload.map_number}.")
+    if payload.kills_a == payload.kills_b:
+        raise ValueError("Empate de kills en un mapa: define desempate manual antes de guardar.")
+
+    map_winner_id = match.team_a_id if payload.kills_a > payload.kills_b else match.team_b_id
+    db_map = (
+        db.query(models.MatchMap)
+        .filter(
+            models.MatchMap.match_id == match.id,
+            models.MatchMap.map_number == payload.map_number,
+        )
+        .first()
+    )
+
+    if db_map is None:
+        db_map = models.MatchMap(
+            match_id=match.id,
+            map_number=payload.map_number,
+            kills_a=payload.kills_a,
+            kills_b=payload.kills_b,
+            map_winner_id=map_winner_id,
+        )
+        db.add(db_map)
+    else:
+        db_map.kills_a = payload.kills_a
+        db_map.kills_b = payload.kills_b
+        db_map.map_winner_id = map_winner_id
+
+    if tournament.bracket_status == BRACKET_LOCKED:
+        tournament.bracket_status = BRACKET_RUNNING
+
+    db.flush()
+
+    maps_won_a, maps_won_b = get_match_maps_won(match)
+    wins_needed = ceil(match.best_of / 2)
+    if maps_won_a >= wins_needed or maps_won_b >= wins_needed:
+        winner_id = match.team_a_id if maps_won_a > maps_won_b else match.team_b_id
+        match.winner_id = winner_id
+        match.status = "completed"
+        if match.next_match_id is not None:
+            next_match = get_match(db, match.next_match_id)
+            if next_match is not None:
+                _assign_match_slot(next_match, match.next_slot, winner_id)
+                _refresh_match_status(next_match)
+        elif tournament.bracket_status in {BRACKET_LOCKED, BRACKET_RUNNING}:
+            tournament.bracket_status = BRACKET_COMPLETED
+    else:
+        match.status = "in_progress"
+
+    db.commit()
+    refreshed = get_match(db, match.id)
+    if refreshed is None:
+        raise ValueError("Match not found after update")
+    return build_match_schema(refreshed)
+
+
+def _cleanup_bracket_matches(db: Session, tournament_id: int) -> None:
+    match_ids = [
+        match_id
+        for (match_id,) in db.query(models.Match.id)
+        .filter(models.Match.tournament_id == tournament_id)
+        .all()
+    ]
+    if not match_ids:
+        return
+    db.query(models.MatchMap).filter(
+        models.MatchMap.match_id.in_(match_ids)
+    ).delete(synchronize_session=False)
+    db.query(models.TeamResult).filter(
+        models.TeamResult.match_id.in_(match_ids)
+    ).delete(synchronize_session=False)
+    db.query(models.Match).filter(
+        models.Match.id.in_(match_ids)
+    ).delete(synchronize_session=False)
+    db.flush()
 
 
 def get_team_results_by_tournament(

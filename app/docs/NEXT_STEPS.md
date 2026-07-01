@@ -1,5 +1,94 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - Sprint B Respins / Import / Stream
+
+**Fecha:** 2026-06-30
+
+**Que se hizo:**
+- Se agregaron locks persistidos en DB para roster y bracket: `roster_status`, `roster_respin_deadline_at`, `roster_locked_at`, `bracket_status`, `bracket_respin_deadline_at`, `bracket_locked_at`.
+- Backend ahora abre/cierra ventanas de respin con endpoints dedicados y rechaza regeneraciones fuera de ventana o despues de `locked`.
+- El timer del frontend refleja `*_deadline_at` desde DB; F5 no reinicia contadores.
+- Import de participantes en frontend ahora acepta texto pegado, `.txt` y `.csv`, separa por newline/coma/punto y coma/tab, hace preview antes de guardar y deduplica.
+- Operator Kill Race muestra controles de respin persistido para roster y bracket.
+- `/stream` ya no cae en otro torneo por silencio: si viene `tournamentId` usa ese; si no, usa el torneo activo persistido en localStorage.
+- `qa_killrace.py` fue actualizado para cubrir el flujo Sprint B de locks reales.
+
+**Que NO se hizo:**
+- No se implemento double elimination real.
+- No se agrego premium visual ni rediseño de ruleta.
+- No se tocaron placement, standings ni scoring de WSOW BR / Rebirth.
+- No se agrego import `.docx` ni parsing OCR.
+
+**Que queda para Sprint C / siguientes:**
+- Flujo visual mas claro para desempate manual cuando un mapa BO3 empata en kills.
+- QA manual con navegador para validar timer visible durante F5 y stream OBS 1920x1080 sin scroll.
+- Ajustar warnings de lint preexistentes en `WorldSeriesOperator.tsx` y `tournamentMode.ts`.
+- Decidir si `bracket_status=running` debe dispararse al primer mapa o por otro evento explicito de operador.
+
+**Resultado del smoke Sprint B:**
+1. `roster-respin/open` -> `generate-roulette-teams` -> `roster-respin/lock`.
+2. Intento de regenerar roster con `roster_status=locked` -> rechazo `400`, DB sin cambios.
+3. `bracket-respin/open` -> `generate-bracket` -> `bracket-respin/lock`.
+4. Intento de regenerar bracket con `bracket_status=locked` -> rechazo `400`, DB sin cambios.
+5. SQL real del torneo QA 22:
+   - `roster_status='locked'`, `roster_respin_deadline_at=NULL`, `roster_locked_at` poblado.
+   - `bracket_status='locked'`, `bracket_respin_deadline_at=NULL`, `bracket_locked_at` poblado.
+
+**Comandos ejecutados:**
+- `cd backend && python -m pytest`
+- `cd backend && python qa_killrace.py`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+
+## ULTIMO SPRINT EJECUTADO - Rescate P0 Kill Race BO3
+
+**Fecha:** 2026-06-30
+
+**Que se hizo:**
+- Backend Kill Race con persistencia real de serie BO3 por mapa en `match_maps`.
+- `matches` ahora guarda `best_of`, `next_match_id`, `next_slot` y `winner_id` se persiste al cerrar la serie.
+- `generate_bracket` arma el arbol completo single elim y avanza BYE al nodo padre sin coronar finales automaticamente.
+- Nuevo endpoint `POST /matches/{match_id}/maps` para Kill Race. Kill Race no usa placement.
+- `GET /tournaments/{id}/matches` ahora devuelve mapas, score de serie y linkage al siguiente match.
+- Operator Kill Race muestra bracket real, serie activa, inputs kills A/B por mapa y refetch completo tras guardar.
+- Standings y stream de bracket ahora leen el mismo estado real del backend.
+
+**Que NO se hizo:**
+- No se implemento double elimination.
+- No se implementaron ventanas de respin / locks.
+- No se implemento import TXT adicional ni stream premium visual.
+- No se toco el flujo WSOW BR / Rebirth existente de placement, standings ni scoring.
+
+**Resultado del smoke BO3:**
+1. Torneo Kill Race 2v2 con 6 participantes -> 3 equipos.
+2. Match 1 operado: mapa1 `12-8`, mapa2 `9-14`, mapa3 `11-7`.
+3. Tras mapa 1, releido desde DB en nueva sesion: serie `1-0`, `winner_id=null`, persistido.
+4. Tras cerrar serie, releido en nueva sesion: serie `2-1`, `winner_id` poblado y siguiente match con slot cargado.
+5. SQL real validado:
+   - `matches`: round 1 completado con `winner_id=36`, final con `team_a_id=36`, `team_b_id=38`, `status=ready`.
+   - `match_maps`: 3 filas persistidas para el BO3.
+
+**Bugs encontrados y corregidos en el sprint:**
+- Propagacion de BYE podia autocerrar el match padre y coronar ganador sin jugar la final.
+- Firma nueva de `buildSingleElimBracket()` rompia consumidores viejos del dashboard.
+- `create_battle_royale_match()` no podia dejar de devolver modelo ORM porque rompia tests existentes.
+
+**Que queda para Sprint B:**
+- Double elimination real o bloqueo UI mas visible si sigue fuera de alcance.
+- Desempate manual explicito en UI cuando un mapa termina empatado en kills.
+- Pulido visual menor de operator/bracket si aparecen roces de UX.
+- Cualquier RESPIN / locks / import adicional definido fuera de este rescate.
+
+**Comandos ejecutados:**
+- `cd backend && python -m pytest`
+- `cd backend && python qa_killrace.py`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+
+**Nota de schema local:**
+- Como no hay migraciones formales, este cambio agrega columnas en `matches` y crea `match_maps`.
+- Si una instancia local vieja queda inconsistente, puede hacer falta detener backend y borrar `backend/bracketflow.db` para regenerarla.
+
 ## ULTIMO SPRINT EJECUTADO — Ruleta / Kill Race P0.1
 
 **Fecha:** 2026-06-30

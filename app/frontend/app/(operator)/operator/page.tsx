@@ -26,6 +26,7 @@ function OperatorPageClient() {
     selectedTournamentId,
     selectedTournament,
     teams,
+    matches,
     players,
     activeMatch,
     activeMatchResults,
@@ -38,15 +39,23 @@ function OperatorPageClient() {
     nextGameNumber,
     submitting,
     resultDrafts,
+    killRaceMapDrafts,
     updateResultDraft,
+    updateKillRaceMapDraft,
     selectTournament,
     importParticipants,
     removeParticipant,
     clearParticipants,
     createTeamWithRoster,
+    lockBracketWindow,
+    lockRosterWindow,
+    openBracketWindow,
+    openRosterWindow,
     generateRouletteForSelected,
+    generateBracketForSelected,
     createNextGame,
     saveTeamReport,
+    saveKillRaceMap,
   } = useWorldSeriesPractice(preferredTournamentId);
 
   const [teamName, setTeamName] = useState("");
@@ -84,6 +93,7 @@ function OperatorPageClient() {
       selectedTournamentId={selectedTournamentId}
       selectedTournament={selectedTournament}
       teams={teams}
+      matches={matches}
       players={players}
       activeMatch={activeMatch}
       activeMatchResults={activeMatchResults}
@@ -99,6 +109,7 @@ function OperatorPageClient() {
       teamRoster={teamRoster}
       teamFormError={teamFormError}
       resultDrafts={resultDrafts}
+      killRaceMapDrafts={killRaceMapDrafts}
       onSelectTournament={(tournamentId) => {
         selectTournament(tournamentId);
         router.replace(`/operator?tournamentId=${tournamentId}`);
@@ -110,9 +121,18 @@ function OperatorPageClient() {
       onRemoveParticipant={removeParticipant}
       onClearParticipants={clearParticipants}
       onGenerateRoulette={generateRouletteForSelected}
+      onGenerateBracket={generateBracketForSelected}
+      onOpenRosterRespin={openRosterWindow}
+      onLockRosterRespin={lockRosterWindow}
+      onOpenBracketRespin={openBracketWindow}
+      onLockBracketRespin={lockBracketWindow}
       onUpdateDraft={updateResultDraft}
+      onUpdateKillRaceMapDraft={updateKillRaceMapDraft}
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);
+      }}
+      onSaveKillRaceMap={(matchId) => {
+        void saveKillRaceMap(matchId);
       }}
       onCreateNextGame={() => {
         void createNextGame();

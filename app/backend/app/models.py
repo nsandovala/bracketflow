@@ -18,6 +18,14 @@ class Tournament(Base):
     scoring_profile: Mapped[str] = mapped_column(
         String, nullable=False, default="wsow_like"
     )
+    roster_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="participants_pending"
+    )
+    roster_respin_deadline_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    roster_locked_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    bracket_status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    bracket_respin_deadline_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    bracket_locked_at: Mapped[str | None] = mapped_column(String, nullable=True)
     config: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     teams: Mapped[list["Team"]] = relationship(
@@ -88,6 +96,9 @@ class Match(Base):
     team_a_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
     team_b_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
     winner_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    best_of: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    next_match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
+    next_slot: Mapped[str | None] = mapped_column(String, nullable=True)
     tournament_id: Mapped[int] = mapped_column(
         ForeignKey("tournaments.id"), nullable=False, index=True
     )
@@ -96,6 +107,22 @@ class Match(Base):
     results: Mapped[list["TeamResult"]] = relationship(
         "TeamResult", back_populates="match", cascade="all, delete-orphan"
     )
+    maps: Mapped[list["MatchMap"]] = relationship(
+        "MatchMap", back_populates="match", cascade="all, delete-orphan"
+    )
+
+
+class MatchMap(Base):
+    __tablename__ = "match_maps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), nullable=False, index=True)
+    map_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    kills_a: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kills_b: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    map_winner_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+
+    match: Mapped["Match"] = relationship("Match", back_populates="maps")
 
 
 class TeamResult(Base):

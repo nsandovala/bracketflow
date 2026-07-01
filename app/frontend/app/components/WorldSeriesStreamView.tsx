@@ -25,7 +25,7 @@ export default function WorldSeriesStreamView({
   brand,
   layout,
 }: WorldSeriesStreamViewProps) {
-  const { tournament, teams, standings, afterGameNumber, connected } =
+  const { tournament, teams, matches, standings, afterGameNumber, connected } =
     useStreamLeaderboard(tournamentId);
   const engine = tournament ? resolveTournamentEngine(tournament) : null;
   const isBracket =
@@ -60,6 +60,7 @@ export default function WorldSeriesStreamView({
         tournament={tournament}
         engine={engine}
         teams={teams}
+        matches={matches}
         connected={connected}
         obs={obs || layout === "sidebar" || layout === "lower"}
         transparent={transparent}

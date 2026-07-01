@@ -1,142 +1,101 @@
-# BracketFlow — Contexto de QA y Recomendaciones
+# BracketFlow - Contexto de QA y Recomendaciones
 
 > Documento de continuidad para sesiones futuras.
-> Fecha: 2026-06-30 (actualizado)
-> Estado: MVP validado, bugs críticos de ruleta corregidos, optimizaciones pendientes documentadas.
+> Fecha: 2026-06-30
+> Estado: rescate P0 de Kill Race BO3 validado.
 
----
+## Sprint B - Respins persistidos / import / stream
 
-## 1. Resumen del QA realizado
+### QA ejecutado
 
-### Sprint P0.1 — Ruleta Real + Kill Race Seed (2026-06-30)
-
-#### Validaciones técnicas
 | Check | Comando | Resultado |
-|-------|---------|-----------|
-| Backend syntax | `cd backend && python -m compileall app` | Sin errores |
-| Frontend lint | `cd frontend && npm run lint` | 0 errores, 9 warnings preexistentes |
-| Frontend build | `cd frontend && npm run build` | Build exitoso (Next.js 16.2.7) |
-| Backend QA script | `python qa_killrace.py` | PASO |
+|---|---|---|
+| Backend tests | `cd backend && python -m pytest` | 39 passed |
+| Backend QA script | `cd backend && python qa_killrace.py` | PASO |
+| Frontend lint | `cd frontend && npm run lint` | 0 errores, 8 warnings no bloqueantes |
+| Frontend build | `cd frontend && npm run build` | Build exitoso |
 
-#### Bugs corregidos en P0.1
-1. **Nickname con comas internas aceptado** → Ahora frontend y backend rechazan nicknames con `, ; \t` internos (422). Evita equipos como `fede / manteca, demain, carlos, lalo, clara`.
-2. **Duplicidad de textos UI** → Aplicada regla anti-duplicidad en RouletteArena, BracketView, Standings, Operator.
-3. **Mensajes de "siguiente sprint"** → Quitados de BracketView y Operator Kill Race.
-4. **Parser debil** → Ahora soporta separadores: newline, coma, punto y coma, tab, multiples espacios.
+### Smoke Sprint B ejecutado
 
-#### Flujo funcional validado (script `qa_killrace.py`)
-1. ✅ Crear torneo Kill Race 2v2.
-2. ✅ Intentar importar nickname con comas → rechazado 422.
-3. ✅ Importar 4 jugadores validos → 201.
-4. ✅ Generar ruleta → 2 equipos de 2 jugadores exactos, 0 banca.
-5. ✅ Agregar 1 jugador extra, regenerar → 2 equipos, 1 banca.
-6. ✅ Bracket visual muestra nombres reales y BYE.
-7. ✅ Stream bifurca: Kill Race → bracket, WSOW → standings.
+1. Crear torneo Kill Race 2v2.
+2. Import backend robusto validado:
+   - nickname con comas internas -> `422`
+   - lista valida -> `201`
+3. Abrir `roster-respin` 3 min.
+4. Generar ruleta y lockear roster.
+5. Reintentar generar ruleta con `roster_status=locked` -> rechazo `400`.
+6. Abrir `bracket-respin` 3 min.
+7. Generar bracket y lockear bracket.
+8. Reintentar generar bracket con `bracket_status=locked` -> rechazo `400`.
+9. SQL real validado en `backend/bracketflow.db` para torneo QA 22:
+   - `('locked', None, '<timestamp>', 'locked', None, '<timestamp>')`
 
-### Sprint anterior (2026-06-02)
+### Bugs encontrados y corregidos
 
-#### Validaciones técnicas
+1. `POST /tournaments/{id}/generate-bracket` devolvia `500` porque el endpoint no retornaba `BracketGenerationResult`.
+2. `_cleanup_bracket_matches()` tenia codigo ajeno pegado al final y rompia la generacion de bracket.
+3. `qa_killrace.py` seguia usando el flujo viejo sin abrir ventanas de respin.
+4. `RouletteArena.tsx` mezclaba `Team[]` y preview teams en el render del seed y rompia `npm run build`.
+
+### Riesgos / pendientes
+
+- Falta QA manual con navegador para confirmar que el countdown visible sigue coherente tras F5.
+- Falta QA visual de stream OBS 1920x1080 sin scroll ni artefactos.
+- `bracket_status` pasa a `running` al guardar el primer mapa; si negocio prefiere otro evento de arranque, decidirlo en siguiente sprint.
+
+## 1. QA ejecutado
+
+### Sprint Rescate P0 - Kill Race BO3 persistente
+
 | Check | Comando | Resultado |
-|-------|---------|-----------|
-| Backend syntax | `cd backend && python -m compileall app` | Sin errores |
-| Frontend lint | `cd frontend && npm run lint` | Sin errores |
-| Frontend build | `cd frontend && npm run build` | Build exitoso (Next.js 16.2.7) |
+|---|---|---|
+| Backend tests | `cd backend && python -m pytest` | 35 passed |
+| Backend QA script | `cd backend && python qa_killrace.py` | PASO |
+| Frontend lint | `cd frontend && npm run lint` | 0 errores, 8 warnings no bloqueantes |
+| Frontend build | `cd frontend && npm run build` | Build exitoso |
 
-#### Flujo funcional validado (vía API REST, script `qa_flow.py`)
-1. ✅ Crear torneo formato `roulette_2v2`.
-2. ✅ Agregar 4 jugadores manualmente.
-3. ✅ Generar ruleta 2v2 (2 equipos creados, 0 en bench).
-4. ✅ Confirmar que equipos devuelven `members` con `player.nickname` (no solo IDs).
-5. ✅ Crear ronda 1.
-6. ✅ Registrar resultados:
-   - Equipo 1: 8 kills, placement 2 → 20 pts.
-   - Equipo 2: 5 kills, placement 1 → 20 pts.
-7. ✅ Leaderboard:
-   - Ambos con 20 puntos.
-   - Desempate por kills: equipo con 8 kills arriba, 5 kills abajo.
-8. ✅ Actualizar resultado existente (8 → 9 kills) sin duplicar registros.
-9. ✅ Persistencia confirmada en `backend/bracketflow.db` tras detener el backend.
+### Smoke BO3 ejecutado
 
-### Bugs encontrados (historico)
-**Ninguno crítico.** El flujo happy path del MVP se comporta según especificación.
+1. Crear torneo Kill Race 2v2 con `bestOf=3`.
+2. Cargar 6 participantes reales.
+3. Generar ruleta -> 3 equipos.
+4. Generar bracket single elim completo.
+5. Operar Match 1 con:
+   - mapa 1: `12-8`
+   - mapa 2: `9-14`
+   - mapa 3: `11-7`
+6. Reabrir sesion despues de mapa 1:
+   - serie `1-0`
+   - `winner_id = NULL`
+   - fila persistida en `match_maps`
+7. Reabrir sesion despues del cierre:
+   - serie `2-1`
+   - `winner_id` persistido en el match resuelto
+   - slot del siguiente match poblado con el ganador
+8. SQL validado en `backend/bracketflow.db`:
+   - `SELECT id, round, status, team_a_id, team_b_id, winner_id, next_match_id FROM matches WHERE tournament_id = 15`
+   - `SELECT * FROM match_maps WHERE match_id = 21`
 
-### Archivos modificados durante el QA
-**Ninguno.** Solo se usó un script temporal externo (`qa_flow.py` en temp) que no quedó en el repo.
+### Estado final del smoke
 
-> ⚠️ Nota: el script de QA eliminó temporalmente `backend/bracketflow.db` para garantizar un flujo limpio. Si se tenían datos locales previos, deben regenerarse por el flujo normal.
+- `winner_id` se persiste en DB y el avance sobrevive a F5.
+- Kill Race no usa placement.
+- El siguiente match queda en `status=ready` con ambos equipos cargados.
 
----
+## 2. Bugs encontrados y corregidos
 
-## 2. Recomendaciones de optimización pendientes
+1. La propagacion de BYE podia autocerrar el nodo padre y dejar un campeon falso antes de jugar la final.
+2. El dashboard seguia consumiendo la firma vieja de `buildSingleElimBracket`.
+3. `create_battle_royale_match()` no podia devolver schema Pydantic sin romper tests que esperan ORM.
 
-### 2.1 Constraint única en `TeamResult`
-Agregar `UniqueConstraint("match_id", "team_id")` en el modelo SQLAlchemy para evitar duplicados a nivel de base de datos, incluso ante concurrencia o inserts manuales.
+## 3. Riesgos y pendientes reales
 
-**Archivo:** `backend/app/models.py`  
-**Prioridad:** Media-Alta.
+- Double elimination sigue fuera de alcance; debe bloquearse con mensaje claro.
+- Empate de kills en un mapa responde 422, pero la UI todavia no tiene flujo de desempate manual.
+- No hay migraciones formales. Si una DB local vieja queda inconsistente, puede ser necesario detener backend y borrar `backend/bracketflow.db`.
 
-### 2.2 Índice compuesto en `team_results`
-Agregar un índice sobre `(tournament_id, team_id)` para acelerar el cálculo del leaderboard a medida que crece el historial de rondas.
+## 4. Reglas vigentes
 
-**Archivo:** `backend/app/models.py`  
-**Prioridad:** Media.
-
-### 2.3 Manejo defensivo de transacciones
-Algunas funciones en `backend/app/crud.py` usan `db.flush()` seguido de consultas y luego `db.commit()`. Si ocurre un error entre `flush` y `commit`, la sesión queda en estado intermedio. Agregar `try/except` con `db.rollback()` protege contra propagación de datos sucios.
-
-**Archivo:** `backend/app/crud.py`  
-**Prioridad:** Media.
-
-### 2.4 `.gitignore` en la raíz del repo
-Actualmente existen archivos sin trackear un nivel arriba de `app/`:
-- `../.venv/`
-- `../requirements.txt`
-
-Agregar un `.gitignore` en la raíz (`bracketflow/.gitignore`) con:
-```
-.venv/
-requirements.txt
-```
-
-**Prioridad:** Baja.
-
-### 2.5 Validación temprana de coherencia de schema
-En `backend/app/schemas.py`, `TournamentCreate` no valida que `team_size` sea coherente con `format`. Aunque `crud.normalize_team_size()` lo corrige, un `model_validator` en Pydantic haría el error visible antes de llegar a CRUD.
-
-**Archivo:** `backend/app/schemas.py`  
-**Prioridad:** Baja.
-
-### 2.6 Mejora de mensajes de error de red en frontend
-`frontend/lib/api.ts` lanza `throw new Error("Request failed")` genérico cuando el backend no responde. Agregar logging en consola o un mensaje más descriptivo facilita el debugging futuro.
-
-**Archivo:** `frontend/lib/api.ts`  
-**Prioridad:** Baja.
-
----
-
-## 3. Reglas operativas vigentes (no negociables)
-
-- **NO** agregar demo data, seeders, mocks persistentes ni botones de demo.
-- **NO** rediseñar UI sin necesidad funcional.
-- **NO** cambiar stack (FastAPI + SQLite + SQLAlchemy / Next.js + TypeScript).
-- **NO** agregar Docker, autenticación, pagos ni IA salvo pedido explícito.
-- **NO** ejecutar `npm audit fix --force`.
-- Trabajar siempre con datos reales ingresados manualmente o por el flujo normal.
-- Si cambia el schema en desarrollo local, avisar explícitamente que puede ser necesario borrar `backend/bracketflow.db` y regenerar.
-
----
-
-## 4. Stack actual
-
-- **Backend:** Python, FastAPI, SQLite, SQLAlchemy, Pydantic.
-- **Frontend:** Next.js 16.2.7, TypeScript, App Router.
-- **Base de datos local:** `backend/bracketflow.db` (sin migraciones formales aún).
-
----
-
-## 5. Estado de Git (al momento de este documento)
-
-- Rama: `master`, up to date con `origin/master`.
-- Sin archivos modificados sin stagear.
-- Sin archivos en staging area.
-- Único cambio a subir: este documento (`docs/QA_CONTEXT.md`).
+- No agregar demo data, seeders, fixtures permanentes ni mocks persistentes.
+- No redisenar la ruleta en este sprint.
+- No tocar placement/scoring de WSOW BR o Rebirth al resolver Kill Race.

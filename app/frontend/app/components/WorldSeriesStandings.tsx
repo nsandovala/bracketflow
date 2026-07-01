@@ -1,7 +1,7 @@
 import StandingsTable from "./StandingsTable";
 import BracketView from "./BracketView";
 
-import { Team, Tournament } from "../../lib/api";
+import { Match, Team, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 
@@ -13,6 +13,7 @@ type WorldSeriesStandingsProps = {
   afterGameNumber: number;
   totalTeams: number;
   teams: Team[];
+  matches: Match[];
   onSelectTournament: (tournamentId: number) => void;
 };
 
@@ -24,6 +25,7 @@ export default function WorldSeriesStandings({
   afterGameNumber,
   totalTeams,
   teams,
+  matches,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
   const selectedEngine = selectedTournament
@@ -75,6 +77,7 @@ export default function WorldSeriesStandings({
             tournament={selectedTournament}
             engine={selectedEngine}
             teams={teams}
+            matches={matches}
             mode="standings"
           />
         ) : (

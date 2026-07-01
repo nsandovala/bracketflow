@@ -1,4 +1,9 @@
-import requests, sys, json, os
+import json
+import os
+import sqlite3
+import sys
+
+import requests
 
 BASE = "http://localhost:8000"
 
@@ -75,7 +80,12 @@ def main():
         print(f"  ERROR inesperado: {r.status_code}")
         sys.exit(1)
 
-    # 4. Generar ruleta
+    # 4. Abrir respin de roster y generar ruleta
+    r = api("post", f"/tournaments/{tid}/roster-respin/open", json={"duration_minutes": 3})
+    if r.status_code != 200:
+        print("  ERROR: No se pudo abrir respin de roster")
+        sys.exit(1)
+
     r = api("post", f"/tournaments/{tid}/generate-roulette-teams", json={
         "shuffle_seed": "qa-seed-01",
         "reset": True,
@@ -89,6 +99,11 @@ def main():
     bench = result.get("bench", [])
     print(f"  Ruleta generada: {len(teams_created)} equipos, {len(bench)} banca.")
 
+    r = api("post", f"/tournaments/{tid}/roster-respin/lock")
+    if r.status_code != 200:
+        print("  ERROR: No se pudo lockear roster")
+        sys.exit(1)
+
     # Verificar que equipos tienen exactamente 2 jugadores
     for team in teams_created:
         members = team.get("members", [])
@@ -97,7 +112,7 @@ def main():
             sys.exit(1)
     print("  OK: Todos los equipos tienen exactamente 2 jugadores.")
 
-    # 5. Verificar bracket en standings
+    # 5. Verificar equipos confirmados
     r = api("get", f"/tournaments/{tid}/teams")
     teams = r.json()
     print(f"  Teams confirmados: {len(teams)}")
@@ -107,28 +122,60 @@ def main():
     roulette_bench = config.get("rouletteBench", [])
     print(f"  Bench en config: {roulette_bench}")
 
-    # 7. Caso con jugador extra (banca)
-    r = api("post", f"/tournaments/{tid}/players/bulk", json={
-        "nicknames": ["ExtraPlayer"]
-    })
-    if r.status_code in (200, 201):
-        print(f"  Jugador extra cargado.")
-    
-    # Regenerar ruleta (reset=True)
+    # 7. Con roster locked, la regeneracion debe ser rechazada
     r = api("post", f"/tournaments/{tid}/generate-roulette-teams", json={
         "shuffle_seed": "qa-seed-02",
         "reset": True,
         "confirm": True
     })
-    if r.status_code == 200:
-        result2 = r.json()
-        teams2 = result2.get("teams_created", [])
-        bench2 = result2.get("bench", [])
-        print(f"  Regeneracion con 5 jugadores: {len(teams2)} equipos, {len(bench2)} banca.")
-        if len(bench2) == 1:
-            print("  OK: Banca correcta con 1 jugador sobrante.")
-        else:
-            print(f"  ERROR: Esperada banca de 1, got {len(bench2)}")
+    if r.status_code not in (400, 409, 422):
+        print("  ERROR: La regeneracion debio ser rechazada despues de locked.")
+        sys.exit(1)
+    print("  OK: Backend rechaza regenerar roster despues de locked.")
+
+    # 8. Abrir respin de bracket, generar llave y lockear running
+    r = api("post", f"/tournaments/{tid}/bracket-respin/open", json={"duration_minutes": 3})
+    if r.status_code != 200:
+        print("  ERROR: No se pudo abrir respin de bracket")
+        sys.exit(1)
+
+    r = api("post", f"/tournaments/{tid}/generate-bracket")
+    if r.status_code != 200:
+        print("  ERROR: No se pudo generar bracket")
+        sys.exit(1)
+    bracket = r.json()
+    matches_created = bracket.get("matches_created", 0)
+    print(f"  Bracket generado: {matches_created} matches.")
+
+    r = api("post", f"/tournaments/{tid}/bracket-respin/lock")
+    if r.status_code != 200:
+        print("  ERROR: No se pudo lockear bracket")
+        sys.exit(1)
+
+    r = api("post", f"/tournaments/{tid}/generate-bracket")
+    if r.status_code not in (400, 409, 422):
+        print("  ERROR: El bracket locked debio rechazar regeneracion.")
+        sys.exit(1)
+    print("  OK: Backend rechaza regenerar bracket despues de locked/running.")
+
+    db_path = os.path.join(os.path.dirname(__file__), "bracketflow.db")
+    if os.path.exists(db_path):
+        conn = sqlite3.connect(db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT roster_status, roster_respin_deadline_at, roster_locked_at,
+                       bracket_status, bracket_respin_deadline_at, bracket_locked_at
+                FROM tournaments
+                WHERE id = ?
+                """,
+                (tid,),
+            )
+            row = cursor.fetchone()
+            print(f"  DB torneo: {row}")
+        finally:
+            conn.close()
 
     print("\n[OK] QA manual backend: PASO")
     print(f"   Torneo id={tid}")

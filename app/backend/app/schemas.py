@@ -27,6 +27,10 @@ class TournamentConfig(BaseModel):
     rouletteStatus: Literal["generated", "confirmed"] | None = None
 
 
+class RespinWindowOpen(BaseModel):
+    duration_minutes: int = Field(ge=3, le=5)
+
+
 class TournamentBase(BaseModel):
     name: str
     game: str
@@ -72,6 +76,12 @@ class TournamentUpdate(BaseModel):
 class Tournament(TournamentBase):
     id: int
     status: str
+    roster_status: Literal["participants_pending", "respin_open", "locked"]
+    roster_respin_deadline_at: str | None
+    roster_locked_at: str | None
+    bracket_status: Literal["pending", "respin_open", "locked", "running", "completed"]
+    bracket_respin_deadline_at: str | None
+    bracket_locked_at: str | None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -151,6 +161,17 @@ class MatchCreate(BaseModel):
     round: int = Field(ge=1)
 
 
+class MatchMap(BaseModel):
+    id: int
+    match_id: int
+    map_number: int
+    kills_a: int
+    kills_b: int
+    map_winner_id: int | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class Match(BaseModel):
     id: int
     round: int
@@ -158,7 +179,13 @@ class Match(BaseModel):
     team_a_id: int | None
     team_b_id: int | None
     winner_id: int | None
+    best_of: int
+    next_match_id: int | None
+    next_slot: str | None
     tournament_id: int
+    maps: list[MatchMap] = Field(default_factory=list)
+    maps_won_a: int = 0
+    maps_won_b: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -167,6 +194,13 @@ class TeamResultUpsert(BaseModel):
     team_id: int
     kills: int = Field(ge=0)
     placement: int = Field(ge=1)
+
+
+class MapResultUpsert(BaseModel):
+    match_id: int
+    map_number: int = Field(ge=1)
+    kills_a: int = Field(ge=0)
+    kills_b: int = Field(ge=0)
 
 
 class TeamResult(BaseModel):

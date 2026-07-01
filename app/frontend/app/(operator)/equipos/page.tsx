@@ -28,6 +28,8 @@ function EquiposPageClient() {
     importParticipants,
     removeParticipant,
     clearParticipants,
+    openRosterWindow,
+    lockRosterWindow,
     generateRouletteForSelected,
   } = useWorldSeriesPractice(preferredTournamentId);
 
@@ -55,6 +57,8 @@ function EquiposPageClient() {
             onRemoveParticipant={removeParticipant}
             onClearParticipants={clearParticipants}
             onConfirmRoulette={generateRouletteForSelected}
+            onOpenRosterRespin={openRosterWindow}
+            onLockRosterRespin={lockRosterWindow}
           />
         </>
       ) : (

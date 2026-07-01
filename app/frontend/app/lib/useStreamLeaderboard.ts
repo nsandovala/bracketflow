@@ -4,14 +4,16 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   LeaderboardEntry,
+  Match,
   Team,
   Tournament,
   getLeaderboard,
+  getMatches,
   getTeams,
   getTournament,
   getTournamentResults,
-  getTournaments,
 } from "../../lib/api";
+import { ACTIVE_WORLD_SERIES_TOURNAMENT_KEY } from "./useWorldSeriesPractice";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 
 // Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
@@ -24,6 +26,7 @@ export type StreamStanding = LeaderboardEntry & {
 export type StreamLeaderboardState = {
   tournament: Tournament | null;
   teams: Team[];
+  matches: Match[];
   standings: StreamStanding[];
   afterGameNumber: number;
   connected: boolean;
@@ -85,11 +88,15 @@ async function resolveTournamentId(preferredId: number | null): Promise<number |
   if (preferredId !== null) {
     return preferredId;
   }
-  const tournaments = await getTournaments();
-  const worldSeries = tournaments.filter(
-    (tournament) => tournament.format === "battle_royale_points"
-  );
-  return worldSeries[0]?.id ?? null;
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const raw = window.localStorage.getItem(ACTIVE_WORLD_SERIES_TOURNAMENT_KEY);
+  if (!raw) {
+    return null;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function useStreamLeaderboard(
@@ -99,6 +106,7 @@ export function useStreamLeaderboard(
   const [state, setState] = useState<StreamLeaderboardState>({
     tournament: null,
     teams: [],
+    matches: [],
     standings: [],
     afterGameNumber: 0,
     connected: false,
@@ -120,15 +128,24 @@ export function useStreamLeaderboard(
           setState((current) =>
             current.connected && current.hasLoadedOnce && current.tournament === null
               ? current
-              : { ...current, connected: true, hasLoadedOnce: true }
+              : {
+                  tournament: null,
+                  teams: [],
+                  matches: [],
+                  standings: [],
+                  afterGameNumber: 0,
+                  connected: true,
+                  hasLoadedOnce: true,
+                }
           );
           return;
         }
 
-        const [tournament, teams, results] = await Promise.all([
+        const [tournament, teams, results, matches] = await Promise.all([
           getTournament(tournamentId),
           getTeams(tournamentId),
           getTournamentResults(tournamentId),
+          getMatches(tournamentId),
         ]);
         const engine = resolveTournamentEngine(tournament);
         const isBracket =
@@ -156,6 +173,7 @@ export function useStreamLeaderboard(
           return {
             tournament,
             teams,
+            matches,
             standings,
             afterGameNumber,
             connected: true,

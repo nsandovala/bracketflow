@@ -75,6 +75,12 @@ export type Tournament = {
   format: TournamentFormat;
   team_size: number;
   scoring_profile: string;
+  roster_status: "participants_pending" | "respin_open" | "locked";
+  roster_respin_deadline_at: string | null;
+  roster_locked_at: string | null;
+  bracket_status: "pending" | "respin_open" | "locked" | "running" | "completed";
+  bracket_respin_deadline_at: string | null;
+  bracket_locked_at: string | null;
   engine_key?: TournamentEngineKey;
   config?: TournamentConfig;
 };
@@ -107,7 +113,22 @@ export type Match = {
   team_a_id: number | null;
   team_b_id: number | null;
   winner_id: number | null;
+  best_of: number;
+  next_match_id: number | null;
+  next_slot: string | null;
   tournament_id: number;
+  maps: MatchMap[];
+  maps_won_a: number;
+  maps_won_b: number;
+};
+
+export type MatchMap = {
+  id: number;
+  match_id: number;
+  map_number: number;
+  kills_a: number;
+  kills_b: number;
+  map_winner_id: number | null;
 };
 
 export type TeamResult = {
@@ -310,6 +331,42 @@ export function saveMatchResult(
   payload: { team_id: number; kills: number; placement: number }
 ) {
   return request<TeamResult>(`/matches/${matchId}/results`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function openRosterRespin(tournamentId: number, payload: { duration_minutes: number }) {
+  return request<Tournament>(`/tournaments/${tournamentId}/roster-respin/open`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function lockRosterRespin(tournamentId: number) {
+  return request<Tournament>(`/tournaments/${tournamentId}/roster-respin/lock`, {
+    method: "POST",
+  });
+}
+
+export function openBracketRespin(tournamentId: number, payload: { duration_minutes: number }) {
+  return request<Tournament>(`/tournaments/${tournamentId}/bracket-respin/open`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function lockBracketRespin(tournamentId: number) {
+  return request<Tournament>(`/tournaments/${tournamentId}/bracket-respin/lock`, {
+    method: "POST",
+  });
+}
+
+export function saveMatchMap(
+  matchId: number,
+  payload: { match_id: number; map_number: number; kills_a: number; kills_b: number }
+) {
+  return request<Match>(`/matches/${matchId}/maps`, {
     method: "POST",
     body: payload,
   });

@@ -1,21 +1,21 @@
-import type { Player, Team } from "./api";
+import type { Match, Team } from "./api";
 
 export type PreviewRosterTeam = {
   id?: number;
   name: string;
-  players: Player[];
+  players: Array<{ nickname: string }>;
 };
 
 export type BracketTeam = Team | PreviewRosterTeam;
 
 export type BracketMatch = {
-  id: string;
+  id: number;
   label: string;
   left: string;
   right: string;
   leftMeta?: string;
   rightMeta?: string;
-  status: "pending" | "bye";
+  status: string;
 };
 
 export type BracketRound = {
@@ -49,70 +49,92 @@ export function getTeamSeedLabel(team: BracketTeam, fallbackIndex?: number) {
   return numericName ? `Seed #${numericName}` : `Seed #${fallbackIndex ?? "?"}`;
 }
 
-function buildRoundOne(teams: BracketTeam[], maxNames: number): BracketMatch[] {
-  const matches: BracketMatch[] = [];
-  for (let index = 0; index < teams.length; index += 2) {
-    const left = teams[index];
-    const right = teams[index + 1] ?? null;
-    matches.push({
-      id: `r1-m${matches.length + 1}`,
-      label: `Match ${matches.length + 1}`,
-      left: getTeamShortDisplayName(left, maxNames),
-      right: right ? getTeamShortDisplayName(right, maxNames) : "BYE",
-      leftMeta: getTeamSeedLabel(left, index + 1),
-      rightMeta: right ? getTeamSeedLabel(right, index + 2) : undefined,
-      status: right ? "pending" : "bye",
-    });
-  }
-  return matches;
-}
-
-function roundTitle(roundIndex: number, totalRounds: number) {
-  if (roundIndex === totalRounds - 1) {
+function roundTitle(roundNumber: number, totalRounds: number) {
+  if (roundNumber === totalRounds) {
     return "Final";
   }
-  if (roundIndex === totalRounds - 2) {
+  if (roundNumber === totalRounds - 1) {
     return "Semifinal";
   }
-  return `Round ${roundIndex + 1}`;
+  return `Round ${roundNumber}`;
 }
 
-export function buildSingleElimBracket(teams: BracketTeam[], teamSize: number): BracketRound[] {
-  if (teams.length === 0) {
+function getApiTeamShortDisplayName(team: Team | undefined, maxNames: number) {
+  if (!team) {
+    return "";
+  }
+  return getTeamShortDisplayName(team, maxNames);
+}
+
+function getSeriesMeta(match: Match, side: "a" | "b") {
+  if (match.status === "completed" && match.winner_id !== null) {
+    const mapsWon = side === "a" ? match.maps_won_a : match.maps_won_b;
+    return match.winner_id === (side === "a" ? match.team_a_id : match.team_b_id)
+      ? `Gana ${mapsWon}-${side === "a" ? match.maps_won_b : match.maps_won_a}`
+      : `Pierde ${mapsWon}-${side === "a" ? match.maps_won_b : match.maps_won_a}`;
+  }
+  if (match.maps.length > 0) {
+    return `Serie ${match.maps_won_a}-${match.maps_won_b}`;
+  }
+  return undefined;
+}
+
+function getFutureSlotLabel(matchId: number) {
+  return `Ganador M${matchId}`;
+}
+
+export function buildSingleElimBracket(
+  matches: Match[],
+  teams: Team[],
+  teamSize: number
+): BracketRound[] {
+  if (matches.length === 0) {
     return [];
   }
 
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  const matchesById = new Map(matches.map((match) => [match.id, match]));
+  const totalRounds = Math.max(...matches.map((match) => match.round));
   const maxNames = teamSize <= 2 ? 2 : 3;
-  const rounds: BracketRound[] = [
-    {
-      title: "Round 1",
-      matches: buildRoundOne(teams, maxNames),
-    },
-  ];
 
-  let previousMatchCount = rounds[0].matches.length;
-  while (previousMatchCount > 1) {
-    const roundIndex = rounds.length;
-    const nextMatchCount = Math.ceil(previousMatchCount / 2);
-    const matches: BracketMatch[] = [];
-    for (let index = 0; index < nextMatchCount; index += 1) {
-      const leftSource = index * 2 + 1;
-      const rightSource = leftSource + 1;
-      matches.push({
-        id: `r${roundIndex + 1}-m${index + 1}`,
-        label: `Match ${index + 1}`,
-        left: `Winner M${leftSource}`,
-        right: rightSource <= previousMatchCount ? `Winner M${rightSource}` : "BYE",
-        status: rightSource <= previousMatchCount ? "pending" : "bye",
+  return Array.from({ length: totalRounds }, (_, index) => {
+    const roundNumber = index + 1;
+    const roundMatches = matches
+      .filter((match) => match.round === roundNumber)
+      .map((match) => {
+        const leftTeam = match.team_a_id ? teamsById.get(match.team_a_id) : undefined;
+        const rightTeam = match.team_b_id ? teamsById.get(match.team_b_id) : undefined;
+        const feederMatches = matches.filter((candidate) => candidate.next_match_id === match.id);
+        const leftFeeder = feederMatches.find((candidate) => candidate.next_slot === "a");
+        const rightFeeder = feederMatches.find((candidate) => candidate.next_slot === "b");
+        const left = leftTeam
+          ? getTeamShortDisplayName(leftTeam, maxNames)
+          : leftFeeder && matchesById.get(leftFeeder.id)?.winner_id === null
+            ? getFutureSlotLabel(leftFeeder.id)
+            : "Slot pendiente";
+        const right = rightTeam
+          ? getApiTeamShortDisplayName(rightTeam, maxNames)
+          : rightFeeder && matchesById.get(rightFeeder.id)?.winner_id === null
+            ? getFutureSlotLabel(rightFeeder.id)
+            : "Slot pendiente";
+        const leftDisplay = leftTeam
+          ? getApiTeamShortDisplayName(leftTeam, maxNames)
+          : left;
+
+        return {
+          id: match.id,
+          label: `Match ${match.id}`,
+          left: leftDisplay,
+          right,
+          leftMeta: getSeriesMeta(match, "a"),
+          rightMeta: getSeriesMeta(match, "b"),
+          status: match.status,
+        };
       });
-    }
-    rounds.push({ title: roundTitle(roundIndex, rounds.length + 1), matches });
-    previousMatchCount = nextMatchCount;
-  }
 
-  const totalRounds = rounds.length;
-  return rounds.map((round, index) => ({
-    ...round,
-    title: index === 0 ? "Round 1" : roundTitle(index, totalRounds),
-  }));
+    return {
+      title: roundTitle(roundNumber, totalRounds),
+      matches: roundMatches,
+    };
+  });
 }

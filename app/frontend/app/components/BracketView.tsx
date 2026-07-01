@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import type { Team, Tournament } from "../../lib/api";
+import type { Match, Team, Tournament } from "../../lib/api";
 import { buildSingleElimBracket } from "../../lib/bracketDisplay";
 import type { ResolvedTournamentEngine } from "../../lib/tournamentModel";
 
@@ -8,16 +8,36 @@ type BracketViewProps = {
   tournament: Tournament | null;
   engine: ResolvedTournamentEngine | null;
   teams: Team[];
+  matches: Match[];
   mode: "setup" | "stream" | "operator" | "standings";
 };
 
-export default function BracketView({ tournament, engine, teams, mode }: BracketViewProps) {
-  const rounds = buildSingleElimBracket(teams, engine?.teamSize ?? 2);
+function getEmptyMeta(label: string) {
+  if (label.startsWith("Ganador M")) {
+    return "Slot futuro";
+  }
+  if (label === "BYE") {
+    return "BYE";
+  }
+  return "Serie pendiente";
+}
+
+export default function BracketView({
+  tournament,
+  engine,
+  teams,
+  matches,
+  mode,
+}: BracketViewProps) {
+  const rounds = buildSingleElimBracket(matches, teams, engine?.teamSize ?? 2);
   const hasTeams = teams.length > 0;
-  const title = hasTeams ? "Bracket" : "Falta generar bracket";
-  const subtitle = hasTeams
+  const hasMatches = matches.length > 0;
+  const title = hasMatches ? "Bracket" : "Falta generar bracket";
+  const subtitle = hasMatches
     ? `${teams.length} equipos sembrados · ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
-    : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
+    : hasTeams
+      ? "Los equipos ya existen. Genera la llave para empezar a operar el BO3."
+      : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
 
   return (
     <section className={`bf-bracket-view is-${mode}`}>
@@ -35,7 +55,11 @@ export default function BracketView({ tournament, engine, teams, mode }: Bracket
       {rounds.length === 0 ? (
         <div className="bf-bracket-empty">
           <strong>Seed pendiente</strong>
-          <p>Carga participantes y confirma equipos para pintar la llave.</p>
+          <p>
+            {hasTeams
+              ? "Los equipos estan listos, pero la llave todavia no fue generada."
+              : "Carga participantes y confirma equipos para pintar la llave."}
+          </p>
         </div>
       ) : (
         <div
@@ -51,11 +75,11 @@ export default function BracketView({ tournament, engine, teams, mode }: Bracket
                     <span className="bf-bracket-match-label">{match.label}</span>
                     <div className="bf-bracket-slot">
                       <strong>{match.left}</strong>
-                      {match.leftMeta ? <em>{match.leftMeta}</em> : <em>Ganador pendiente</em>}
+                      <em>{match.leftMeta ?? getEmptyMeta(match.left)}</em>
                     </div>
-                    <div className={`bf-bracket-slot${match.status === "bye" ? " is-bye" : ""}`}>
+                    <div className={`bf-bracket-slot${match.right === "BYE" ? " is-bye" : ""}`}>
                       <strong>{match.right}</strong>
-                      {match.rightMeta ? <em>{match.rightMeta}</em> : <em>{match.status === "bye" ? "BYE" : "Ganador pendiente"}</em>}
+                      <em>{match.rightMeta ?? getEmptyMeta(match.right)}</em>
                     </div>
                   </article>
                 ))}
