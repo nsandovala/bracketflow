@@ -1,5 +1,139 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - UX-P0 Rescue Parte 5 (Rediseño Ruleta Casino + Efecto Portal)
+
+**Fecha:** 2026-07-01
+**Rama:** `fix/ux-p0-operator-roulette-bracket`
+
+**Qué se hizo:**
+- **Layout horizontal 3 columnas**: `Participantes (izq) | Ruleta Casino (centro) | Seed/Equipos (der)`. La ruleta ya no está abajo sino en el centro visual dominante.
+- **Ruleta tipo casino**: Segmentos coloreados pastel con nombre de cada jugador visible (como ruleta de nombres clásica). Borde dorado `#ffd700` con glow. Centro oscuro con contador de jugadores.
+- **Efecto portal Doctor Strange al girar**: 4 anillos concéntricos que giran a diferentes velocidades con colores cálidos (dorado, naranja, rojo-anaranjado). Se activan solo durante el spin (1.2s). Glow intenso en los bordes dorados.
+- **Botón "Limpiar" eliminado**: Era un botón prominente que confundía y mataba la UI. Ahora es un `×` pequeño al lado del contador de tags de participantes.
+- **CSS limpieza**: Todos los estilos v1 (`bf-roulette-arena`, `bf-roulette-grid`, `bf-roulette-panel`, `bf-roulette-wheel`, etc.) y v2 eliminados. Solo quedan clases v3 funcionales.
+- **Responsive**: En pantallas <1100px la ruleta pasa arriba y participantes/equipos abajo. En <720px se apilan verticalmente.
+
+**Decisiones de diseño:**
+- La ruleta es grande y dominante SOLO cuando hay jugadores cargados y respin abierto — ese momento de expectativa genera dopamina y espectativa por el compañero que tocará.
+- Cuando está locked o sin jugadores, muestra una barra compacta de estado.
+- Los colores pastel de los segmentos se reparten cíclicamente entre los 16 disponibles para máxima diferenciación.
+- El efecto portal usa animaciones CSS puras con `transform: rotate()` y `box-shadow`, sin librerías externas.
+
+**Archivos modificados:**
+- `frontend/app/components/RouletteArena.tsx` — Reescrito completo con layout v3, ruleta casino con segmentos, portal effect, tags participantes, seed de bracket/equipos
+- `frontend/app/globals.css` — Eliminados ~150 líneas de CSS v1/v2 obsoleto. Agregados ~200 líneas de CSS v3: `.bf-roulette-arena-v3`, `.bf-roulette-workspace-v3`, `.bf-roulette-casino-wheel`, `.bf-roulette-portal`, `.bf-roulette-segment`, `.bf-roulette-casino-actions`, etc.
+
+**Validación técnica:**
+- `cd frontend && npm run lint` → 0 errores, 8 warnings preexistentes
+- `cd frontend && npm run build` → Exitoso
+- No se tocó backend.
+- No se cambió stack ni se agregaron dependencias.
+
+---
+
+## ULTIMO SPRINT EJECUTADO - UX-P0 Rescue Parte 4 (Import masivo de equipos WSOW BR)
+
+**Fecha:** 2026-07-01
+**Rama:** `fix/ux-p0-operator-roulette-bracket`
+
+**Qué se hizo:**
+- **Import masivo de equipos para WSOW BR (fixed squad)**: En la sección "Equipos & Roster" del Operator (modo setup sin ruleta), se agregó botón "Importar equipos .txt/.csv".
+- **Formato soportado**: `TeamName,Jugador1,Jugador2,Jugador3,Jugador4` — una línea por equipo. Parser separa por comas (con o sin espacio después), primer elemento = nombre del equipo, resto = roster.
+- **Proceso**: Lee archivo con FileReader, parsea línea por línea, llama a `createTeamWithRoster` del hook para cada equipo, muestra mensaje de éxito con contador.
+- **Fallback**: El form manual de "Agregar equipo real" sigue funcionando igual. El import es una alternativa rápida para torneos grandes.
+
+**Archivos modificados:**
+- `frontend/app/components/WorldSeriesOperator.tsx` — Prop `onBulkImportTeams`, UI de import, parser CSV, estado `teamImportMessage`
+- `frontend/app/(operator)/operator/page.tsx` — `handleBulkImportTeams` que itera y crea equipos
+
+**Validación técnica:**
+- `cd frontend && npm run lint` → 0 errores, 8 warnings preexistentes
+- `cd frontend && npm run build` → Exitoso
+
+---
+
+## ULTIMO SPRINT EJECUTADO - UX-P0 Rescue Parte 3 (Bulk Actions + Estados normalizados)
+
+**Fecha:** 2026-06-30
+**Rama:** `fix/ux-p0-operator-roulette-bracket`
+
+**Qué se hizo:**
+- **P0.6 Bulk actions**: Checkbox por fila en cada tarjeta de torneo. Checkbox maestro en la barra bulk que refleja "seleccionar visibles". Barra bulk sticky con contador (`N seleccionado(s)`) y botones `[Archivar seleccionados]` `[Eliminar seleccionados]` `[Cancelar]`. Tarjeta resaltada visualmente cuando está seleccionada (`is-checked`).
+- **P0.6 Confirmación destructiva**: Modal overlay fijo con backdrop blur, título "Borrar N torneo(s)" en rojo, texto explicativo: "Se eliminarán torneos, equipos, matches, mapas y resultados asociados. Esta acción no se puede deshacer.", botón destructivo rojo "Borrar N torneo(s)", botón cancelar secundario. Nunca dice "OK".
+- **P0.7 Estados normalizados**: La lista de torneos ahora usa `getTournamentStatusLabel()` del helper `tournamentStatus.ts`. Nunca muestra `BRACKET_GENERATED`, `TEAMS_GENERATED`, `ACTIVE` crudo. Muestra "Bracket listo", "Equipos listos", "Activo", "Finalizado", etc.
+
+**Archivos modificados:**
+- `frontend/app/(operator)/torneos/page.tsx` — Estado `selectedIds`, toggleSelection, toggleSelectAllVisible, bulkArchive, bulkDelete con confirmación modal, checkbox por fila
+- `frontend/app/globals.css` — Estilos `.bf-bulk-bar`, `.bf-bulk-confirm`, `.bf-bulk-confirm-panel`, `.bf-hub-tournament-card.is-checked`, checkbox en tarjetas
+- `frontend/lib/tournamentStatus.ts` — Sin cambios (ya existía de Parte 1)
+
+**Validación técnica:**
+- `cd frontend && npm run lint` → 0 errores, 8 warnings preexistentes
+- `cd frontend && npm run build` → Exitoso
+
+---
+
+## ULTIMO SPRINT EJECUTADO - UX-P0 Rescue Parte 2 (Bracket Visual + Nombres + Stream)
+
+**Fecha:** 2026-06-30
+**Rama:** `fix/ux-p0-operator-roulette-bracket`
+
+**Qué se hizo:**
+- **P0.3 Bracket legible**: Seeds más anchas (300px vs 268px), gap entre rondas aumentado (18px), canvas con transform scale para fit/reset, toolbar con botones `Fit` y `Reset`, scroll horizontal encapsulado dentro del board con borde y fondo oscuro, rounds centrados verticalmente.
+- **P0.4 Nombres reales**: `toBracketRounds.ts` ya usaba `getTeamDisplayName` con regex `GENERIC_TEAM_NAME` que detecta "Team 1" / "Equipo 2" y reemplaza por roster real. Verificado que funciona correctamente.
+- **P0.5 Ganador/Avanza obvio**: `.is-winner` ahora tiene borde verde más fuerte, background gradient, box-shadow sutil, nombre y score en color éxito con text-shadow. `.is-loser` opacity reducida a 0.48, grayscale 35%, estado "Eliminado" en color danger. Badge "Avanza" agrandado con borde. Score del ganador más grande (1.65rem).
+- **P0.9 Stream Kill Race**: `BracketStreamView` ya consumía `BracketView` en modo `stream`, que incluye `ChampionBlock` de la Parte 1. Stream muestra bracket o champion state según corresponda, NO tabla WSOW.
+
+**Archivos modificados:**
+- `frontend/app/components/BracketView.tsx` — Toolbar Fit/Reset, canvas con scale
+- `frontend/lib/toBracketRounds.ts` — Sin cambios (ya funcionaba correctamente)
+- `frontend/app/globals.css` — Estilos bracket ampliados, winner/loser potenciados, toolbar nuevo
+- `frontend/app/components/BracketStreamView.tsx` — Sin cambios (ya correcto)
+
+**Qué NO se hizo (para Parte 3):**
+- No se implementó zoom granular paso a paso (solo fit/reset).
+- No se tocó backend.
+- No se agregó pan/drag del bracket.
+
+**Validación técnica:**
+- `cd frontend && npm run lint` → 0 errores, 8 warnings preexistentes
+- `cd frontend && npm run build` → Exitoso
+
+---
+
+## ULTIMO SPRINT EJECUTADO - UX-P0 Rescue Parte 1 (Navegación + Estados + Champion)
+
+**Fecha:** 2026-06-30
+**Rama:** `fix/ux-p0-operator-roulette-bracket`
+
+**Qué se hizo:**
+- **P0.1 Champion State**: `BracketView` ahora muestra bloque visual dorado cuando el bracket está `completed` con `winner_id`. Muestra nombre del campeón, roster, score final, y CTAs (Ver bracket final, Ir a Stream, Volver a Torneos). Operator muestra "Torneo finalizado · Campeón: [equipo]" cuando no quedan matches pendientes.
+- **P0.2 Botón volver**: Barra contextual sticky `opr-context-bar` en Operator Kill Race con: `← Volver al bracket`, nombre del torneo, y estado actual (`Setup` / `Bracket listo` / `En operación` / `Finalizado`). Si está finalizado, muestra "Campeón: [equipo]".
+- **P0.7 Normalizar estados**: Nuevo helper `frontend/lib/tournamentStatus.ts` con mapeo de estados backend a labels humanos (`ACTIVE → Activo`, `COMPLETED → Finalizado`, etc.). Funciones `findChampion()`, `isTournamentCompleted()`, `getTournamentPhase()`.
+- **P0.8 Standings Kill Race**: Título visible cambiado a `Bracket / Resultados`. Subtítulo muestra campeón y score final cuando el torneo está completado.
+- **Limpieza dependencias**: `react-brackets` movido de `app/package.json` (accidental) a `frontend/package.json` con `--legacy-peer-deps`. `app/package.json` eliminado.
+
+**Archivos modificados:**
+- `frontend/app/components/BracketView.tsx` — ChampionBlock, imports de tournamentStatus
+- `frontend/app/components/WorldSeriesOperator.tsx` — Context bar sticky, champion state en serie vacía
+- `frontend/app/components/WorldSeriesStandings.tsx` — Título Bracket/Resultados, champion en subtítulo
+- `frontend/lib/tournamentStatus.ts` — Nuevo helper de estados y champion
+- `frontend/app/globals.css` — Estilos `bf-champion-block`, `bf-champion-*`, `opr-context-bar`, `opr-context-*`
+- `frontend/package.json` — Agregado `react-brackets@^0.4.7`
+- `app/package.json` — Eliminado
+
+**Qué NO se hizo (para Parte 2):**
+- No se tocó layout del bracket (zoom, fit, canvas centrado) — va en Parte 2.
+- No se tocó visual de ganador/avanza en los seeds del bracket (opacidad, badge) — va en Parte 2.
+- No se tocó Stream champion state obs-specific — va en Parte 2.
+- No se tocó backend.
+
+**Validación técnica:**
+- `cd frontend && npm run lint` → 0 errores, 8 warnings preexistentes
+- `cd frontend && npm run build` → Exitoso
+
+---
+
 ## ULTIMO SPRINT EJECUTADO - BRACKET-UI react-brackets
 
 **Fecha:** 2026-06-30

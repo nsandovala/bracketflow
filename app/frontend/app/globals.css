@@ -1465,6 +1465,108 @@ a:focus-visible {
     var(--amon-glass-v2-bg);
 }
 
+.bf-hub-tournament-card.is-checked {
+  border-color: rgba(97, 242, 163, .2);
+  background:
+    linear-gradient(120deg, rgba(97, 242, 163, .05), transparent 46%),
+    var(--amon-glass-v2-bg);
+}
+
+/* ---- Bulk actions bar ---- */
+.bf-bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid rgba(97, 242, 163, .18);
+  background:
+    linear-gradient(120deg, rgba(97, 242, 163, .06), transparent 46%),
+    var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.bf-bulk-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bf-bulk-info input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--amon-accent);
+  cursor: pointer;
+}
+
+.bf-bulk-info strong {
+  color: var(--amon-text);
+  font-size: .92rem;
+  letter-spacing: .02em;
+}
+
+.bf-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Bulk delete confirmation ---- */
+.bf-bulk-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 10, 18, .72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.bf-bulk-confirm-panel {
+  display: grid;
+  gap: 12px;
+  max-width: 480px;
+  width: calc(100% - 48px);
+  padding: 28px;
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid rgba(255, 127, 150, .22);
+  background:
+    linear-gradient(145deg, rgba(255, 127, 150, .06), transparent 38%),
+    var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.bf-bulk-confirm-panel strong {
+  color: var(--bf-danger);
+  font-family: var(--amon-font-display);
+  font-size: 1.2rem;
+  letter-spacing: .03em;
+}
+
+.bf-bulk-confirm-panel p {
+  margin: 0;
+  color: var(--amon-muted);
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+/* ---- Tournament row checkbox ---- */
+.bf-hub-tournament-info input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--amon-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .bf-tournaments-motors {
   margin: 0;
 }
@@ -4262,427 +4364,6 @@ a:focus-visible {
 .opr-teamcard .n { font-family: var(--amon-font-display); font-weight: 700; letter-spacing: .03em; color: var(--amon-text); }
 .opr-teamcard .r { font-size: .8rem; color: var(--amon-muted); }
 
-/* ---- Roulette Arena ---- */
-.bf-roulette-arena {
-  display: grid;
-  gap: 18px;
-  padding: 22px;
-  border-radius: var(--amon-radius-lg);
-  border: 1px solid var(--amon-glass-v2-border);
-  background:
-    radial-gradient(circle at 50% 0%, rgba(97, 242, 163, .08), transparent 42%),
-    var(--amon-glass-v2-bg);
-  box-shadow: var(--amon-glass-v2-shadow);
-}
-
-.bf-roulette-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.bf-roulette-head h2 {
-  margin: 6px 0 4px;
-  color: var(--amon-text);
-  font-family: var(--amon-font-display);
-  font-size: 1.55rem;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-
-.bf-roulette-head p {
-  margin: 0;
-  color: var(--amon-muted);
-}
-
-.bf-roulette-head-side {
-  display: grid;
-  justify-items: end;
-  gap: 8px;
-}
-
-.bf-roulette-head-side strong {
-  color: var(--amon-text);
-  font-family: var(--amon-font-display);
-  font-size: .9rem;
-  letter-spacing: .04em;
-}
-
-.bf-roulette-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(97, 242, 163, .24);
-  background: var(--amon-accent-dim);
-  color: var(--amon-text);
-  font-size: .75rem;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.bf-roulette-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, .82fr) minmax(360px, 1.18fr) minmax(270px, .9fr);
-  grid-template-areas: "pool hero results";
-  gap: 16px;
-  align-items: stretch;
-  min-height: clamp(540px, 68vh, 720px);
-}
-
-.bf-roulette-panel,
-.bf-roulette-core {
-  min-width: 0;
-  border: 1px solid var(--amon-line);
-  border-radius: var(--amon-radius-md);
-  background: rgba(255, 255, 255, .025);
-}
-
-.bf-roulette-panel {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
-  align-content: start;
-  gap: 14px;
-  padding: 16px;
-  max-height: clamp(540px, 68vh, 720px);
-  overflow: hidden;
-}
-
-.bf-roulette-pool { grid-area: pool; }
-.bf-roulette-hero { grid-area: hero; }
-.bf-roulette-results { grid-area: results; }
-
-.bf-roulette-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.bf-roulette-panel-head div {
-  display: grid;
-  gap: 3px;
-}
-
-.bf-roulette-panel-head span,
-.bf-roulette-panel-head em {
-  color: var(--amon-faint);
-  font-size: .66rem;
-  font-style: normal;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
-
-.bf-roulette-panel-head strong {
-  color: var(--amon-text);
-  font-family: var(--amon-font-display);
-  font-size: 1rem;
-  letter-spacing: .03em;
-}
-
-.bf-roulette-import {
-  display: grid;
-  gap: 10px;
-}
-
-.bf-roulette-file {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 12px;
-  border-radius: var(--amon-radius-md);
-  border: 1px dashed rgba(97, 242, 163, .3);
-  background: rgba(97, 242, 163, .05);
-  color: var(--amon-text);
-  font-size: .82rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.bf-roulette-file:hover {
-  border-color: rgba(97, 242, 163, .54);
-  background: rgba(97, 242, 163, .08);
-}
-
-.bf-roulette-file:disabled {
-  cursor: not-allowed;
-  opacity: .55;
-}
-
-.bf-roulette-file-input {
-  display: none;
-}
-
-.bf-roulette-file-message {
-  margin: 0;
-  color: var(--amon-accent);
-  font-size: .78rem;
-}
-
-.bf-roulette-import textarea {
-  width: 100%;
-  resize: none;
-  min-height: 118px;
-  max-height: 118px;
-  padding: 12px;
-  border: 1px solid var(--amon-line);
-  border-radius: var(--amon-radius-md);
-  background: rgba(6, 10, 18, .72);
-  color: var(--amon-text);
-  font: inherit;
-}
-
-.bf-roulette-import textarea:focus {
-  outline: none;
-  border-color: rgba(97, 242, 163, .34);
-}
-
-.bf-roulette-counts {
-  color: var(--amon-muted);
-  font-size: .82rem;
-}
-
-.bf-roulette-player-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.bf-roulette-panel-scroll {
-  min-height: 0;
-  max-height: 100%;
-  overflow: auto;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(97, 242, 163, .35) rgba(255, 255, 255, .04);
-}
-
-.bf-roulette-player {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 0 8px 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--amon-line);
-  background: rgba(255, 255, 255, .035);
-  color: var(--amon-text-dim);
-  font-size: .82rem;
-}
-
-.bf-roulette-player button {
-  border: 0;
-  background: transparent;
-  color: var(--amon-faint);
-  cursor: pointer;
-}
-
-.bf-roulette-core {
-  position: relative;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 14px;
-  padding: 20px;
-  min-height: 100%;
-}
-
-.bf-roulette-outcome {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  padding: 9px 14px;
-  border: 1px solid rgba(97, 242, 163, .22);
-  border-radius: 999px;
-  background: rgba(6, 10, 18, .64);
-}
-
-.bf-roulette-outcome span {
-  color: var(--amon-faint);
-  font-size: .64rem;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
-
-.bf-roulette-outcome strong {
-  color: var(--amon-text);
-  font-size: .86rem;
-}
-
-.bf-roulette-pointer {
-  position: relative;
-  z-index: 4;
-  width: 0;
-  height: 0;
-  margin-bottom: -22px;
-  border-left: 16px solid transparent;
-  border-right: 16px solid transparent;
-  border-top: 30px solid var(--amon-accent);
-  filter: drop-shadow(0 0 12px rgba(97, 242, 163, .5));
-}
-
-.bf-roulette-wheel {
-  position: relative;
-  width: clamp(340px, 34vw, 420px);
-  max-width: 100%;
-  aspect-ratio: 1;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(6, 10, 18, .24) 0 33%, transparent 34%),
-    conic-gradient(from 0deg,
-      rgba(97, 242, 163, .34) 0 10deg,
-      rgba(255,255,255,.06) 10deg 20deg,
-      rgba(110, 168, 255, .25) 20deg 30deg,
-      rgba(255,255,255,.08) 30deg 40deg);
-  box-shadow:
-    inset 0 0 42px rgba(0,0,0,.5),
-    inset 0 0 0 10px rgba(255,255,255,.035),
-    0 0 0 1px rgba(97, 242, 163, .32),
-    0 0 54px rgba(97, 242, 163, .16);
-}
-
-.bf-roulette-wheel.is-spinning {
-  animation: bf-roulette-spin 1.25s cubic-bezier(.18,.72,.21,1) both;
-}
-
-.bf-roulette-ring {
-  position: absolute;
-  inset: 12px;
-  border-radius: inherit;
-  border: 2px solid rgba(232, 247, 239, .18);
-  box-shadow: inset 0 0 30px rgba(6, 10, 18, .5);
-}
-
-.bf-roulette-segments {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    repeating-conic-gradient(from 0deg, transparent 0 18deg, rgba(6, 10, 18, .22) 18deg 20deg);
-  mix-blend-mode: screen;
-  opacity: .52;
-}
-
-.bf-roulette-center {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 116px;
-  height: 116px;
-  border-radius: 999px;
-  border: 1px solid rgba(97, 242, 163, .34);
-  background: rgba(6, 10, 18, .88);
-  color: var(--amon-text);
-  box-shadow: 0 0 28px rgba(97, 242, 163, .18);
-}
-
-.bf-roulette-center strong {
-  font-family: var(--amon-font-display);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.bf-roulette-center span,
-.bf-roulette-note {
-  color: var(--amon-muted);
-  font-size: .76rem;
-}
-
-.bf-roulette-tick {
-  position: absolute;
-  inset: 16px;
-  transform-origin: center;
-  pointer-events: none;
-}
-
-.bf-roulette-tick i {
-  position: absolute;
-  left: 50%;
-  top: 4px;
-  transform: translateX(-50%);
-  color: rgba(232, 247, 239, .72);
-  font-size: .62rem;
-  font-style: normal;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.bf-roulette-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-}
-
-.bf-roulette-note {
-  margin: 0;
-  text-align: center;
-}
-
-.bf-roulette-teams-list,
-.bf-roulette-seed {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-}
-
-.bf-roulette-team-card,
-.bf-roulette-match,
-.bf-roulette-bench {
-  display: grid;
-  gap: 7px;
-  padding: 12px;
-  border: 1px solid var(--amon-line);
-  border-radius: var(--amon-radius-md);
-  background: rgba(6, 10, 18, .42);
-}
-
-.bf-roulette-match small {
-  color: var(--amon-faint);
-  font-size: .68rem;
-}
-
-.bf-roulette-team-card div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.bf-roulette-team-card strong,
-.bf-roulette-match strong,
-.bf-roulette-bench strong {
-  color: var(--amon-text);
-  font-family: var(--amon-font-display);
-}
-
-.bf-roulette-team-card span,
-.bf-roulette-match span,
-.bf-roulette-match em {
-  color: var(--amon-faint);
-  font-size: .68rem;
-  font-style: normal;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-.bf-roulette-team-card p,
-.bf-roulette-bench p {
-  margin: 0;
-  color: var(--amon-muted);
-  font-size: .84rem;
-  line-height: 1.45;
-}
-
 .bf-standings-seed-preview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4787,28 +4468,82 @@ a:focus-visible {
   color: var(--amon-muted);
 }
 
+.bf-bracket-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--amon-line);
+  border-bottom: 0;
+  border-radius: var(--amon-radius-md) var(--amon-radius-md) 0 0;
+  background: rgba(255, 255, 255, .025);
+}
+
+.bf-bracket-toolbar-label {
+  color: var(--amon-faint);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+
+.bf-bracket-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, .03);
+  color: var(--amon-muted);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, color .16s ease;
+}
+
+.bf-bracket-toolbar-btn:hover {
+  border-color: rgba(97, 242, 163, .22);
+  background: rgba(97, 242, 163, .06);
+  color: var(--amon-text);
+}
+
 .bf-bracket-board {
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 4px;
+  padding: 12px;
   scrollbar-width: thin;
   scrollbar-color: rgba(97, 242, 163, .34) rgba(255, 255, 255, .04);
+  border: 1px solid var(--amon-line);
+  border-radius: 0 0 var(--amon-radius-lg) var(--amon-radius-lg);
+  background: rgba(6, 10, 18, .42);
+}
+
+.bf-bracket-canvas {
+  display: inline-block;
+  transition: transform .3s ease;
 }
 
 .bf-rb-root {
   display: flex;
-  gap: 4px;
+  gap: 18px;
   min-width: max-content;
-  padding-right: 12px;
+  padding: 8px 16px;
+  margin: 0 auto;
 }
 
 .bf-rb-round {
-  min-width: 268px;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .bf-rb-seed-shell {
-  min-width: 268px !important;
-  width: 268px !important;
+  min-width: 300px !important;
+  width: 300px !important;
 }
 
 .bf-rb-round-title {
@@ -4910,23 +4645,30 @@ a:focus-visible {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  min-height: 68px;
-  padding: 11px 12px;
+  min-height: 72px;
+  padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, .07);
   border-radius: 12px;
   background: rgba(255, 255, 255, .035);
-  transition: opacity .16s ease, border-color .16s ease, background .16s ease;
+  transition: opacity .2s ease, border-color .2s ease, background .2s ease, transform .2s ease;
 }
 
 .bf-rb-team.is-winner {
-  border-color: rgba(97, 242, 163, .3);
+  border-color: rgba(97, 242, 163, .35);
   background:
-    linear-gradient(180deg, rgba(97, 242, 163, .1), rgba(97, 242, 163, .03)),
+    linear-gradient(180deg, rgba(97, 242, 163, .12), rgba(97, 242, 163, .04)),
     rgba(255, 255, 255, .04);
+  box-shadow: 0 0 20px rgba(97, 242, 163, .08);
 }
 
 .bf-rb-team.is-loser {
-  opacity: .58;
+  opacity: .48;
+  filter: grayscale(.35);
+}
+
+.bf-rb-team.is-loser .bf-rb-team-state {
+  color: var(--bf-danger);
+  opacity: .8;
 }
 
 .bf-rb-team.is-neutral {
@@ -4954,7 +4696,7 @@ a:focus-visible {
   overflow: hidden;
   color: var(--amon-text);
   font-family: var(--amon-font-display);
-  font-size: .98rem;
+  font-size: 1.08rem;
   font-weight: 700;
   letter-spacing: .02em;
   text-overflow: ellipsis;
@@ -4965,10 +4707,18 @@ a:focus-visible {
 .bf-rb-team-state {
   overflow: hidden;
   color: var(--amon-muted);
-  font-size: .7rem;
-  line-height: 1.35;
+  font-size: .74rem;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.bf-rb-team.is-winner .bf-rb-team-name {
+  color: var(--bf-success);
+}
+
+.bf-rb-team.is-loser .bf-rb-team-name {
+  opacity: .7;
 }
 
 .bf-rb-team-side {
@@ -4979,25 +4729,31 @@ a:focus-visible {
 .bf-rb-team-score {
   color: var(--amon-text);
   font-family: var(--amon-font-display);
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
+.bf-rb-team.is-winner .bf-rb-team-score {
+  color: var(--bf-success);
+  text-shadow: 0 0 16px rgba(126, 255, 186, .25);
+}
+
 .bf-rb-team-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
-  padding: 0 8px;
+  min-height: 22px;
+  padding: 0 10px;
   border-radius: 999px;
-  background: rgba(97, 242, 163, .14);
+  background: rgba(97, 242, 163, .18);
   color: var(--amon-text);
-  font-size: .58rem;
+  font-size: .64rem;
   font-weight: 800;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   white-space: nowrap;
+  border: 1px solid rgba(97, 242, 163, .2);
 }
 
 .bf-rb-team.is-neutral .bf-rb-team-name,
@@ -5013,6 +4769,194 @@ a:focus-visible {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, .028), transparent 36%),
     rgba(4, 8, 14, .82);
+}
+
+/* ============================================================
+   Champion Block — minimalista, preciso, tipo Apple
+   ============================================================ */
+
+.bf-champion-block {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  padding: 32px;
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid rgba(255, 211, 110, .22);
+  background:
+    linear-gradient(145deg, rgba(255, 211, 110, .06), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, .035), transparent 24%),
+    rgba(6, 10, 18, .82);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, .28),
+    inset 0 0 80px rgba(255, 211, 110, .04);
+  overflow: hidden;
+}
+
+.bf-champion-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 50%, rgba(255, 211, 110, .08), transparent 55%),
+    radial-gradient(circle at 88% 50%, rgba(255, 211, 110, .04), transparent 45%);
+  pointer-events: none;
+}
+
+.bf-champion-content {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  z-index: 1;
+}
+
+.bf-champion-kicker {
+  color: var(--bf-pending);
+  font-family: var(--font-rajdhani), sans-serif;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+}
+
+.bf-champion-name {
+  margin: 0;
+  color: var(--bf-text);
+  font-family: var(--font-rajdhani), sans-serif;
+  font-size: clamp(1.8rem, 3.6vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.1;
+}
+
+.bf-champion-roster {
+  margin: 0;
+  color: var(--bf-muted);
+  font-size: .96rem;
+  letter-spacing: .02em;
+}
+
+.bf-champion-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.bf-champion-score {
+  color: var(--bf-pending);
+  font-family: var(--font-rajdhani), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.bf-champion-division {
+  color: var(--bf-muted);
+  opacity: .5;
+}
+
+.bf-champion-format {
+  color: var(--bf-muted);
+  font-size: .82rem;
+  letter-spacing: .08em;
+}
+
+.bf-champion-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   Operator Context Bar — navegación sticky minimalista
+   ============================================================ */
+
+.opr-context-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  margin-bottom: 18px;
+  border-radius: var(--amon-radius-md);
+  border: 1px solid var(--amon-glass-v2-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .015) 60%),
+    var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.opr-context-main {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.opr-context-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, .03);
+  color: var(--amon-muted);
+  font-size: .82rem;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.opr-context-back:hover {
+  border-color: rgba(97, 242, 163, .22);
+  background: rgba(97, 242, 163, .06);
+  color: var(--amon-text);
+}
+
+.opr-context-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.opr-context-info strong {
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: .96rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opr-context-sep {
+  color: var(--amon-faint);
+  opacity: .4;
+}
+
+.opr-context-phase {
+  color: var(--amon-muted);
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.opr-context-champion {
+  color: var(--bf-pending);
+  font-size: .82rem;
+  font-weight: 600;
+  letter-spacing: .04em;
 }
 
 .bf-dash-seed-preview {
@@ -5046,11 +4990,6 @@ a:focus-visible {
   color: var(--amon-text);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@keyframes bf-roulette-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(1080deg); }
 }
 
 /* ---- Nav compacta (reemplaza AppTopbar en operator) ---- */
@@ -5096,20 +5035,6 @@ a:focus-visible {
 /* ---- Responsive ---- */
 @media (max-width: 1080px) {
   .opr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bf-roulette-grid {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "hero"
-      "pool"
-      "results";
-    min-height: 0;
-  }
-  .bf-roulette-panel {
-    max-height: 520px;
-  }
-  .bf-roulette-wheel {
-    width: min(76vw, 380px);
-  }
   .bf-standings-seed-preview {
     grid-template-columns: 1fr;
   }
@@ -5129,23 +5054,636 @@ a:focus-visible {
   .opr-form { grid-template-columns: 1fr; }
   .opr-topbar { flex-wrap: wrap; height: auto; gap: 12px; }
   .opr-topbar-side { margin-left: 0; flex-wrap: wrap; }
-  .bf-roulette-arena {
-    padding: 16px;
+}
+/* ---- Roulette Arena V3 ---- */
+.bf-roulette-arena-v3 {
+  display: grid;
+  gap: 20px;
+}
+
+.bf-roulette-head-v3 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--bf-border);
+}
+.bf-roulette-head-v3 h2 {
+  margin: 6px 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--bf-text);
+}
+.bf-roulette-head-side-v3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.bf-roulette-timer {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 211, 110, 0.35);
+  background: rgba(255, 211, 110, 0.08);
+  color: #ffd36e;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.bf-roulette-status-confirmed {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(97, 242, 163, 0.35);
+  background: rgba(97, 242, 163, 0.08);
+  color: var(--bf-success);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.bf-roulette-status-locked {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--bf-border-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--bf-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.bf-roulette-status-pending {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--bf-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--bf-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ---- 3-Column Workspace ---- */
+.bf-roulette-workspace-v3 {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(320px, 380px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.bf-roulette-col {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--bf-border);
+  background: var(--bf-panel);
+  min-height: 200px;
+}
+
+.bf-roulette-col-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bf-border);
+}
+.bf-roulette-col-title span {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+  font-weight: 600;
+}
+.bf-roulette-col-title strong {
+  font-size: 0.8rem;
+  color: var(--bf-text-soft);
+  font-weight: 600;
+}
+
+/* ---- Participants column ---- */
+.bf-roulette-import-v3 {
+  display: grid;
+  gap: 8px;
+}
+.bf-roulette-import-actions-v3 {
+  display: flex;
+  gap: 8px;
+}
+.bf-roulette-import-v3 textarea {
+  resize: vertical;
+}
+
+.bf-roulette-tags-v3 {
+  display: grid;
+  gap: 8px;
+}
+.bf-roulette-tag-header-v3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bf-roulette-tag-header-v3 span {
+  font-size: 0.78rem;
+  color: var(--bf-muted);
+}
+.bf-roulette-tag-list-v3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.bf-roulette-tag-v3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: 1px solid var(--bf-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--bf-text-soft);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.bf-roulette-tag-v3 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(255, 127, 150, 0.12);
+  color: var(--bf-danger);
+  font-size: 0.68rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.bf-roulette-tag-v3 button:hover {
+  background: rgba(255, 127, 150, 0.25);
+}
+
+.bf-roulette-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--bf-border);
+  background: rgba(255, 127, 150, 0.08);
+  color: var(--bf-danger);
+  font-size: 0.78rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+.bf-roulette-clear-btn:hover {
+  background: rgba(255, 127, 150, 0.18);
+}
+
+/* ---- Center: Casino Wheel ---- */
+.bf-roulette-col-wheel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 16px;
+}
+.bf-roulette-col-wheel.is-hero {
+  border-color: rgba(255, 215, 0, 0.25);
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.04), transparent 60%), var(--bf-panel);
+}
+
+/* Idle state */
+.bf-roulette-casino-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 20px;
+}
+.bf-roulette-idle-wheel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 999px;
+  border: 2px solid var(--bf-border-strong);
+  background: var(--bf-panel);
+  color: var(--bf-muted);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.bf-roulette-casino-idle strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--bf-text);
+}
+.bf-roulette-casino-idle span {
+  font-size: 0.76rem;
+  color: var(--bf-muted);
+  letter-spacing: 0.06em;
+}
+
+/* Casino wheel container */
+.bf-roulette-casino {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  position: relative;
+  width: 100%;
+}
+
+/* ---- Doctor Strange Portal Effect ---- */
+.bf-roulette-portal {
+  position: absolute;
+  inset: -20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.bf-roulette-portal.is-active {
+  opacity: 1;
+}
+.bf-roulette-portal-ring {
+  position: absolute;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+.bf-roulette-portal-ring.ring-1 {
+  width: 340px;
+  height: 340px;
+  border-color: rgba(255, 215, 0, 0.4);
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.15), inset 0 0 30px rgba(255, 215, 0, 0.1);
+  animation: portal-spin-1 3s linear infinite;
+}
+.bf-roulette-portal-ring.ring-2 {
+  width: 360px;
+  height: 360px;
+  border-color: rgba(255, 140, 0, 0.3);
+  box-shadow: 0 0 50px rgba(255, 140, 0, 0.1), inset 0 0 40px rgba(255, 140, 0, 0.05);
+  animation: portal-spin-2 4s linear infinite reverse;
+}
+.bf-roulette-portal-ring.ring-3 {
+  width: 380px;
+  height: 380px;
+  border-color: rgba(255, 69, 0, 0.2);
+  box-shadow: 0 0 60px rgba(255, 69, 0, 0.08);
+  animation: portal-spin-3 5s linear infinite;
+}
+.bf-roulette-portal-ring.ring-4 {
+  width: 300px;
+  height: 300px;
+  border: 3px dashed rgba(255, 215, 0, 0.25);
+  animation: portal-spin-1 2.5s linear infinite reverse;
+}
+
+@keyframes portal-spin-1 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes portal-spin-2 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes portal-spin-3 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Casino Wheel ---- */
+.bf-roulette-casino-wheel {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 4px solid rgba(255, 215, 0, 0.45);
+  box-shadow:
+    0 0 0 4px rgba(255, 215, 0, 0.15),
+    0 0 60px rgba(255, 215, 0, 0.12),
+    inset 0 0 40px rgba(0, 0, 0, 0.4);
+  background: var(--bf-panel);
+  z-index: 1;
+  transition: box-shadow 0.3s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bf-roulette-casino-wheel.is-spinning {
+  animation: casino-spin 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 0 0 6px rgba(255, 215, 0, 0.3),
+    0 0 100px rgba(255, 140, 0, 0.25),
+    0 0 40px rgba(255, 69, 0, 0.15),
+    inset 0 0 50px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes casino-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(1080deg); }
+}
+
+.bf-roulette-casino-segments {
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bf-roulette-segment {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 50%;
+  height: 100%;
+  transform-origin: 0% 50%;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bf-roulette-segment span {
+  position: absolute;
+  left: 58%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.bf-roulette-casino-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.bf-roulette-casino-center strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 215, 0, 0.5);
+  background: linear-gradient(180deg, #1a1425, #0d0a12);
+  color: #ffd700;
+  font-size: 1.6rem;
+  font-weight: 700;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.2), inset 0 0 20px rgba(0,0,0,0.4);
+}
+.bf-roulette-casino-center span {
+  position: absolute;
+  bottom: -20px;
+  font-size: 0.68rem;
+  color: var(--bf-muted);
+  letter-spacing: 0.08em;
+}
+
+.bf-roulette-casino-pointer {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 18px solid #ffd700;
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+  z-index: 3;
+}
+
+/* Casino actions */
+.bf-roulette-casino-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 220px;
+}
+.bf-button-casino {
+  min-height: 48px;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.15);
+  border-color: rgba(255, 215, 0, 0.35);
+}
+.bf-button-casino:hover:not(:disabled) {
+  box-shadow: 0 0 50px rgba(255, 215, 0, 0.25);
+  border-color: rgba(255, 215, 0, 0.55);
+}
+
+.bf-roulette-casino-note {
+  text-align: center;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--bf-muted);
+}
+
+/* ---- Right: Teams ---- */
+.bf-roulette-teams-grid-v3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.bf-roulette-team-card-v3 {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1.5px solid;
+  background: rgba(255, 255, 255, 0.02);
+  transition: transform 0.15s ease;
+}
+.bf-roulette-team-card-v3:hover {
+  transform: translateY(-2px);
+}
+.bf-roulette-team-card-head-v3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.bf-roulette-team-card-head-v3 strong {
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bf-roulette-team-card-head-v3 span {
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+  flex-shrink: 0;
+}
+.bf-roulette-team-card-body-v3 {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  word-break: break-word;
+  opacity: 0.85;
+}
+
+/* Seed rows v3 */
+.bf-roulette-seed-rows-v3 {
+  display: grid;
+  gap: 8px;
+}
+.bf-roulette-seed-row-v3 {
+  display: grid;
+  grid-template-columns: 36px 1fr 40px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bf-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.bf-roulette-seed-num-v3 {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--bf-muted);
+  font-weight: 700;
+}
+.bf-roulette-seed-team-v3 strong {
+  font-size: 0.84rem;
+  color: var(--bf-text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.bf-roulette-seed-team-v3 small {
+  font-size: 0.66rem;
+  color: var(--bf-muted);
+  display: block;
+}
+.bf-roulette-seed-vs-v3 {
+  text-align: center;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--bf-accent);
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Bench bar */
+.bf-roulette-bench-bar-v3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px dashed var(--bf-border-strong);
+  background: rgba(255, 211, 110, 0.04);
+}
+.bf-roulette-bench-bar-v3 strong {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffd36e;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.bf-roulette-bench-bar-v3 span {
+  font-size: 0.8rem;
+  color: var(--bf-text-soft);
+}
+
+/* Bottom actions */
+.bf-roulette-bottom-actions-v3 {
+  margin-top: 4px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+  .bf-roulette-workspace-v3 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "wheel wheel"
+      "players teams";
   }
-  .bf-roulette-head {
-    display: grid;
+  .bf-roulette-col-wheel { grid-area: wheel; }
+  .bf-roulette-col-players { grid-area: players; }
+  .bf-roulette-col-teams { grid-area: teams; }
+  .bf-roulette-casino-wheel {
+    width: 260px;
+    height: 260px;
   }
-  .bf-roulette-head-side {
-    justify-items: start;
+  .bf-roulette-portal-ring.ring-1 { width: 300px; height: 300px; }
+  .bf-roulette-portal-ring.ring-2 { width: 320px; height: 320px; }
+  .bf-roulette-portal-ring.ring-3 { width: 340px; height: 340px; }
+  .bf-roulette-portal-ring.ring-4 { width: 260px; height: 260px; }
+}
+@media (max-width: 720px) {
+  .bf-roulette-workspace-v3 {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "wheel"
+      "players"
+      "teams";
   }
-  .bf-roulette-panel {
-    max-height: 460px;
+  .bf-roulette-head-v3 {
+    flex-direction: column;
+    gap: 10px;
   }
-  .bf-roulette-wheel {
-    width: min(86vw, 340px);
+  .bf-roulette-head-v3 h2 {
+    font-size: 1.1rem;
+  }
+  .bf-roulette-casino-wheel {
+    width: 240px;
+    height: 240px;
+  }
+  .bf-roulette-portal-ring.ring-1 { width: 280px; height: 280px; }
+  .bf-roulette-portal-ring.ring-2 { width: 300px; height: 300px; }
+  .bf-roulette-portal-ring.ring-3 { width: 320px; height: 320px; }
+  .bf-roulette-portal-ring.ring-4 { width: 240px; height: 240px; }
+  .bf-roulette-teams-grid-v3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bf-roulette-seed-row-v3 {
+    grid-template-columns: 32px 1fr 36px 1fr;
+    gap: 6px;
+    padding: 8px 10px;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .opr-bar i, .opr-next, .opr-card, .opr-save { transition: none; }
-  .bf-roulette-wheel.is-spinning { animation: none; }
+  .bf-roulette-casino-wheel.is-spinning { animation: none; }
+  .bf-roulette-portal-ring { animation: none !important; }
 }
