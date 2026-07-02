@@ -65,6 +65,10 @@ export type TournamentConfig = {
   rouletteTeamSize?: 1 | 2 | 3 | 4;
   rouletteBench?: string[];
   rouletteStatus?: "generated" | "confirmed";
+  rouletteRespinCount?: number;
+  rouletteLastSpinAt?: string;
+  rouletteRosterTimerState?: "idle" | "running" | "closed";
+  rouletteRosterDurationSeconds?: number;
 };
 
 export type Tournament = {
@@ -336,10 +340,19 @@ export function saveMatchResult(
   });
 }
 
-export function openRosterRespin(tournamentId: number, payload: { duration_minutes: number }) {
+export function openRosterRespin(
+  tournamentId: number,
+  payload: { duration_seconds?: number; duration_minutes?: number }
+) {
   return request<Tournament>(`/tournaments/${tournamentId}/roster-respin/open`, {
     method: "POST",
     body: payload,
+  });
+}
+
+export function closeRosterRespin(tournamentId: number) {
+  return request<Tournament>(`/tournaments/${tournamentId}/roster-respin/close`, {
+    method: "POST",
   });
 }
 

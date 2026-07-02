@@ -33,6 +33,9 @@ BRACKET_RESPIN_OPEN = "respin_open"
 BRACKET_LOCKED = "locked"
 BRACKET_RUNNING = "running"
 BRACKET_COMPLETED = "completed"
+ROULETTE_TIMER_IDLE = "idle"
+ROULETTE_TIMER_RUNNING = "running"
+ROULETTE_TIMER_CLOSED = "closed"
 
 
 def normalize_team_size(format_name: str, requested_team_size: int) -> int:
@@ -66,6 +69,35 @@ def read_tournament_config(tournament: models.Tournament) -> dict:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def write_tournament_config(tournament: models.Tournament, config: dict) -> None:
+    tournament.config = json.dumps(config) if config else None
+
+
+def get_roulette_timer_state(tournament: models.Tournament) -> str:
+    config = read_tournament_config(tournament)
+    state = config.get("rouletteRosterTimerState")
+    if state in {ROULETTE_TIMER_IDLE, ROULETTE_TIMER_RUNNING, ROULETTE_TIMER_CLOSED}:
+        return state
+    if tournament.roster_status == ROSTER_LOCKED:
+        return ROULETTE_TIMER_CLOSED
+    if tournament.roster_status == ROSTER_RESPIN_OPEN and tournament.roster_respin_deadline_at:
+        return ROULETTE_TIMER_RUNNING
+    return ROULETTE_TIMER_IDLE
+
+
+def set_roulette_timer_state(
+    tournament: models.Tournament,
+    *,
+    state: str,
+    duration_seconds: int | None = None,
+) -> None:
+    config = read_tournament_config(tournament)
+    config["rouletteRosterTimerState"] = state
+    if duration_seconds is not None:
+        config["rouletteRosterDurationSeconds"] = duration_seconds
+    write_tournament_config(tournament, config)
 
 
 def get_engine_key(tournament: models.Tournament) -> str | None:
@@ -187,9 +219,10 @@ def apply_tournament_windows(db: Session, tournament: models.Tournament) -> mode
 
     roster_deadline = parse_utc_iso(tournament.roster_respin_deadline_at)
     if tournament.roster_status == ROSTER_RESPIN_OPEN and roster_deadline is not None and now >= roster_deadline:
-        tournament.roster_status = ROSTER_LOCKED
-        tournament.roster_locked_at = tournament.roster_respin_deadline_at
+        tournament.roster_status = ROSTER_PENDING
+        tournament.roster_locked_at = None
         tournament.roster_respin_deadline_at = None
+        set_roulette_timer_state(tournament, state=ROULETTE_TIMER_CLOSED)
         changed = True
 
     bracket_deadline = parse_utc_iso(tournament.bracket_respin_deadline_at)
@@ -402,15 +435,33 @@ def delete_tournament(db: Session, tournament: models.Tournament) -> None:
 def open_roster_respin(
     db: Session,
     tournament: models.Tournament,
-    duration_minutes: int,
+    duration_seconds: int,
 ) -> models.Tournament:
     tournament = apply_tournament_windows(db, tournament)
     if tournament.roster_status == ROSTER_LOCKED:
         raise ValueError("El roster ya esta locked. No se puede abrir respin.")
-    deadline = datetime.now(tz=UTC) + timedelta(minutes=duration_minutes)
+    deadline = datetime.now(tz=UTC) + timedelta(seconds=duration_seconds)
     tournament.roster_status = ROSTER_RESPIN_OPEN
     tournament.roster_respin_deadline_at = deadline.isoformat()
     tournament.roster_locked_at = None
+    set_roulette_timer_state(
+        tournament,
+        state=ROULETTE_TIMER_RUNNING,
+        duration_seconds=duration_seconds,
+    )
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
+def close_roster_respin(db: Session, tournament: models.Tournament) -> models.Tournament:
+    tournament = apply_tournament_windows(db, tournament)
+    if tournament.roster_status == ROSTER_LOCKED:
+        return tournament
+    tournament.roster_status = ROSTER_PENDING
+    tournament.roster_respin_deadline_at = None
+    tournament.roster_locked_at = None
+    set_roulette_timer_state(tournament, state=ROULETTE_TIMER_CLOSED)
     db.commit()
     db.refresh(tournament)
     return tournament
@@ -420,11 +471,14 @@ def lock_roster(db: Session, tournament: models.Tournament) -> models.Tournament
     tournament = apply_tournament_windows(db, tournament)
     if tournament.roster_status == ROSTER_LOCKED:
         return tournament
+    if get_roulette_timer_state(tournament) == ROULETTE_TIMER_RUNNING:
+        raise ValueError("Cierra el respin antes de bloquear el roster.")
     if not get_teams_by_tournament(db, tournament.id):
         raise ValueError("No se puede locked el roster sin equipos generados.")
     tournament.roster_status = ROSTER_LOCKED
     tournament.roster_locked_at = utc_now_iso()
     tournament.roster_respin_deadline_at = None
+    set_roulette_timer_state(tournament, state=ROULETTE_TIMER_CLOSED)
     db.commit()
     db.refresh(tournament)
     return tournament
@@ -877,8 +931,8 @@ def generate_roulette_teams(
         raise ValueError("No se puede regenerar ruleta si ya existen resultados.")
     if tournament.roster_status == ROSTER_LOCKED:
         raise ValueError("El roster ya esta locked. No se puede regenerar equipos.")
-    if tournament.roster_status != ROSTER_RESPIN_OPEN:
-        raise ValueError("Abre la ventana de respin de roster antes de generar equipos.")
+    if get_roulette_timer_state(tournament) != ROULETTE_TIMER_RUNNING:
+        raise ValueError("Inicia el respin manual antes de girar la ruleta.")
     team_size = resolve_roulette_team_size(tournament)
     minimum_players = team_size * 2
     if payload.reset:
@@ -896,6 +950,9 @@ def generate_roulette_teams(
         raise ValueError(
             f"Faltan participantes para generar equipos: tienes {len(available_players)}, necesitas mínimo {minimum_players}."
         )
+    remainder = len(available_players) % team_size
+    if remainder != 0:
+        raise ValueError(f"El pool debe calzar exacto con team_size={team_size}. Sobran {remainder}.")
 
     seed = payload.shuffle_seed if payload.shuffle_seed is not None else payload.seed
     seed_value = str(seed) if seed is not None else str(datetime.now(tz=UTC).timestamp())
@@ -907,8 +964,6 @@ def generate_roulette_teams(
 
     for index in range(0, len(available_players), team_size):
         chunk = available_players[index : index + team_size]
-        if len(chunk) < team_size:
-            break
 
         team = models.Team(
             name=f"Team {next_team_index}",
@@ -923,8 +978,7 @@ def generate_roulette_teams(
             db.add(models.TeamMember(team_id=team.id, player_id=player.id))
         created_team_ids.append(team.id)
 
-    bench_start = len(created_team_ids) * team_size
-    bench = available_players[bench_start:]
+    bench: list[models.Player] = []
 
     tournament.team_size = team_size
     if team_size == 2:
@@ -938,16 +992,20 @@ def generate_roulette_teams(
     tournament.bracket_respin_deadline_at = None
     tournament.bracket_locked_at = None
     config = read_tournament_config(tournament)
+    respin_count = int(config.get("rouletteRespinCount", 0)) + 1
+    last_spin_at = datetime.now(tz=UTC).isoformat()
     config.update(
         {
-            "rouletteGeneratedAt": datetime.now(tz=UTC).isoformat(),
+            "rouletteGeneratedAt": last_spin_at,
             "rouletteSeed": seed_value,
             "rouletteTeamSize": team_size,
-            "rouletteBench": [player.nickname for player in bench],
+            "rouletteBench": [],
             "rouletteStatus": "confirmed" if payload.confirm else "generated",
+            "rouletteRespinCount": respin_count,
+            "rouletteLastSpinAt": last_spin_at,
         }
     )
-    tournament.config = json.dumps(config) if config else None
+    write_tournament_config(tournament, config)
     db.commit()
 
     created_teams = (
