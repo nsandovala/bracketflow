@@ -11,6 +11,7 @@ import {
   addTeamMember,
   archiveTournament,
   bulkImportPlayers,
+  closeRosterRespin,
   clearPlayers,
   createBattleRoyaleMatch,
   createPlayer,
@@ -708,9 +709,16 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         reset: true,
         confirm: false,
       });
-      await lockRosterRespin(selectedTournamentId);
       await refreshSelectedTournament(selectedTournamentId);
-      setMessage(`Ruleta generada: ${result.teams_created.length} equipos.`);
+      const nextRespinCount =
+        selectedTournament?.config?.rouletteRespinCount !== undefined
+          ? selectedTournament.config.rouletteRespinCount + 1
+          : undefined;
+      setMessage(
+        nextRespinCount
+          ? `Ruleta generada: ${result.teams_created.length} equipos. Respin #${nextRespinCount}.`
+          : `Ruleta generada: ${result.teams_created.length} equipos.`
+      );
       return result;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo generar la ruleta.");
@@ -859,7 +867,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     }
   }
 
-  async function openRosterWindow(durationMinutes: number) {
+  async function openRosterWindow(durationSeconds: number) {
     if (selectedTournamentId === null) {
       return null;
     }
@@ -867,13 +875,32 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setMessage(null);
     try {
       const tournament = await openRosterRespin(selectedTournamentId, {
-        duration_minutes: durationMinutes,
+        duration_seconds: durationSeconds,
       });
       await refreshSelectedTournament(selectedTournamentId);
-      setMessage(`Respin de roster abierto por ${durationMinutes} minutos.`);
+      setMessage(`Respin de roster abierto por ${durationSeconds} segundos.`);
       return tournament;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo abrir respin de roster.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function closeRosterWindow() {
+    if (selectedTournamentId === null) {
+      return null;
+    }
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const tournament = await closeRosterRespin(selectedTournamentId);
+      await refreshSelectedTournament(selectedTournamentId);
+      setMessage("Respin cerrado.");
+      return tournament;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo cerrar respin de roster.");
       return null;
     } finally {
       setSubmitting(false);
@@ -1074,6 +1101,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     clearParticipants,
     createTeamWithRoster,
     openRosterWindow,
+    closeRosterWindow,
     lockRosterWindow,
     generateRouletteForSelected,
     generateBracketForSelected,

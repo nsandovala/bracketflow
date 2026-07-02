@@ -1,21 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Player, Team, Tournament } from "../../lib/api";
-import {
-  BracketTeam,
-  getTeamDisplayName,
-  getTeamSeedLabel,
-  getTeamShortDisplayName,
-} from "../../lib/bracketDisplay";
+import { getTeamSeedLabel, getTeamShortDisplayName } from "../../lib/bracketDisplay";
 import { ResolvedTournamentEngine } from "../../lib/tournamentModel";
-
-type PreviewTeam = {
-  name: string;
-  players: Player[];
-};
 
 type RouletteArenaProps = {
   tournament: Tournament;
@@ -26,11 +16,31 @@ type RouletteArenaProps = {
   onImportParticipants: (nicknames: string[]) => Promise<unknown>;
   onRemoveParticipant: (playerId: number) => Promise<unknown>;
   onClearParticipants: () => Promise<unknown>;
-  onConfirmRoulette: (shuffleSeed: string) => Promise<unknown>;
-  onOpenRosterRespin: (durationMinutes: number) => Promise<unknown>;
+  onSpinRoulette?: (shuffleSeed: string) => Promise<unknown>;
+  onConfirmRoulette?: (shuffleSeed: string) => Promise<unknown>;
+  onOpenRosterRespin: (durationSeconds: number) => Promise<unknown>;
+  onCloseRosterRespin?: () => Promise<unknown>;
   onLockRosterRespin: () => Promise<unknown>;
   canRegenerate?: boolean;
 };
+
+type TimerState = "idle" | "running" | "closed";
+type RoulettePhase = "idle" | "spinning" | "revealing";
+
+type PreviewUpload = {
+  label: string;
+  names: string[];
+};
+
+const WHEEL_SIZE = 340;
+const WHEEL_RADIUS = WHEEL_SIZE / 2;
+const WHEEL_SEGMENTS = 16;
+const DEFAULT_RESPIN_SECONDS = 180;
+const MAX_RESPIN_SECONDS = 240;
+
+function clampDuration(value: number) {
+  return Math.max(1, Math.min(MAX_RESPIN_SECONDS, value));
+}
 
 function cleanParticipantName(value: string) {
   return value
@@ -40,10 +50,9 @@ function cleanParticipantName(value: string) {
     .trim();
 }
 
-function parseParticipants(value: string): { names: string[]; rejected: string[] } {
+function parseParticipants(value: string) {
   const seen = new Set<string>();
   const names: string[] = [];
-  const rejected: string[] = [];
   const rawParts = value.split(/[\n,;\t]+/);
 
   rawParts.forEach((raw) => {
@@ -55,79 +64,166 @@ function parseParticipants(value: string): { names: string[]; rejected: string[]
     names.push(cleaned);
   });
 
-  return { names, rejected };
+  return names;
 }
 
-function seededRandom(seed: string) {
-  let hash = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    hash ^= seed.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return () => {
-    hash += hash << 13;
-    hash ^= hash >>> 7;
-    hash += hash << 3;
-    hash ^= hash >>> 17;
-    hash += hash << 5;
-    return ((hash >>> 0) % 100000) / 100000;
-  };
+function formatTimer(seconds: number) {
+  const safe = Math.max(0, seconds);
+  const minutes = Math.floor(safe / 60);
+  const remainder = safe % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
-function buildPreview(players: Player[], teamSize: number, seed: string) {
-  const random = seededRandom(seed);
-  const shuffled = [...players];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  const teams: PreviewTeam[] = [];
-  for (let i = 0; i < shuffled.length; i += teamSize) {
-    const chunk = shuffled.slice(i, i + teamSize);
-    if (chunk.length < teamSize) return { teams, bench: chunk };
-    teams.push({ name: `Team ${teams.length + 1}`, players: chunk });
-  }
-  return { teams, bench: [] as Player[] };
+function polar(cx: number, cy: number, radius: number, degrees: number) {
+  const radians = (degrees * Math.PI) / 180;
+  return [cx + radius * Math.sin(radians), cy - radius * Math.cos(radians)];
 }
 
-function buildBracketPairs<T extends { name: string }>(teams: T[]) {
-  const pairs: Array<[T, T | null]> = [];
-  for (let i = 0; i < teams.length; i += 2) {
-    pairs.push([teams[i], teams[i + 1] ?? null]);
+function buildSlicePath(start: number, end: number, radius: number) {
+  const [x0, y0] = polar(WHEEL_RADIUS, WHEEL_RADIUS, radius, start);
+  const [x1, y1] = polar(WHEEL_RADIUS, WHEEL_RADIUS, radius, end);
+  return `M ${WHEEL_RADIUS} ${WHEEL_RADIUS} L ${x0} ${y0} A ${radius} ${radius} 0 0 1 ${x1} ${y1} Z`;
+}
+
+function buildBracketPairs(teams: Team[]) {
+  const pairs: Array<[Team, Team | null]> = [];
+  for (let index = 0; index < teams.length; index += 2) {
+    pairs.push([teams[index], teams[index + 1] ?? null]);
   }
   return pairs;
 }
 
-function formatCountdown(deadline: string | null, now: number) {
-  if (!deadline) return null;
-  const diffMs = new Date(deadline).getTime() - now;
-  if (diffMs <= 0) return "00:00";
-  const totalSeconds = Math.floor(diffMs / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+function playCloseBeep() {
+  try {
+    const AudioContextCtor =
+      window.AudioContext ||
+      ((window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext ?? null);
+    if (!AudioContextCtor) return;
+    const context = new AudioContextCtor();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "triangle";
+    oscillator.frequency.value = 784;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    const start = context.currentTime;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+    oscillator.start(start);
+    oscillator.stop(start + 0.24);
+  } catch {}
 }
 
-// Pastel casino segment colors (like image 4)
-const SEGMENT_COLORS = [
-  { bg: "#ff8fa3", text: "#4a0e1a" },
-  { bg: "#7ee8c6", text: "#0a2e1f" },
-  { bg: "#ffd166", text: "#4a3300" },
-  { bg: "#a0c4ff", text: "#0d1b2a" },
-  { bg: "#c9a0dc", text: "#2a0e3d" },
-  { bg: "#ffb5a7", text: "#4a1a0f" },
-  { bg: "#90e0ef", text: "#0a2e3d" },
-  { bg: "#ffdac1", text: "#4a2a10" },
-  { bg: "#b5e48c", text: "#1a330a" },
-  { bg: "#ff9f1c", text: "#4a2200" },
-  { bg: "#caffbf", text: "#1a3300" },
-  { bg: "#9bf6ff", text: "#0a2a2e" },
-  { bg: "#a0c4ff", text: "#0d1b2a" },
-  { bg: "#bdb2ff", text: "#1a0e3d" },
-  { bg: "#ffc6ff", text: "#4a004a" },
-  { bg: "#fdffb6", text: "#3a3a00" },
-];
+function RevealRunes({ active, reducedMotion }: { active: boolean; reducedMotion: boolean }) {
+  if (!active) return null;
+  const ticks = Array.from({ length: 24 }, (_, index) => index * 15);
+  return (
+    <div
+      className={`bf-roulette-runes${reducedMotion ? " is-reduced" : ""}`}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 200 200">
+        <circle className="bf-roulette-runes-core" cx="100" cy="100" r="70" />
+        <g className="bf-roulette-runes-ring bf-roulette-runes-ring-a">
+          <circle cx="100" cy="100" r="92" />
+          <circle cx="100" cy="100" r="84" />
+        </g>
+        <g className="bf-roulette-runes-ring bf-roulette-runes-ring-b">
+          <circle cx="100" cy="100" r="70" />
+          <circle cx="100" cy="100" r="60" />
+        </g>
+        <g className="bf-roulette-runes-ticks">
+          {ticks.map((angle) => {
+            const [x1, y1] = polar(100, 100, 94, angle);
+            const [x2, y2] = polar(100, 100, 100, angle);
+            return <line key={angle} x1={x1} y1={y1} x2={x2} y2={y2} />;
+          })}
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function Wheel({
+  disabled,
+  participantCount,
+  phase,
+  rotation,
+  reducedMotion,
+  onSpin,
+}: {
+  disabled: boolean;
+  participantCount: number;
+  phase: RoulettePhase;
+  rotation: number;
+  reducedMotion: boolean;
+  onSpin: () => void;
+}) {
+  const sliceAngle = 360 / WHEEL_SEGMENTS;
+  const spinDurationMs = reducedMotion ? 320 : 4000;
+
+  return (
+    <div className="bf-roulette-wheel-shell">
+      <svg
+        className="bf-roulette-pointer"
+        width="28"
+        height="22"
+        viewBox="0 0 28 22"
+        aria-hidden="true"
+      >
+        <polygon points="14,22 2,2 26,2" />
+      </svg>
+
+      <svg
+        className="bf-roulette-wheel"
+        viewBox={`0 0 ${WHEEL_SIZE} ${WHEEL_SIZE}`}
+        width="100%"
+        height="100%"
+        aria-hidden="true"
+      >
+        <circle
+          className="bf-roulette-wheel-ring"
+          cx={WHEEL_RADIUS}
+          cy={WHEEL_RADIUS}
+          r={WHEEL_RADIUS - 2}
+        />
+        <g
+          style={{
+            transform: `rotate(${rotation}deg)`,
+            transformOrigin: "50% 50%",
+            transition:
+              phase === "spinning"
+                ? `transform ${spinDurationMs}ms cubic-bezier(0.15,0.85,0.2,1)`
+                : "none",
+          }}
+        >
+          {Array.from({ length: WHEEL_SEGMENTS }, (_, index) => (
+            <path
+              key={index}
+              d={buildSlicePath(index * sliceAngle, (index + 1) * sliceAngle, WHEEL_RADIUS - 5)}
+              className={index % 2 === 0 ? "bf-roulette-wheel-slice is-black" : "bf-roulette-wheel-slice is-navy"}
+            />
+          ))}
+        </g>
+      </svg>
+
+      <button
+        type="button"
+        className={`bf-roulette-hub${disabled ? " is-disabled" : ""}${
+          !disabled && !reducedMotion && phase === "idle" ? " is-ready" : ""
+        }`}
+        disabled={disabled}
+        aria-label={`Girar ruleta con ${participantCount} participantes`}
+        onClick={onSpin}
+      >
+        <strong>{participantCount}</strong>
+        <span>{phase === "spinning" ? "GIRANDO" : "GIRAR"}</span>
+      </button>
+    </div>
+  );
+}
 
 export default function RouletteArena({
   tournament,
@@ -138,85 +234,150 @@ export default function RouletteArena({
   onImportParticipants,
   onRemoveParticipant,
   onClearParticipants,
+  onSpinRoulette,
   onConfirmRoulette,
   onOpenRosterRespin,
+  onCloseRosterRespin,
   onLockRosterRespin,
-  canRegenerate = true,
 }: RouletteArenaProps) {
   const [bulkValue, setBulkValue] = useState("");
-  const [seed, setSeed] = useState(() => `${Date.now()}`);
-  const [preview, setPreview] = useState<{ teams: PreviewTeam[]; bench: Player[] } | null>(null);
-  const [participantPreview, setParticipantPreview] = useState<string[]>([]);
-  const [spinning, setSpinning] = useState(false);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
-  const [now, setNow] = useState(0);
+  const [uploadPreview, setUploadPreview] = useState<PreviewUpload | null>(null);
+  const [phase, setPhase] = useState<RoulettePhase>("idle");
+  const [rotation, setRotation] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const [durationSeconds, setDurationSeconds] = useState(() =>
+    clampDuration(engine.config.rouletteRosterDurationSeconds ?? DEFAULT_RESPIN_SECONDS)
+  );
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [spinPending, setSpinPending] = useState(false);
+
+  const spinTimeoutRef = useRef<number | null>(null);
+  const revealTimeoutRef = useRef<number | null>(null);
+  const autoClosedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const applyPreference = () => setReducedMotion(mediaQuery.matches);
+    applyPreference();
+    mediaQuery.addEventListener("change", applyPreference);
+    return () => mediaQuery.removeEventListener("change", applyPreference);
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (spinTimeoutRef.current !== null) {
+        window.clearTimeout(spinTimeoutRef.current);
+      }
+      if (revealTimeoutRef.current !== null) {
+        window.clearTimeout(revealTimeoutRef.current);
+      }
+    };
   }, []);
 
   const teamSize = engine.teamSize;
   const minimumPlayers = teamSize * 2;
+  const remainder = players.length % teamSize;
   const missingPlayers = Math.max(minimumPlayers - players.length, 0);
-  const hasConfirmedTeams = teams.length > 0;
-  const isKillRace = engine.engineKey === "kill_race_bracket";
-  const rosterCountdown = formatCountdown(tournament.roster_respin_deadline_at, now);
-  const rosterOpen = tournament.roster_status === "respin_open" && rosterCountdown !== "00:00";
-  const modeBadge =
-    engine.engineKey === "roulette_ws"
-      ? engine.gameMode === "br"
-        ? "BR 4v4"
-        : "Rebirth 3v3"
-      : `${teamSize}v${teamSize}`;
-  const confirmedBench = engine.config.rouletteBench ?? [];
-  const visiblePreviewTeams = preview?.teams ?? [];
-  const visiblePreviewBench = preview?.bench ?? [];
-  const resultTeams: BracketTeam[] = preview ? visiblePreviewTeams : teams;
-  const bracketPairs = buildBracketPairs(resultTeams);
-  const resultBench = preview
-    ? visiblePreviewBench.map((p) => p.nickname)
-    : confirmedBench;
-  const estimatedTeams = Math.floor(players.length / teamSize);
-  const estimatedBench = players.length >= teamSize ? players.length % teamSize : players.length;
+  const poolValid = players.length >= minimumPlayers && remainder === 0;
+  const isLocked = tournament.roster_status === "locked";
+  const configuredTimerState = engine.config.rouletteRosterTimerState ?? "idle";
+  const respinCount = engine.config.rouletteRespinCount ?? 0;
+  const lastSpinAt = engine.config.rouletteLastSpinAt ?? engine.config.rouletteGeneratedAt ?? null;
+  const countdownSeconds = tournament.roster_respin_deadline_at
+    ? Math.max(
+        0,
+        Math.ceil((new Date(tournament.roster_respin_deadline_at).getTime() - now) / 1000)
+      )
+    : 0;
 
-  const wheelPlayers = useMemo(() => {
-    const max = 20;
-    const slice = players.slice(0, max);
-    if (players.length > max) {
-      return [...slice, { id: -1, nickname: `+${players.length - max}` } as Player];
-    }
-    return slice;
-  }, [players]);
+  const timerState: TimerState = isLocked
+    ? "closed"
+    : tournament.roster_status === "respin_open" && countdownSeconds > 0
+      ? "running"
+      : configuredTimerState === "closed"
+        ? "closed"
+        : "idle";
+  const spinAction = onSpinRoulette ?? onConfirmRoulette;
 
-  const isHeroMode = players.length >= minimumPlayers && rosterOpen;
-  const showBigWheel = isHeroMode || spinning || preview;
-
-  async function persistParticipantPreview() {
-    if (participantPreview.length === 0) {
-      setFileMessage("No hay participantes en preview.");
+  useEffect(() => {
+    if (timerState !== "running") {
+      autoClosedRef.current = false;
       return;
     }
-    await onImportParticipants(participantPreview);
-    setParticipantPreview([]);
-    setBulkValue("");
-    setFileMessage(`${participantPreview.length} guardados.`);
+    if (countdownSeconds > 0 || autoClosedRef.current) {
+      return;
+    }
+    autoClosedRef.current = true;
+    playCloseBeep();
+    if (onCloseRosterRespin) {
+      void onCloseRosterRespin();
+    }
+  }, [countdownSeconds, onCloseRosterRespin, timerState]);
+
+  const sortedPlayers = useMemo(
+    () =>
+      [...players].sort((left, right) =>
+        left.nickname.localeCompare(right.nickname, undefined, { sensitivity: "base" })
+      ),
+    [players]
+  );
+
+  const bracketPairs = useMemo(() => buildBracketPairs(teams), [teams]);
+
+  const canSpin =
+    poolValid &&
+    phase === "idle" &&
+    timerState === "running" &&
+    !isLocked &&
+    !submitting &&
+    spinAction !== undefined &&
+    !spinPending;
+
+  const invalidMessage =
+    players.length === 0
+      ? null
+      : players.length < minimumPlayers
+        ? `Faltan ${missingPlayers}`
+        : remainder !== 0
+          ? `Sobran ${remainder}`
+          : null;
+
+  async function persistUploadPreview() {
+    if (!uploadPreview || uploadPreview.names.length === 0) {
+      setFileMessage("No hay participantes para guardar.");
+      return;
+    }
+    await onImportParticipants(uploadPreview.names);
+    setUploadPreview(null);
+    setFileMessage(`${uploadPreview.names.length} participantes agregados.`);
   }
 
-  function handleParsedParticipants(content: string, source: string) {
-    const { names } = parseParticipants(content);
+  async function addFromTextarea() {
+    const names = parseParticipants(bulkValue);
     if (names.length === 0) {
-      setFileMessage("No se detectaron participantes validos.");
+      setFileMessage("No se detectaron nombres válidos.");
       return;
     }
-    setParticipantPreview(names);
-    setFileMessage(`${source}: ${names.length} detectados.`);
+    await onImportParticipants(names);
+    setBulkValue("");
+    setFileMessage(`${names.length} participantes agregados.`);
   }
 
-  function handleBulkPreview(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    handleParsedParticipants(bulkValue, "Texto");
+  function handleFileContent(content: string, label: string) {
+    const names = parseParticipants(content);
+    if (names.length === 0) {
+      setFileMessage("No se detectaron participantes válidos.");
+      return;
+    }
+    setUploadPreview({ label, names });
+    setFileMessage(`${label}: ${names.length} detectados.`);
   }
 
   function handleFileImport(event: ChangeEvent<HTMLInputElement>) {
@@ -231,407 +392,332 @@ export default function RouletteArena({
     const reader = new FileReader();
     reader.onload = () => {
       const content = typeof reader.result === "string" ? reader.result : "";
-      handleParsedParticipants(content, `Archivo ${file.name}`);
+      handleFileContent(content, `Archivo ${file.name}`);
     };
     reader.onerror = () => setFileMessage("No se pudo leer el archivo.");
     reader.readAsText(file);
   }
 
-  function spinRoulette() {
-    if (!rosterOpen || players.length < minimumPlayers) return;
-    const nextSeed = `${Date.now()}-${players.length}-${teamSize}`;
-    setSeed(nextSeed);
-    setSpinning(true);
-    window.setTimeout(() => {
-      setPreview(buildPreview(players, teamSize, nextSeed));
-      setSpinning(false);
-    }, 1200);
+  async function handleStartRespin(seconds = durationSeconds) {
+    await onOpenRosterRespin(clampDuration(seconds));
   }
 
-  async function confirmRoulette() {
-    if (!preview) return;
-    await onConfirmRoulette(seed);
-    setPreview(null);
-  }
-
-  // Team card render
-  const renderTeamGrid = () => {
-    if (resultTeams.length === 0) {
-      return <p className="bf-empty">Gira la ruleta para ver equipos.</p>;
+  async function handleCloseRespin(manual = true) {
+    if (manual) {
+      playCloseBeep();
     }
-    return (
-      <div className="bf-roulette-teams-grid-v3">
-        {resultTeams.map((team, index) => {
-          const color = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
-          const displayName = getTeamDisplayName(team);
-          const seedLabel = getTeamSeedLabel(team, index + 1);
-          const playerNames = (() => {
-            const t = team as unknown as { players?: Player[]; roster?: Array<{ nickname?: string } | string> };
-            if (Array.isArray(t.players)) return t.players.map((p) => p.nickname).join(" · ");
-            if (Array.isArray(t.roster)) return t.roster.map((p) => (typeof p === "string" ? p : p.nickname ?? "?")).join(" · ");
-            return "";
-          })();
-          return (
-            <div
-              key={team.name || index}
-              className="bf-roulette-team-card-v3"
-              style={{
-                borderColor: color.bg,
-                background: `${color.bg}12`,
-                boxShadow: `0 0 16px ${color.bg}22`,
-              }}
-            >
-              <div className="bf-roulette-team-card-head-v3">
-                <strong style={{ color: color.text }}>{displayName}</strong>
-                <span>{seedLabel}</span>
-              </div>
-              <div className="bf-roulette-team-card-body-v3" style={{ color: color.text }}>
-                {playerNames}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+    if (onCloseRosterRespin) {
+      await onCloseRosterRespin();
+    }
+  }
+
+  async function handleSpin() {
+    if (!canSpin) return;
+    if (!spinAction) return;
+
+    setSpinPending(true);
+    setPhase("spinning");
+    setRotation((current) => current + (reducedMotion ? 360 : 5 * 360) + Math.floor(Math.random() * 360));
+
+    const spinDuration = reducedMotion ? 320 : 4000;
+    const revealDuration = reducedMotion ? 400 : 1300;
+    const shuffleSeed =
+      typeof window.crypto?.randomUUID === "function"
+        ? window.crypto.randomUUID()
+        : `${Date.now()}-${players.length}-${teamSize}`;
+
+    spinTimeoutRef.current = window.setTimeout(async () => {
+      const result = await spinAction(shuffleSeed);
+      if (!result) {
+        setSpinPending(false);
+        setPhase("idle");
+        return;
+      }
+
+      setPhase("revealing");
+      revealTimeoutRef.current = window.setTimeout(() => {
+        setSpinPending(false);
+        setPhase("idle");
+      }, revealDuration);
+    }, spinDuration + 40);
+  }
 
   return (
-    <section className="bf-roulette-arena-v3">
-      {/* ---- Header ---- */}
-      <div className="bf-roulette-head-v3">
-        <div>
-          <span className="opr-eyebrow">
-            {hasConfirmedTeams
-              ? "Equipos confirmados"
-              : preview
-                ? "Preview de ruleta"
-                : participantPreview.length > 0
-                  ? "Preview de import"
-                  : "Carga participantes"}
+    <section className="bf-roulette-setup">
+      <header className={`bf-roulette-setup-header${timerState === "closed" ? " is-closed" : ""}`}>
+        <div className="bf-roulette-setup-timer">
+          <span className="bf-roulette-setup-kicker">
+            {timerState === "running"
+              ? "RESPIN ABIERTO"
+              : timerState === "closed"
+                ? "RESPIN CERRADO"
+                : "RESPIN SIN INICIAR"}
           </span>
-          <h2>
-            {hasConfirmedTeams
-              ? `${teams.length} equipos · ${modeBadge}`
-              : preview
-                ? "Revisa antes de confirmar"
-                : participantPreview.length > 0
-                  ? `${participantPreview.length} participantes detectados`
-                  : rosterOpen
-                    ? "Respin abierto · gira la ruleta"
-                    : "Carga participantes"}
-          </h2>
+          <strong>{formatTimer(timerState === "running" ? countdownSeconds : durationSeconds)}</strong>
+          <small>
+            {lastSpinAt ? `Último giro ${new Date(lastSpinAt).toLocaleTimeString()}` : "Sin giros todavía"}
+          </small>
         </div>
-        <div className="bf-roulette-head-side-v3">
-          <span className="bf-roulette-badge">{modeBadge}</span>
-          {rosterOpen && rosterCountdown ? (
-            <span className="bf-roulette-timer">Respin {rosterCountdown}</span>
-          ) : hasConfirmedTeams ? (
-            <span className="bf-roulette-status-confirmed">Confirmado</span>
-          ) : tournament.roster_status === "locked" ? (
-            <span className="bf-roulette-status-locked">Locked</span>
-          ) : (
-            <span className="bf-roulette-status-pending">{players.length} cargados</span>
-          )}
-        </div>
-      </div>
 
-      {!rosterOpen && tournament.roster_status !== "locked" ? (
-        <div className="bf-hub-form-actions bf-roulette-open-actions">
-          {[3, 4, 5].map((minutes) => (
+        <div className="bf-roulette-setup-controls">
+          <label className="bf-roulette-duration">
+            <span>Segundos</span>
+            <input
+              type="number"
+              min={1}
+              max={MAX_RESPIN_SECONDS}
+              value={durationSeconds}
+              disabled={submitting || isLocked}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                setDurationSeconds(clampDuration(Number.isFinite(next) ? next : DEFAULT_RESPIN_SECONDS));
+              }}
+            />
+          </label>
+
+          <div className="bf-roulette-setup-actions">
             <button
-              key={minutes}
+              type="button"
+              className="bf-button bf-button-ghost"
+              disabled={submitting || timerState === "running" || isLocked}
+              onClick={() => void handleStartRespin()}
+            >
+              Iniciar respin
+            </button>
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              disabled={submitting || timerState !== "running" || isLocked}
+              onClick={() => void handleCloseRespin(true)}
+            >
+              Cerrar respin ahora
+            </button>
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              disabled={submitting || isLocked}
+              onClick={() => void handleStartRespin(durationSeconds)}
+            >
+              Reiniciar
+            </button>
+            <button
               type="button"
               className="bf-button bf-button-primary"
-              disabled={submitting}
-              onClick={() => void onOpenRosterRespin(minutes)}
+              disabled={submitting || isLocked || timerState !== "closed" || teams.length === 0}
+              onClick={() => void onLockRosterRespin()}
             >
-              Abrir respin {minutes} min
+              Bloquear y preparar bracket
             </button>
-          ))}
+          </div>
         </div>
-      ) : null}
+      </header>
 
-      {tournament.roster_status === "locked" ? (
-        <p className="bf-message">
-          Roster locked{tournament.roster_locked_at ? ` · ${tournament.roster_locked_at}` : ""}
-        </p>
-      ) : null}
-
-      {/* ---- 3-Column Workspace: Players | Wheel | Results ---- */}
-      <div className="bf-roulette-workspace-v3">
-        {/* LEFT: Participants */}
-        <aside className="bf-roulette-col bf-roulette-col-players">
-          <div className="bf-roulette-col-title">
+      <div className="bf-roulette-grid">
+        <aside className="bf-roulette-panel bf-roulette-panel-participants">
+          <div className="bf-roulette-panel-title">
             <span>Participantes</span>
-            <strong>{players.length} · min {minimumPlayers}</strong>
+            <strong>
+              {players.length} / {minimumPlayers}
+            </strong>
           </div>
 
-          <form className="bf-roulette-import-v3" onSubmit={handleBulkPreview}>
+          <div className="bf-roulette-import-drop">
             <input
               ref={fileInputRef}
               className="bf-roulette-file-input"
               type="file"
               accept=".txt,.csv,text/plain,text/csv"
               onChange={handleFileImport}
-              disabled={submitting || tournament.roster_status === "locked"}
+              disabled={submitting || isLocked}
             />
-            <div className="bf-roulette-import-actions-v3">
-              <button
-                type="button"
-                className="bf-button bf-button-ghost"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={submitting || tournament.roster_status === "locked"}
-              >
-                Importar .txt/.csv
-              </button>
-            </div>
-            {fileMessage ? <p className="bf-roulette-file-message">{fileMessage}</p> : null}
-            <textarea
-              value={bulkValue}
-              onChange={(e) => setBulkValue(e.target.value)}
-              placeholder={"manteca\ndemian\ncarlos\nlalo\nclara\n\nO: manteca, demian, carlos, lalo, clara"}
-              rows={4}
-              disabled={submitting || tournament.roster_status === "locked"}
-            />
-            <div className="bf-hub-form-actions">
-              <button
-                type="submit"
-                className="bf-button bf-button-primary"
-                disabled={submitting || tournament.roster_status === "locked" || bulkValue.trim().length === 0}
-              >
-                Preview
-              </button>
-            </div>
-          </form>
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              disabled={submitting || isLocked}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Importar TXT / CSV
+            </button>
+            <p>El import existente se mantiene y agrega al pool real.</p>
+          </div>
 
-          {participantPreview.length > 0 ? (
-            <div className="bf-roulette-tags-v3">
-              <div className="bf-roulette-tag-header-v3">
-                <span>{participantPreview.length} listos</span>
+          {fileMessage ? <p className="bf-roulette-inline-note">{fileMessage}</p> : null}
+
+          {uploadPreview ? (
+            <div className="bf-roulette-upload-preview">
+              <div className="bf-roulette-upload-preview-head">
+                <span>{uploadPreview.label}</span>
                 <button
                   type="button"
                   className="bf-button bf-button-primary bf-button-small"
-                  disabled={submitting}
-                  onClick={() => void persistParticipantPreview()}
+                  disabled={submitting || isLocked}
+                  onClick={() => void persistUploadPreview()}
                 >
                   Guardar
                 </button>
               </div>
-              <div className="bf-roulette-tag-list-v3">
-                {participantPreview.map((n) => (
-                  <span key={n} className="bf-roulette-tag-v3">{n}</span>
-                ))}
-              </div>
-            </div>
-          ) : players.length > 0 ? (
-            <div className="bf-roulette-tags-v3">
-              <div className="bf-roulette-tag-header-v3">
-                {missingPlayers > 0 ? (
-                  <span>Faltan {missingPlayers} para {estimatedTeams + 1} equipos</span>
-                ) : estimatedBench > 0 ? (
-                  <span>{estimatedTeams} equipos · {estimatedBench} banca</span>
-                ) : (
-                  <span>{estimatedTeams} equipos · sin banca</span>
-                )}
-                <button
-                  type="button"
-                  className="bf-roulette-clear-btn"
-                  onClick={() => void onClearParticipants()}
-                  disabled={submitting || tournament.roster_status === "locked"}
-                  title="Limpiar participantes"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="bf-roulette-tag-list-v3">
-                {players.map((p) => (
-                  <span key={p.id} className="bf-roulette-tag-v3">
-                    {p.nickname}
-                    {tournament.roster_status !== "locked" ? (
-                      <button
-                        type="button"
-                        onClick={() => void onRemoveParticipant(p.id)}
-                        disabled={submitting}
-                        aria-label={`Eliminar ${p.nickname}`}
-                      >
-                        ×
-                      </button>
-                    ) : null}
+              <div className="bf-roulette-chip-list is-preview">
+                {uploadPreview.names.map((name) => (
+                  <span key={name} className="bf-roulette-chip">
+                    {name}
                   </span>
                 ))}
               </div>
             </div>
-          ) : (
-            <p className="bf-empty">Todavia no hay participantes.</p>
-          )}
-        </aside>
+          ) : null}
 
-        {/* CENTER: Casino Wheel */}
-        <div className={`bf-roulette-col bf-roulette-col-wheel${showBigWheel ? " is-hero" : ""}`}>
-          {showBigWheel ? (
-            <div className="bf-roulette-casino">
-              {/* Portal rings (Doctor Strange effect) */}
-              <div className={`bf-roulette-portal${spinning ? " is-active" : ""}`} aria-hidden="true">
-                <div className="bf-roulette-portal-ring ring-1" />
-                <div className="bf-roulette-portal-ring ring-2" />
-                <div className="bf-roulette-portal-ring ring-3" />
-                <div className="bf-roulette-portal-ring ring-4" />
-              </div>
-
-              {/* The wheel */}
-              <div className={`bf-roulette-casino-wheel${spinning ? " is-spinning" : ""}`}>
-                <div className="bf-roulette-casino-segments">
-                  {wheelPlayers.map((player, index) => {
-                    const color = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
-                    const angle = 360 / Math.max(wheelPlayers.length, 1);
-                    const rotation = index * angle;
-                    return (
-                      <div
-                        key={player.id === -1 ? `extra-${index}` : player.id}
-                        className="bf-roulette-segment"
-                        style={{
-                          transform: `rotate(${rotation}deg)`,
-                          background: color.bg,
-                          color: color.text,
-                        }}
-                      >
-                        <span>{player.nickname.slice(0, 14)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="bf-roulette-casino-center">
-                  <strong>{spinning ? "" : preview ? "✓" : "?"}</strong>
-                  <span>{players.length}</span>
-                </div>
-                <div className="bf-roulette-casino-pointer" aria-hidden="true" />
-              </div>
-
-              {/* Actions */}
-              <div className="bf-roulette-casino-actions">
-                {!preview ? (
-                  <button
-                    type="button"
-                    className="bf-button bf-button-primary bf-button-casino"
-                    onClick={spinRoulette}
-                    disabled={!rosterOpen || submitting || spinning || players.length < minimumPlayers}
-                  >
-                    {hasConfirmedTeams && canRegenerate ? "REGENERAR" : "GIRAR RULETA"}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="bf-button bf-button-ghost"
-                      onClick={spinRoulette}
-                      disabled={!rosterOpen || submitting || spinning}
-                    >
-                      Regenerar
-                    </button>
-                    <button
-                      type="button"
-                      className="bf-button bf-button-primary"
-                      onClick={() => void confirmRoulette()}
-                      disabled={submitting}
-                    >
-                      Confirmar
-                    </button>
-                  </>
-                )}
-                {rosterOpen && hasConfirmedTeams ? (
-                  <button
-                    type="button"
-                    className="bf-button bf-button-ghost"
-                    disabled={submitting}
-                    onClick={() => void onLockRosterRespin()}
-                  >
-                    Locked
-                  </button>
-                ) : null}
-              </div>
-
-              <p className="bf-roulette-casino-note">
-                {rosterOpen
-                  ? `Respin abierto · ${players.length} jugadores · ${modeBadge}`
-                  : "Abre respin para generar equipos."}
-              </p>
-            </div>
-          ) : (
-            <div className="bf-roulette-casino-idle">
-              <div className="bf-roulette-idle-wheel" aria-hidden="true">
-                <span>?</span>
-              </div>
-              <strong>
-                {players.length === 0
-                  ? "Carga participantes para activar la ruleta"
-                  : players.length < minimumPlayers
-                    ? `Faltan ${minimumPlayers - players.length} para ${teamSize}v${teamSize}`
-                    : rosterOpen
-                      ? "Lista para girar"
-                      : hasConfirmedTeams
-                        ? `${teams.length} equipos confirmados`
-                        : "Abre respin para girar"}
-              </strong>
-              <span>{modeBadge}</span>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT: Teams / Seed */}
-        <aside className="bf-roulette-col bf-roulette-col-teams">
-          <div className="bf-roulette-col-title">
-            <span>{isKillRace ? "Seed de bracket" : "Equipos generados"}</span>
-            <strong>{resultTeams.length > 0 ? `${resultTeams.length} equipos` : "Pendiente"}</strong>
+          <textarea
+            className="bf-roulette-paste"
+            rows={4}
+            value={bulkValue}
+            disabled={submitting || isLocked}
+            onChange={(event) => setBulkValue(event.target.value)}
+            placeholder={"Pega nombres aquí\nuno por línea, coma o punto y coma"}
+          />
+          <div className="bf-roulette-paste-actions">
+            <button
+              type="button"
+              className="bf-button bf-button-primary"
+              disabled={submitting || isLocked || bulkValue.trim().length === 0}
+              onClick={() => void addFromTextarea()}
+            >
+              Agregar
+            </button>
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              disabled={submitting || isLocked || players.length === 0}
+              onClick={() => void onClearParticipants()}
+            >
+              Limpiar
+            </button>
           </div>
 
-          {isKillRace && bracketPairs.length > 0 ? (
-            <div className="bf-roulette-seed-rows-v3">
+          {invalidMessage ? (
+            <div className="bf-roulette-pool-warning">
+              {invalidMessage}
+              {players.length < minimumPlayers ? ` para completar ${minimumPlayers}.` : "."}
+            </div>
+          ) : null}
+
+          <div className="bf-roulette-chip-header">
+            <span>{sortedPlayers.length} participantes</span>
+            <span>{poolValid ? "Pool listo" : `Team size ${teamSize}`}</span>
+          </div>
+          <div className="bf-roulette-chip-list">
+            {sortedPlayers.map((player) => (
+              <span key={player.id} className="bf-roulette-chip">
+                {player.nickname}
+                {!isLocked ? (
+                  <button
+                    type="button"
+                    aria-label={`Quitar ${player.nickname}`}
+                    disabled={submitting}
+                    onClick={() => void onRemoveParticipant(player.id)}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </span>
+            ))}
+          </div>
+        </aside>
+
+        <section className="bf-roulette-panel bf-roulette-panel-wheel">
+          <div className="bf-roulette-panel-title">
+            <span>Ruleta</span>
+            <strong>
+              {teamSize}v{teamSize} · respins {respinCount}
+            </strong>
+          </div>
+
+          <div className="bf-roulette-wheel-stage">
+            <Wheel
+              disabled={!canSpin}
+              participantCount={players.length}
+              phase={phase}
+              rotation={rotation}
+              reducedMotion={reducedMotion}
+              onSpin={() => void handleSpin()}
+            />
+            <RevealRunes active={phase === "revealing"} reducedMotion={reducedMotion} />
+          </div>
+
+          <p className={`bf-roulette-wheel-copy${phase === "revealing" ? " is-highlight" : ""}`}>
+            {phase === "spinning"
+              ? "Armando equipos..."
+              : phase === "revealing"
+                ? "Equipos formados."
+                : isLocked
+                  ? "Equipos bloqueados."
+                  : timerState === "closed"
+                    ? "Respin cerrado."
+                    : !poolValid
+                      ? "Ajusta el pool para girar."
+                      : timerState !== "running"
+                        ? "Inicia respin para habilitar el giro."
+                        : teams.length > 0
+                          ? "Cada giro re-arma todos los equipos."
+                          : "Presiona el centro para armar equipos."}
+          </p>
+        </section>
+
+        <aside className="bf-roulette-panel bf-roulette-panel-seed">
+          <div className="bf-roulette-panel-title">
+            <span>Seed del bracket</span>
+            <strong>{teams.length > 0 ? `${teams.length} equipos` : "Pendiente"}</strong>
+          </div>
+
+          {bracketPairs.length === 0 ? (
+            <div className="bf-empty">Gira la ruleta y los emparejamientos aparecen aquí.</div>
+          ) : (
+            <div key={respinCount} className="bf-roulette-seed-list">
               {bracketPairs.map(([left, right], index) => (
-                <div key={index} className="bf-roulette-seed-row-v3">
-                  <span className="bf-roulette-seed-num-v3">M{index + 1}</span>
-                  <div className="bf-roulette-seed-team-v3">
+                <article
+                  key={`${left.id}-${right?.id ?? "bye"}`}
+                  className="bf-roulette-seed-card"
+                  style={{ animationDelay: `${index * 60}ms` }}
+                >
+                  <span className="bf-roulette-seed-match">M{index + 1}</span>
+                  <div className="bf-roulette-seed-team">
                     <strong>{getTeamShortDisplayName(left, teamSize <= 2 ? 2 : 3)}</strong>
                     <small>{getTeamSeedLabel(left, index * 2 + 1)}</small>
                   </div>
-                  <em className="bf-roulette-seed-vs-v3">VS</em>
-                  <div className="bf-roulette-seed-team-v3">
-                    <strong>{right ? getTeamShortDisplayName(right, teamSize <= 2 ? 2 : 3) : "BYE"}</strong>
+                  <em>VS</em>
+                  <div className="bf-roulette-seed-team">
+                    <strong>
+                      {right ? getTeamShortDisplayName(right, teamSize <= 2 ? 2 : 3) : "BYE"}
+                    </strong>
                     {right ? <small>{getTeamSeedLabel(right, index * 2 + 2)}</small> : null}
                   </div>
-                </div>
+                </article>
               ))}
             </div>
-          ) : (
-            renderTeamGrid()
           )}
 
-          {resultBench.length > 0 && (
-            <div className="bf-roulette-bench-bar-v3">
-              <strong>Banca</strong>
-              <span>{resultBench.join(" · ")}</span>
-            </div>
-          )}
-
-          <div className="bf-hub-form-actions bf-roulette-bottom-actions-v3">
-            {isKillRace ? (
-              <>
-                <Link href={`/operator?tournamentId=${tournament.id}&tab=bracket`} className="bf-button bf-button-primary">
-                  Preparar bracket
-                </Link>
-                <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                  Ver bracket
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href={`/operator?tournamentId=${tournament.id}`} className="bf-button bf-button-primary">
-                  Ir a Operator
-                </Link>
-                <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                  Ver Standings
-                </Link>
-              </>
-            )}
+          <div className="bf-roulette-footer-actions">
+            <Link
+              href={`/standings?tournamentId=${tournament.id}`}
+              className={`bf-button bf-button-ghost${isLocked ? "" : " is-disabled-link"}`}
+              aria-disabled={!isLocked}
+              tabIndex={isLocked ? 0 : -1}
+              onClick={(event) => {
+                if (!isLocked) event.preventDefault();
+              }}
+            >
+              Ver bracket
+            </Link>
+            <Link
+              href={`/operator?tournamentId=${tournament.id}&tab=bracket`}
+              className={`bf-button bf-button-primary${isLocked ? "" : " is-disabled-link"}`}
+              aria-disabled={!isLocked}
+              tabIndex={isLocked ? 0 : -1}
+              onClick={(event) => {
+                if (!isLocked) event.preventDefault();
+              }}
+            >
+              Preparar bracket
+            </Link>
           </div>
         </aside>
       </div>

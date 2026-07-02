@@ -199,6 +199,10 @@ function readConfig(tournament: Tournament): TournamentConfig {
   const matchPointThreshold = config.matchPointThreshold;
   const rouletteTeamSize = config.rouletteTeamSize;
   const rouletteBench = config.rouletteBench;
+  const rouletteRespinCount = config.rouletteRespinCount;
+  const rouletteLastSpinAt = config.rouletteLastSpinAt;
+  const rouletteRosterTimerState = config.rouletteRosterTimerState;
+  const rouletteRosterDurationSeconds = config.rouletteRosterDurationSeconds;
   const rawEngineKey =
     config.engine_key === "wsow_classic" ? "wsow_br" : config.engine_key;
   return {
@@ -260,6 +264,23 @@ function readConfig(tournament: Tournament): TournamentConfig {
     rouletteStatus:
       config.rouletteStatus === "generated" || config.rouletteStatus === "confirmed"
         ? config.rouletteStatus
+        : undefined,
+    rouletteRespinCount:
+      typeof rouletteRespinCount === "number" && Number.isFinite(rouletteRespinCount)
+        ? rouletteRespinCount
+        : undefined,
+    rouletteLastSpinAt:
+      typeof rouletteLastSpinAt === "string" ? rouletteLastSpinAt : undefined,
+    rouletteRosterTimerState:
+      rouletteRosterTimerState === "idle" ||
+      rouletteRosterTimerState === "running" ||
+      rouletteRosterTimerState === "closed"
+        ? rouletteRosterTimerState
+        : undefined,
+    rouletteRosterDurationSeconds:
+      typeof rouletteRosterDurationSeconds === "number" &&
+      Number.isFinite(rouletteRosterDurationSeconds)
+        ? rouletteRosterDurationSeconds
         : undefined,
   };
 }
