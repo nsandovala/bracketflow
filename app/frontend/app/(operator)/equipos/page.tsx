@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 import RouletteArena from "../../components/RouletteArena";
+import ContextBar from "../../components/ContextBar";
 import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
 
 function parseTournamentId(value: string | null) {
@@ -44,6 +45,13 @@ function EquiposPageClient() {
   return (
     <main className="bf-page">
       {message ? <p className="bf-message">{message}</p> : null}
+      <ContextBar
+        engineKey={selectedEngine?.engineKey}
+        tournamentName={selectedTournament?.name}
+        tournamentId={selectedTournament?.id}
+        teams={teams}
+        tournamentStatus={selectedTournament?.status}
+      />
       {selectedEngine.rosterPolicy === "roulette" ? (
         <>
           {/* No duplicar el H1 en titulos internos. */}

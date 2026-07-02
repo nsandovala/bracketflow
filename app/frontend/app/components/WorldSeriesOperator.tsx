@@ -10,6 +10,7 @@ import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tourn
 import { getTournamentPhase, isTournamentCompleted, findChampion } from "../../lib/tournamentStatus";
 import { KillRaceMapDraft, ResultDraft } from "../lib/useWorldSeriesPractice";
 import BracketView from "./BracketView";
+import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
 
 type WorldSeriesOperatorProps = {
@@ -293,40 +294,14 @@ export default function WorldSeriesOperator({
         </section>
       ) : isKillRace ? (
         <>
-          {/* ---- Context bar sticky ---- */}
-          <div className="opr-context-bar">
-            <div className="opr-context-main">
-              <button
-                type="button"
-                className="opr-context-back"
-                onClick={() => {
-                  if (mode === "bracket" || mode === "op") {
-                    // Si ya estamos en bracket, ir a standings
-                    window.location.href = `/standings?tournamentId=${selectedTournament?.id ?? ""}`;
-                  } else {
-                    setMode("bracket");
-                  }
-                }}
-              >
-                ← Volver al bracket
-              </button>
-              <div className="opr-context-info">
-                <strong>{selectedTournament?.name ?? "Torneo"}</strong>
-                <span className="opr-context-sep">·</span>
-                <span className="opr-context-phase">
-                  {getTournamentPhase(matches, selectedTournament?.status)}
-                </span>
-                {isTournamentCompleted(matches) ? (
-                  <>
-                    <span className="opr-context-sep">·</span>
-                    <span className="opr-context-champion">
-                      Campeón: {findChampion(matches, teams)?.team.name ?? "—"}
-                    </span>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </div>
+          <ContextBar
+            engineKey={selectedEngine?.engineKey}
+            tournamentName={selectedTournament?.name}
+            tournamentId={selectedTournament?.id}
+            matches={matches}
+            teams={teams}
+            tournamentStatus={selectedTournament?.status}
+          />
 
         <section className="opr-panel">
           <div className="opr-eyebrow">Kill Race · {selectedEngine?.teamSize ?? 2}v{selectedEngine?.teamSize ?? 2}</div>
@@ -613,6 +588,15 @@ export default function WorldSeriesOperator({
         </>
       ) : (
         <>
+          <ContextBar
+            engineKey={selectedEngine?.engineKey}
+            tournamentName={selectedTournament?.name}
+            tournamentId={selectedTournament?.id}
+            matches={matches}
+            teams={teams}
+            tournamentStatus={selectedTournament?.status}
+          />
+
           {/* ---- Command bar ---- */}
           {requiresRoulette ? (
             <section className="opr-panel">

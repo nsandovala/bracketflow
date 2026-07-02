@@ -1,5 +1,6 @@
 import StandingsTable from "./StandingsTable";
 import BracketView from "./BracketView";
+import ContextBar from "./ContextBar";
 
 import { Match, Team, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
@@ -41,7 +42,16 @@ export default function WorldSeriesStandings({
 
   return (
     <main className="bf-shell-standings">
-        <section className="bf-standings-toolbar">
+      <ContextBar
+        engineKey={selectedEngine?.engineKey}
+        tournamentName={selectedTournament?.name}
+        tournamentId={selectedTournament?.id}
+        matches={matches}
+        teams={teams}
+        tournamentStatus={selectedTournament?.status}
+      />
+
+      <section className="bf-standings-toolbar">
         <div>
           <span className="bf-standings-kicker">
             {isBracket ? "Bracket / Resultados" : "Clasificación general"}

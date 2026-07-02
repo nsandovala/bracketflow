@@ -4959,6 +4959,28 @@ a:focus-visible {
   letter-spacing: .04em;
 }
 
+.opr-context-standings {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, .03);
+  color: var(--bf-standings-accent, #61f2a3);
+  font-size: .82rem;
+  letter-spacing: .04em;
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.opr-context-standings:hover {
+  border-color: rgba(97, 242, 163, .22);
+  background: rgba(97, 242, 163, .06);
+  color: var(--amon-text);
+}
+
 .bf-dash-seed-preview {
   display: grid;
   gap: 10px;
