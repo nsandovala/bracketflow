@@ -5156,7 +5156,7 @@ a:focus-visible {
 /* ---- 3-Column Workspace ---- */
 .bf-roulette-workspace-v3 {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(320px, 380px) 1fr;
+  grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr) minmax(340px, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -5169,6 +5169,8 @@ a:focus-visible {
   border: 1px solid var(--bf-border);
   background: var(--bf-panel);
   min-height: 200px;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .bf-roulette-col-title {
@@ -5222,35 +5224,36 @@ a:focus-visible {
 .bf-roulette-tag-list-v3 {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  max-height: 320px;
+  gap: 5px;
+  max-height: 340px;
   overflow-y: auto;
   padding-right: 4px;
+  align-content: flex-start;
 }
 .bf-roulette-tag-v3 {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 28px;
-  padding: 0 9px;
-  border-radius: 7px;
+  gap: 4px;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
   border: 1px solid var(--bf-border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--bf-text-soft);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .bf-roulette-tag-v3 button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
   border: 0;
   background: rgba(255, 127, 150, 0.12);
   color: var(--bf-danger);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -5587,13 +5590,15 @@ a:focus-visible {
 }
 .bf-roulette-seed-row-v3 {
   display: grid;
-  grid-template-columns: 36px 1fr 40px 1fr;
+  grid-template-columns: 32px minmax(0, 1fr) 28px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid var(--bf-border);
   background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+  overflow: hidden;
 }
 .bf-roulette-seed-num-v3 {
   font-size: 0.7rem;
@@ -5602,13 +5607,14 @@ a:focus-visible {
   font-weight: 700;
 }
 .bf-roulette-seed-team-v3 strong {
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   color: var(--bf-text);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+  min-width: 0;
 }
 .bf-roulette-seed-team-v3 small {
   font-size: 0.66rem;
@@ -5699,13 +5705,214 @@ a:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .bf-roulette-seed-row-v3 {
-    grid-template-columns: 32px 1fr 36px 1fr;
-    gap: 6px;
-    padding: 8px 10px;
+    grid-template-columns: 28px minmax(0, 1fr) 24px minmax(0, 1fr);
+    gap: 4px;
+    padding: 6px 8px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .bf-roulette-casino-wheel.is-spinning { animation: none; }
   .bf-roulette-portal-ring { animation: none !important; }
+}
+
+/* ============================================================
+   S1 — Ruleta Setup Redesign (negro mate / azul marino / dorado)
+   ============================================================ */
+
+.bf-roulette-wheel-wrap {
+  position: relative;
+  width: 340px;
+  height: 340px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  flex-shrink: 0;
+}
+
+.bf-roulette-wheel-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 181, 77, 0.10) 0%, transparent 62%);
+  filter: blur(8px);
+  z-index: 0;
+}
+
+.bf-roulette-wheel-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.bf-roulette-wheel-ring-glow {
+  filter: drop-shadow(0 0 6px #E8B54D);
+}
+
+.bf-roulette-wheel-pointer-svg {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.6));
+}
+
+.bf-roulette-arcade-hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  border: 3px solid #E8B54D;
+  background: radial-gradient(circle at 38% 32%, #3a2f14, #171207 70%);
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.55), 0 0 0 4px #111620, 0 0 18px rgba(232, 181, 77, 0.27);
+  color: #F4CE7A;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  z-index: 3;
+  transition: transform 0.1s ease, box-shadow 0.25s ease;
+}
+
+.bf-roulette-arcade-hub:disabled {
+  background: radial-gradient(circle at 38% 32%, #1a1f2a, #111620);
+  border-color: #222836;
+  color: var(--bf-muted);
+  cursor: not-allowed;
+  box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.6);
+}
+
+.bf-roulette-arcade-hub:not(:disabled):active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+.bf-roulette-arcade-hub:not(:disabled):hover {
+  box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.55), 0 0 0 4px #111620, 0 0 26px rgba(232, 181, 77, 0.4);
+}
+
+.bf-roulette-arcade-hub.is-ready {
+  animation: hub-breathe 2.4s ease-in-out infinite;
+}
+
+.bf-roulette-arcade-hub .hub-count {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bf-roulette-arcade-hub .hub-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+@keyframes hub-breathe {
+  0%, 100% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.55), 0 0 0 4px #111620, 0 0 14px rgba(232, 181, 77, 0.2); }
+  50% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.55), 0 0 0 4px #111620, 0 0 26px rgba(232, 181, 77, 0.4); }
+}
+
+.bf-roulette-strange-rings {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.bf-roulette-strange-rings.is-active {
+  opacity: 1;
+  animation: ds-burst 1300ms ease-out forwards;
+}
+
+.bf-roulette-strange-ring-cw {
+  transform-origin: 100px 100px;
+  animation: ds-cw 2.4s linear infinite;
+}
+
+.bf-roulette-strange-ring-ccw {
+  transform-origin: 100px 100px;
+  animation: ds-ccw 1.8s linear infinite;
+}
+
+.bf-roulette-strange-ring-cw-slow {
+  transform-origin: 100px 100px;
+  animation: ds-cw 3.6s linear infinite;
+}
+
+@keyframes ds-cw {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ds-ccw {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes ds-burst {
+  0% { opacity: 0; transform: scale(0.55); }
+  22% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+.bf-roulette-timer-below {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0 0;
+  min-height: 34px;
+}
+
+.bf-roulette-timer-below .timer-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #00E676;
+}
+
+.bf-roulette-timer-below .timer-value.is-warning {
+  color: #E8B54D;
+}
+
+.bf-roulette-timer-below .timer-value.is-closed {
+  color: #E8B54D;
+}
+
+.bf-roulette-timer-below .timer-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--bf-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.bf-roulette-seed-row-v3.is-stagger {
+  animation: seed-in 350ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes seed-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.bf-roulette-wheel-group {
+  transition: transform 4000ms cubic-bezier(0.15, 0.85, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-roulette-arcade-hub.is-ready { animation: none; }
+  .bf-roulette-strange-rings.is-active { animation: ds-burst 400ms ease-out forwards; }
+  .bf-roulette-wheel-group { transition-duration: 320ms; }
+  .bf-roulette-seed-row-v3.is-stagger { animation-duration: 200ms; }
 }

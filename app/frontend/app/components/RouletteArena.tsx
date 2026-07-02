@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 
 import { Player, Team, Tournament } from "../../lib/api";
 import {
@@ -129,6 +129,35 @@ const SEGMENT_COLORS = [
   { bg: "#fdffb6", text: "#3a3a00" },
 ];
 
+const WHEEL_SIZE = 340;
+const WHEEL_R = WHEEL_SIZE / 2;
+const WHEEL_SEGMENTS = 16;
+const SEG_BLACK = "#0D1117";
+const SEG_NAVY = "#1A2942";
+const GOLD = "#E8B54D";
+const GOLD_SOFT = "#F4CE7A";
+
+const reduceMotion =
+  typeof window !== "undefined" &&
+  window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
+  const rad = (deg * Math.PI) / 180;
+  return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
+}
+
+function slicePath(a0: number, a1: number, r: number): string {
+  const [x0, y0] = polar(WHEEL_R, WHEEL_R, r, a0);
+  const [x1, y1] = polar(WHEEL_R, WHEEL_R, r, a1);
+  return `M ${WHEEL_R} ${WHEEL_R} L ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1} Z`;
+}
+
+function fmt(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  return `${m}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 export default function RouletteArena({
   tournament,
   engine,
@@ -148,13 +177,21 @@ export default function RouletteArena({
   const [preview, setPreview] = useState<{ teams: PreviewTeam[]; bench: Player[] } | null>(null);
   const [participantPreview, setParticipantPreview] = useState<string[]>([]);
   const [spinning, setSpinning] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [wheelRotation, setWheelRotation] = useState(0);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const spinT = useRef<number | null>(null);
+  const revealT = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      if (spinT.current) window.clearTimeout(spinT.current);
+      if (revealT.current) window.clearTimeout(revealT.current);
+    };
   }, []);
 
   const teamSize = engine.teamSize;
@@ -164,6 +201,13 @@ export default function RouletteArena({
   const isKillRace = engine.engineKey === "kill_race_bracket";
   const rosterCountdown = formatCountdown(tournament.roster_respin_deadline_at, now);
   const rosterOpen = tournament.roster_status === "respin_open" && rosterCountdown !== "00:00";
+  const timerSecondsRaw = (() => {
+    if (!tournament.roster_respin_deadline_at) return 0;
+    const diff = new Date(tournament.roster_respin_deadline_at).getTime() - now;
+    return Math.max(0, Math.floor(diff / 1000));
+  })();
+  const timerIsWarning = timerSecondsRaw <= 30;
+  const timerIsClosed = tournament.roster_status !== "respin_open" || rosterCountdown === "00:00";
   const modeBadge =
     engine.engineKey === "roulette_ws"
       ? engine.gameMode === "br"
@@ -181,17 +225,7 @@ export default function RouletteArena({
   const estimatedTeams = Math.floor(players.length / teamSize);
   const estimatedBench = players.length >= teamSize ? players.length % teamSize : players.length;
 
-  const wheelPlayers = useMemo(() => {
-    const max = 20;
-    const slice = players.slice(0, max);
-    if (players.length > max) {
-      return [...slice, { id: -1, nickname: `+${players.length - max}` } as Player];
-    }
-    return slice;
-  }, [players]);
-
   const isHeroMode = players.length >= minimumPlayers && rosterOpen;
-  const showBigWheel = isHeroMode || spinning || preview;
 
   async function persistParticipantPreview() {
     if (participantPreview.length === 0) {
@@ -242,10 +276,18 @@ export default function RouletteArena({
     const nextSeed = `${Date.now()}-${players.length}-${teamSize}`;
     setSeed(nextSeed);
     setSpinning(true);
-    window.setTimeout(() => {
+    setRevealing(false);
+    setWheelRotation((r) => r + (reduceMotion ? 360 : 5 * 360) + Math.floor(Math.random() * 360));
+    const dur = reduceMotion ? 340 : 4050;
+    spinT.current = window.setTimeout(() => {
       setPreview(buildPreview(players, teamSize, nextSeed));
       setSpinning(false);
-    }, 1200);
+      setRevealing(true);
+      revealT.current = window.setTimeout(
+        () => setRevealing(false),
+        reduceMotion ? 420 : 1350
+      );
+    }, dur);
   }
 
   async function confirmRoulette() {
@@ -466,115 +508,148 @@ export default function RouletteArena({
           )}
         </aside>
 
-        {/* CENTER: Casino Wheel */}
-        <div className={`bf-roulette-col bf-roulette-col-wheel${showBigWheel ? " is-hero" : ""}`}>
-          {showBigWheel ? (
-            <div className="bf-roulette-casino">
-              {/* Portal rings (Doctor Strange effect) */}
-              <div className={`bf-roulette-portal${spinning ? " is-active" : ""}`} aria-hidden="true">
-                <div className="bf-roulette-portal-ring ring-1" />
-                <div className="bf-roulette-portal-ring ring-2" />
-                <div className="bf-roulette-portal-ring ring-3" />
-                <div className="bf-roulette-portal-ring ring-4" />
-              </div>
+        {/* CENTER: Casino Wheel — siempre visible */}
+        <div className={`bf-roulette-col bf-roulette-col-wheel${isHeroMode ? " is-hero" : ""}`}>
+          <div className="bf-roulette-casino">
+            {/* SVG Wheel */}
+            <div className="bf-roulette-wheel-wrap">
+              {/* Pointer */}
+              <svg className="bf-roulette-wheel-pointer-svg" width="28" height="22" viewBox="0 0 28 22">
+                <polygon points="14,22 2,2 26,2" fill={GOLD} />
+              </svg>
 
-              {/* The wheel */}
-              <div className={`bf-roulette-casino-wheel${spinning ? " is-spinning" : ""}`}>
-                <div className="bf-roulette-casino-segments">
-                  {wheelPlayers.map((player, index) => {
-                    const color = SEGMENT_COLORS[index % SEGMENT_COLORS.length];
-                    const angle = 360 / Math.max(wheelPlayers.length, 1);
-                    const rotation = index * angle;
+              {/* Wheel SVG */}
+              <svg className="bf-roulette-wheel-svg" viewBox={`0 0 ${WHEEL_SIZE} ${WHEEL_SIZE}`}>
+                {/* Outer ring with glow */}
+                <circle cx={WHEEL_R} cy={WHEEL_R} r={WHEEL_R - 2} fill="none" stroke={GOLD} strokeWidth="4" className="bf-roulette-wheel-ring-glow" />
+                {/* Segments */}
+                <g
+                  className="bf-roulette-wheel-group"
+                  style={{
+                    transform: `rotate(${wheelRotation}deg)`,
+                    transformOrigin: "50% 50%",
+                  }}
+                >
+                  {Array.from({ length: WHEEL_SEGMENTS }, (_, i) => {
+                    const segAngle = 360 / WHEEL_SEGMENTS;
                     return (
-                      <div
-                        key={player.id === -1 ? `extra-${index}` : player.id}
-                        className="bf-roulette-segment"
-                        style={{
-                          transform: `rotate(${rotation}deg)`,
-                          background: color.bg,
-                          color: color.text,
-                        }}
-                      >
-                        <span>{player.nickname.slice(0, 14)}</span>
-                      </div>
+                      <path
+                        key={i}
+                        d={slicePath(i * segAngle, (i + 1) * segAngle, WHEEL_R - 5)}
+                        fill={i % 2 === 0 ? SEG_BLACK : SEG_NAVY}
+                        stroke={GOLD}
+                        strokeWidth="0.75"
+                        strokeOpacity="0.45"
+                      />
                     );
                   })}
-                </div>
-                <div className="bf-roulette-casino-center">
-                  <strong>{spinning ? "" : preview ? "✓" : "?"}</strong>
-                  <span>{players.length}</span>
-                </div>
-                <div className="bf-roulette-casino-pointer" aria-hidden="true" />
-              </div>
+                </g>
+              </svg>
 
-              {/* Actions */}
-              <div className="bf-roulette-casino-actions">
-                {!preview ? (
-                  <button
-                    type="button"
-                    className="bf-button bf-button-primary bf-button-casino"
-                    onClick={spinRoulette}
-                    disabled={!rosterOpen || submitting || spinning || players.length < minimumPlayers}
-                  >
-                    {hasConfirmedTeams && canRegenerate ? "REGENERAR" : "GIRAR RULETA"}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="bf-button bf-button-ghost"
-                      onClick={spinRoulette}
-                      disabled={!rosterOpen || submitting || spinning}
-                    >
-                      Regenerar
-                    </button>
-                    <button
-                      type="button"
-                      className="bf-button bf-button-primary"
-                      onClick={() => void confirmRoulette()}
-                      disabled={submitting}
-                    >
-                      Confirmar
-                    </button>
-                  </>
-                )}
-                {rosterOpen && hasConfirmedTeams ? (
+              {/* Arcade Hub Button */}
+              <button
+                type="button"
+                className={`bf-roulette-arcade-hub${!preview && rosterOpen && players.length >= minimumPlayers && !spinning ? " is-ready" : ""}`}
+                onClick={spinRoulette}
+                disabled={!rosterOpen || submitting || spinning || players.length < minimumPlayers}
+                aria-label={`Girar ruleta, ${players.length} jugadores`}
+                onMouseDown={(e) => {
+                  if (rosterOpen && players.length >= minimumPlayers && !spinning) {
+                    e.currentTarget.style.transform = "translate(-50%, -50%) scale(.94)";
+                  }
+                }}
+                onMouseUp={(e) => { e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)"; }}
+              >
+                <div className="hub-count">{players.length}</div>
+                <div className="hub-label">{spinning ? "GIRANDO" : "GIRAR"}</div>
+              </button>
+
+              {/* Doctor Strange Rings */}
+              <div className={`bf-roulette-strange-rings${revealing ? " is-active" : ""}`} aria-hidden="true">
+                <svg width="100%" height="100%" viewBox="0 0 200 200" style={{ overflow: "visible" }}>
+                  <defs>
+                    <radialGradient id="ds-core" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor={GOLD_SOFT} stopOpacity="0.5" />
+                      <stop offset="60%" stopColor={GOLD} stopOpacity="0.12" />
+                      <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
+                    </radialGradient>
+                  </defs>
+                  <circle cx="100" cy="100" r="70" fill="url(#ds-core)" />
+                  <g className="bf-roulette-strange-ring-cw">
+                    <circle cx="100" cy="100" r="92" fill="none" stroke={GOLD} strokeWidth="1.5" strokeDasharray="2 7" />
+                    <circle cx="100" cy="100" r="86" fill="none" stroke={GOLD} strokeWidth="3" strokeDasharray="16 10" opacity="0.9" />
+                  </g>
+                  <g className="bf-roulette-strange-ring-ccw">
+                    <circle cx="100" cy="100" r="70" fill="none" stroke={GOLD_SOFT} strokeWidth="1.5" strokeDasharray="4 6" />
+                    <circle cx="100" cy="100" r="60" fill="none" stroke={GOLD} strokeWidth="1" strokeDasharray="1 5" opacity="0.8" />
+                  </g>
+                  <g className="bf-roulette-strange-ring-cw-slow">
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const deg = i * 15;
+                      const [x1, y1] = polar(100, 100, 94, deg);
+                      const [x2, y2] = polar(100, 100, 100, deg);
+                      return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={GOLD} strokeWidth="1.5" opacity="0.9" />;
+                    })}
+                  </g>
+                </svg>
+              </div>
+            </div>
+
+            {/* Timer below wheel */}
+            {rosterOpen && rosterCountdown && (
+              <div className="bf-roulette-timer-below">
+                <span className="timer-label">Respin</span>
+                <span className={`timer-value${timerIsWarning ? " is-warning" : ""}`}>{rosterCountdown}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="bf-roulette-casino-actions">
+              {preview ? (
+                <>
                   <button
                     type="button"
                     className="bf-button bf-button-ghost"
-                    disabled={submitting}
-                    onClick={() => void onLockRosterRespin()}
+                    onClick={spinRoulette}
+                    disabled={!rosterOpen || submitting || spinning}
                   >
-                    Locked
+                    Regenerar
                   </button>
-                ) : null}
-              </div>
-
-              <p className="bf-roulette-casino-note">
-                {rosterOpen
-                  ? `Respin abierto · ${players.length} jugadores · ${modeBadge}`
-                  : "Abre respin para generar equipos."}
-              </p>
+                  <button
+                    type="button"
+                    className="bf-button bf-button-primary"
+                    onClick={() => void confirmRoulette()}
+                    disabled={submitting}
+                  >
+                    Confirmar
+                  </button>
+                </>
+              ) : null}
+              {rosterOpen && hasConfirmedTeams ? (
+                <button
+                  type="button"
+                  className="bf-button bf-button-ghost"
+                  disabled={submitting}
+                  onClick={() => void onLockRosterRespin()}
+                >
+                  Locked
+                </button>
+              ) : null}
             </div>
-          ) : (
-            <div className="bf-roulette-casino-idle">
-              <div className="bf-roulette-idle-wheel" aria-hidden="true">
-                <span>?</span>
-              </div>
-              <strong>
-                {players.length === 0
+
+            <p className="bf-roulette-casino-note">
+              {rosterOpen
+                ? `Respin abierto · ${players.length} jugadores · ${modeBadge}`
+                : players.length === 0
                   ? "Carga participantes para activar la ruleta"
                   : players.length < minimumPlayers
                     ? `Faltan ${minimumPlayers - players.length} para ${teamSize}v${teamSize}`
-                    : rosterOpen
-                      ? "Lista para girar"
-                      : hasConfirmedTeams
-                        ? `${teams.length} equipos confirmados`
-                        : "Abre respin para girar"}
-              </strong>
-              <span>{modeBadge}</span>
-            </div>
-          )}
+                    : hasConfirmedTeams
+                      ? `${teams.length} equipos confirmados`
+                      : "Abre respin para girar"}
+            </p>
+          </div>
         </div>
 
         {/* RIGHT: Teams / Seed */}
@@ -587,7 +662,11 @@ export default function RouletteArena({
           {isKillRace && bracketPairs.length > 0 ? (
             <div className="bf-roulette-seed-rows-v3">
               {bracketPairs.map(([left, right], index) => (
-                <div key={index} className="bf-roulette-seed-row-v3">
+                <div
+                  key={index}
+                  className={`bf-roulette-seed-row-v3${preview ? " is-stagger" : ""}`}
+                  style={preview ? { animationDelay: `${index * 60}ms` } : undefined}
+                >
                   <span className="bf-roulette-seed-num-v3">M{index + 1}</span>
                   <div className="bf-roulette-seed-team-v3">
                     <strong>{getTeamShortDisplayName(left, teamSize <= 2 ? 2 : 3)}</strong>
