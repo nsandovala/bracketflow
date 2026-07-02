@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { Player, Team, Tournament } from "../../lib/api";
+import {
+  ParticipantImportAccepted,
+  ParticipantImportRejected,
+  ParticipantImportResult,
+  Player,
+  Team,
+  Tournament,
+} from "../../lib/api";
 import {
   BracketTeam,
   getTeamDisplayName,
@@ -17,13 +24,21 @@ type PreviewTeam = {
   players: Player[];
 };
 
+type ParticipantPreview = {
+  source: string;
+  rows: string[];
+  accepted: ParticipantImportAccepted[];
+  rejected: ParticipantImportRejected[];
+};
+
 type RouletteArenaProps = {
   tournament: Tournament;
   engine: ResolvedTournamentEngine;
   players: Player[];
   teams: Team[];
   submitting: boolean;
-  onImportParticipants: (nicknames: string[]) => Promise<unknown>;
+  onPreviewParticipants?: (rows: string[]) => Promise<ParticipantImportResult | null>;
+  onImportParticipants: (rows: string[]) => Promise<ParticipantImportResult | null | unknown>;
   onRemoveParticipant: (playerId: number) => Promise<unknown>;
   onClearParticipants: () => Promise<unknown>;
   onConfirmRoulette: (shuffleSeed: string) => Promise<unknown>;
@@ -32,30 +47,27 @@ type RouletteArenaProps = {
   canRegenerate?: boolean;
 };
 
-function cleanParticipantName(value: string) {
-  return value
-    .trim()
-    .replace(/^\uFEFF/, "")
-    .replace(/^\s*(?:[-*•]\s+|\d+[\.)]\s*)/, "")
-    .trim();
+function splitParticipantRows(value: string) {
+  return value.split(/\n/).map((row) => row.replace(/\r$/, ""));
 }
 
-function parseParticipants(value: string): { names: string[]; rejected: string[] } {
-  const seen = new Set<string>();
-  const names: string[] = [];
-  const rejected: string[] = [];
-  const rawParts = value.split(/[\n,;\t]+/);
+function splitLegacyParticipants(value: string) {
+  return value
+    .split(/[\n,;\t]+/)
+    .map((row) => row.trim())
+    .filter((row) => row.length > 0);
+}
 
-  rawParts.forEach((raw) => {
-    const cleaned = cleanParticipantName(raw);
-    if (!cleaned) return;
-    const key = cleaned.toLocaleLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    names.push(cleaned);
-  });
+function collapseInternalWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
 
-  return { names, rejected };
+function isParticipantImportResult(value: unknown): value is ParticipantImportResult {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ParticipantImportResult>;
+  return Array.isArray(candidate.accepted) && Array.isArray(candidate.rejected);
 }
 
 function seededRandom(seed: string) {
@@ -135,6 +147,7 @@ export default function RouletteArena({
   players,
   teams,
   submitting,
+  onPreviewParticipants,
   onImportParticipants,
   onRemoveParticipant,
   onClearParticipants,
@@ -146,7 +159,7 @@ export default function RouletteArena({
   const [bulkValue, setBulkValue] = useState("");
   const [seed, setSeed] = useState(() => `${Date.now()}`);
   const [preview, setPreview] = useState<{ teams: PreviewTeam[]; bench: Player[] } | null>(null);
-  const [participantPreview, setParticipantPreview] = useState<string[]>([]);
+  const [participantPreview, setParticipantPreview] = useState<ParticipantPreview | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
   const [now, setNow] = useState(0);
@@ -194,29 +207,71 @@ export default function RouletteArena({
   const showBigWheel = isHeroMode || spinning || preview;
 
   async function persistParticipantPreview() {
-    if (participantPreview.length === 0) {
+    if (!participantPreview || participantPreview.accepted.length === 0) {
       setFileMessage("No hay participantes en preview.");
       return;
     }
-    await onImportParticipants(participantPreview);
-    setParticipantPreview([]);
+    const result = await onImportParticipants(participantPreview.rows);
+    if (!result) {
+      return;
+    }
+    setParticipantPreview(null);
     setBulkValue("");
-    setFileMessage(`${participantPreview.length} guardados.`);
+    if (isParticipantImportResult(result)) {
+      setFileMessage(`${result.persisted_count} guardados.`);
+      return;
+    }
+    setFileMessage("Participantes guardados.");
   }
 
-  function handleParsedParticipants(content: string, source: string) {
-    const { names } = parseParticipants(content);
-    if (names.length === 0) {
+  async function handleParsedParticipants(content: string, source: string) {
+    if (!onPreviewParticipants) {
+      const rows = splitLegacyParticipants(content);
+      const accepted = rows.map((row, index) => ({
+        line: index + 1,
+        raw: row,
+        display_name: collapseInternalWhitespace(row),
+        activision_id: null,
+      }));
+      if (accepted.length === 0) {
+        setFileMessage("No se detectaron participantes validos.");
+        return;
+      }
+      setParticipantPreview({
+        source,
+        rows,
+        accepted,
+        rejected: [],
+      });
+      setFileMessage(`${source}: ${accepted.length} aceptados.`);
+      return;
+    }
+
+    const rows = splitParticipantRows(content);
+    const result = await onPreviewParticipants(rows);
+    if (!result) {
+      return;
+    }
+    if (result.accepted.length === 0 && result.rejected.length === 0) {
       setFileMessage("No se detectaron participantes validos.");
       return;
     }
-    setParticipantPreview(names);
-    setFileMessage(`${source}: ${names.length} detectados.`);
+    setParticipantPreview({
+      source,
+      rows,
+      accepted: result.accepted,
+      rejected: result.rejected,
+    });
+    setFileMessage(
+      `${source}: ${result.accepted.length} aceptados${
+        result.rejected.length > 0 ? `, ${result.rejected.length} rechazados` : ""
+      }.`
+    );
   }
 
   function handleBulkPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    handleParsedParticipants(bulkValue, "Texto");
+    void handleParsedParticipants(bulkValue, "Texto");
   }
 
   function handleFileImport(event: ChangeEvent<HTMLInputElement>) {
@@ -231,7 +286,7 @@ export default function RouletteArena({
     const reader = new FileReader();
     reader.onload = () => {
       const content = typeof reader.result === "string" ? reader.result : "";
-      handleParsedParticipants(content, `Archivo ${file.name}`);
+      void handleParsedParticipants(content, `Archivo ${file.name}`);
     };
     reader.onerror = () => setFileMessage("No se pudo leer el archivo.");
     reader.readAsText(file);
@@ -305,7 +360,7 @@ export default function RouletteArena({
               ? "Equipos confirmados"
               : preview
                 ? "Preview de ruleta"
-                : participantPreview.length > 0
+                : participantPreview
                   ? "Preview de import"
                   : "Carga participantes"}
           </span>
@@ -314,8 +369,8 @@ export default function RouletteArena({
               ? `${teams.length} equipos · ${modeBadge}`
               : preview
                 ? "Revisa antes de confirmar"
-                : participantPreview.length > 0
-                  ? `${participantPreview.length} participantes detectados`
+                : participantPreview
+                  ? `${participantPreview.accepted.length} aceptados · ${participantPreview.rejected.length} rechazados`
                   : rosterOpen
                     ? "Respin abierto · gira la ruleta"
                     : "Carga participantes"}
@@ -404,24 +459,45 @@ export default function RouletteArena({
             </div>
           </form>
 
-          {participantPreview.length > 0 ? (
+          {participantPreview ? (
             <div className="bf-roulette-tags-v3">
               <div className="bf-roulette-tag-header-v3">
-                <span>{participantPreview.length} listos</span>
+                <span>
+                  {participantPreview.accepted.length} listos
+                  {participantPreview.rejected.length > 0
+                    ? ` · ${participantPreview.rejected.length} rechazados`
+                    : ""}
+                </span>
                 <button
                   type="button"
                   className="bf-button bf-button-primary bf-button-small"
-                  disabled={submitting}
+                  disabled={submitting || participantPreview.accepted.length === 0}
                   onClick={() => void persistParticipantPreview()}
                 >
                   Guardar
                 </button>
               </div>
               <div className="bf-roulette-tag-list-v3">
-                {participantPreview.map((n) => (
-                  <span key={n} className="bf-roulette-tag-v3">{n}</span>
+                {participantPreview.accepted.map((item) => (
+                  <span
+                    key={`${item.line}-${item.display_name}`}
+                    className="bf-roulette-tag-v3"
+                  >
+                    {item.activision_id
+                      ? `${item.display_name} · ${item.activision_id}`
+                      : item.display_name}
+                  </span>
                 ))}
               </div>
+              {participantPreview.rejected.length > 0 ? (
+                <div className="bf-message" role="status">
+                  {participantPreview.rejected.map((item) => (
+                    <p key={`${item.line}-${item.raw}`}>
+                      Linea {item.line}: {item.reason}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : players.length > 0 ? (
             <div className="bf-roulette-tags-v3">

@@ -508,15 +508,148 @@ def get_player(db: Session, player_id: int) -> models.Player | None:
 def create_player(
     db: Session, tournament_id: int, player: schemas.PlayerCreate
 ) -> models.Player:
-    db_player = models.Player(nickname=player.nickname, tournament_id=tournament_id)
-    db.add(db_player)
-    db.commit()
-    db.refresh(db_player)
-    return db_player
+    created = create_players_bulk(db, tournament_id, [player.nickname])
+    if not created:
+        raise ValueError("Ese participante ya existe en el torneo.")
+    return created[0]
 
 
 def normalize_nickname(value: str) -> str:
     return " ".join(value.strip().split())
+
+
+ACTIVISION_ID_PATTERN = re.compile(r"^[^,#;\t]+#\d+$")
+
+
+def normalize_participant_row(value: str) -> str:
+    return value.replace("\r", "").replace("\uFEFF", "").strip()
+
+
+def get_player_display_name(player: models.Player) -> str:
+    if player.display_name:
+        return normalize_nickname(player.display_name)
+    return normalize_nickname(player.nickname)
+
+
+def parse_participant_rows(
+    db: Session,
+    tournament_id: int,
+    rows: list[str],
+) -> dict[str, list[dict[str, str | int | None]]]:
+    existing = {
+        get_player_display_name(player).casefold()
+        for player in get_players_by_tournament(db, tournament_id)
+    }
+    seen: set[str] = set()
+    accepted: list[dict[str, str | int | None]] = []
+    rejected: list[dict[str, str | int]] = []
+
+    for line_number, raw_row in enumerate(rows, start=1):
+        normalized_row = normalize_participant_row(raw_row)
+        if not normalized_row:
+            continue
+
+        parts = [normalize_nickname(part) for part in normalized_row.split(",")]
+        if len(parts) > 2:
+            rejected.append(
+                {
+                    "line": line_number,
+                    "raw": raw_row,
+                    "reason": f"La fila tiene {len(parts)} campos; solo se admite display name o display name + Activision ID.",
+                }
+            )
+            continue
+
+        display_name = parts[0] if parts else ""
+        activision_id = parts[1] if len(parts) == 2 else None
+
+        try:
+            display_name = schemas._validate_nickname(display_name)
+        except ValueError as error:
+            rejected.append(
+                {
+                    "line": line_number,
+                    "raw": raw_row,
+                    "reason": str(error),
+                }
+            )
+            continue
+
+        if activision_id is not None:
+            if not activision_id or not ACTIVISION_ID_PATTERN.match(activision_id):
+                rejected.append(
+                    {
+                        "line": line_number,
+                        "raw": raw_row,
+                        "reason": "Activision ID invalido. Usa formato nombre#digitos.",
+                    }
+                )
+                continue
+
+        key = display_name.casefold()
+        if key in existing or key in seen:
+            continue
+
+        seen.add(key)
+        accepted.append(
+            {
+                "line": line_number,
+                "raw": raw_row,
+                "display_name": display_name,
+                "activision_id": activision_id,
+            }
+        )
+
+    return {"accepted": accepted, "rejected": rejected}
+
+
+def preview_participant_rows(
+    db: Session,
+    tournament_id: int,
+    rows: list[str],
+) -> dict[str, list[dict[str, str | int | None]] | int]:
+    result = parse_participant_rows(db, tournament_id, rows)
+    return {
+        "accepted": result["accepted"],
+        "rejected": result["rejected"],
+        "persisted_count": 0,
+    }
+
+
+def import_participant_rows(
+    db: Session,
+    tournament_id: int,
+    rows: list[str],
+) -> dict[str, list[dict[str, str | int | None]] | int | list[models.Player]]:
+    result = parse_participant_rows(db, tournament_id, rows)
+    created: list[models.Player] = []
+
+    for item in result["accepted"]:
+        display_name = str(item["display_name"])
+        activision_id = (
+            str(item["activision_id"])
+            if item["activision_id"] is not None
+            else None
+        )
+        db_player = models.Player(
+            nickname=display_name,
+            display_name=display_name,
+            activision_id=activision_id,
+            tournament_id=tournament_id,
+        )
+        db.add(db_player)
+        created.append(db_player)
+
+    db.commit()
+    for player in created:
+        db.refresh(player)
+
+    return {
+        "accepted": result["accepted"],
+        "rejected": result["rejected"],
+        "persisted_count": len(created),
+        "players_created": created,
+    }
 
 
 def create_players_bulk(
@@ -524,27 +657,11 @@ def create_players_bulk(
     tournament_id: int,
     nicknames: list[str],
 ) -> list[models.Player]:
-    existing = {
-        normalize_nickname(player.nickname).casefold()
-        for player in get_players_by_tournament(db, tournament_id)
-    }
-    seen: set[str] = set()
-    created: list[models.Player] = []
-    for raw_nickname in nicknames:
-        nickname = normalize_nickname(raw_nickname)
-        if not nickname:
-            continue
-        key = nickname.casefold()
-        if key in existing or key in seen:
-            continue
-        db_player = models.Player(nickname=nickname, tournament_id=tournament_id)
-        db.add(db_player)
-        created.append(db_player)
-        seen.add(key)
-    db.commit()
-    for player in created:
-        db.refresh(player)
-    return created
+    preview = parse_participant_rows(db, tournament_id, nicknames)
+    if preview["rejected"]:
+        raise ValueError(str(preview["rejected"][0]["reason"]))
+    result = import_participant_rows(db, tournament_id, nicknames)
+    return result["players_created"]
 
 
 def update_player(
@@ -563,9 +680,10 @@ def update_player(
         )
         .all()
     )
-    if any(normalize_nickname(candidate.nickname).casefold() == nickname.casefold() for candidate in duplicate):
+    if any(get_player_display_name(candidate).casefold() == nickname.casefold() for candidate in duplicate):
         raise ValueError("Ese participante ya existe en el torneo.")
     player.nickname = nickname
+    player.display_name = nickname
     db.commit()
     db.refresh(player)
     return player

@@ -184,6 +184,28 @@ def bulk_import_players(
     return crud.create_players_bulk(db, tournament_id, payload.nicknames)
 
 
+@app.post(
+    "/tournaments/{tournament_id}/players/import",
+    response_model=schemas.ParticipantImportResult,
+)
+def import_players_preview(
+    tournament_id: int,
+    payload: schemas.ParticipantImportRequest,
+    db: Session = Depends(get_db),
+) -> schemas.ParticipantImportResult:
+    get_tournament_or_404(db, tournament_id)
+    result = (
+        crud.import_participant_rows(db, tournament_id, payload.rows)
+        if payload.confirm
+        else crud.preview_participant_rows(db, tournament_id, payload.rows)
+    )
+    return schemas.ParticipantImportResult(
+        accepted=result["accepted"],
+        rejected=result["rejected"],
+        persisted_count=int(result.get("persisted_count", 0)),
+    )
+
+
 @app.get("/tournaments/{tournament_id}/players", response_model=list[schemas.Player])
 def list_players(
     tournament_id: int,

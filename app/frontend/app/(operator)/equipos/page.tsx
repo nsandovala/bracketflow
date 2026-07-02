@@ -25,6 +25,7 @@ function EquiposPageClient() {
     selectedEngine,
     players,
     teams,
+    previewParticipantImport,
     importParticipants,
     removeParticipant,
     clearParticipants,
@@ -53,6 +54,7 @@ function EquiposPageClient() {
             players={players}
             teams={teams}
             submitting={submitting}
+            onPreviewParticipants={previewParticipantImport}
             onImportParticipants={importParticipants}
             onRemoveParticipant={removeParticipant}
             onClearParticipants={clearParticipants}

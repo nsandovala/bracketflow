@@ -98,19 +98,9 @@ def _validate_nickname(value: str) -> str:
 class PlayerCreate(BaseModel):
     nickname: str
 
-    @field_validator("nickname")
-    @classmethod
-    def check_nickname(cls, v: str) -> str:
-        return _validate_nickname(v)
-
 
 class PlayerBulkImport(BaseModel):
     nicknames: list[str]
-
-    @field_validator("nicknames")
-    @classmethod
-    def check_nicknames(cls, v: list[str]) -> list[str]:
-        return [_validate_nickname(n) for n in v]
 
 
 class PlayerUpdate(BaseModel):
@@ -125,9 +115,35 @@ class PlayerUpdate(BaseModel):
 class Player(BaseModel):
     id: int
     nickname: str
+    display_name: str | None = None
+    activision_id: str | None = None
     tournament_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ParticipantImportRequest(BaseModel):
+    rows: list[str]
+    confirm: bool = False
+
+
+class ParticipantImportAccepted(BaseModel):
+    line: int
+    raw: str
+    display_name: str
+    activision_id: str | None = None
+
+
+class ParticipantImportRejected(BaseModel):
+    line: int
+    raw: str
+    reason: str
+
+
+class ParticipantImportResult(BaseModel):
+    accepted: list[ParticipantImportAccepted]
+    rejected: list[ParticipantImportRejected]
+    persisted_count: int = 0
 
 
 class TeamMember(BaseModel):
