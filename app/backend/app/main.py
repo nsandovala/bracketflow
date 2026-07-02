@@ -312,7 +312,19 @@ def open_roster_respin(
 ) -> schemas.Tournament:
     tournament = get_tournament_or_404(db, tournament_id)
     try:
-        return crud.open_roster_respin(db, tournament, payload.duration_minutes)
+        return crud.open_roster_respin(db, tournament, payload.resolve_duration_seconds())
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/tournaments/{tournament_id}/roster-respin/close", response_model=schemas.Tournament)
+def close_roster_respin(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.close_roster_respin(db, tournament)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

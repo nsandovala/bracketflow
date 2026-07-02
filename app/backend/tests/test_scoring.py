@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 from app import schemas
 from app.crud import (
     calculate_points,
+    close_roster_respin,
     create_battle_royale_match,
     create_players_bulk,
     create_tournament,
@@ -276,7 +277,7 @@ def add_players(db_session, tournament_id: int, count: int):
 def test_roulette_ws_br_generates_teams_of_four(db_session):
     tournament = create_engine_tournament(db_session, "roulette_ws", 4, "br")
     add_players(db_session, tournament.id, 8)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
 
     teams, bench, updated = generate_roulette_teams(
         db_session,
@@ -294,7 +295,7 @@ def test_roulette_ws_br_generates_teams_of_four(db_session):
 def test_roulette_ws_rebirth_generates_teams_of_three_with_bench(db_session):
     tournament = create_engine_tournament(db_session, "roulette_ws", 3, "rebirth")
     add_players(db_session, tournament.id, 10)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
 
     teams, bench, updated = generate_roulette_teams(
         db_session,
@@ -312,7 +313,7 @@ def test_roulette_ws_rebirth_generates_teams_of_three_with_bench(db_session):
 def test_kill_race_2v2_generates_teams_of_two(db_session):
     tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
     add_players(db_session, tournament.id, 8)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
 
     teams, bench, updated = generate_roulette_teams(
         db_session,
@@ -329,7 +330,7 @@ def test_kill_race_2v2_generates_teams_of_two(db_session):
 def test_roulette_requires_minimum_two_teams(db_session):
     tournament = create_engine_tournament(db_session, "roulette_ws", 4, "br")
     add_players(db_session, tournament.id, 7)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
 
     with pytest.raises(ValueError, match="tienes 7, necesitas mínimo 8"):
         generate_roulette_teams(
@@ -342,7 +343,7 @@ def test_roulette_requires_minimum_two_teams(db_session):
 def test_roulette_does_not_regenerate_after_results(db_session):
     tournament = create_engine_tournament(db_session, "roulette_ws", 4, "br")
     add_players(db_session, tournament.id, 8)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
     teams, _, _ = generate_roulette_teams(
         db_session,
         tournament,
@@ -364,27 +365,31 @@ def test_roulette_does_not_regenerate_after_results(db_session):
         )
 
 
-def test_roulette_requires_open_roster_window(db_session):
+def test_roulette_allows_idle_roster_window(db_session):
     tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
     add_players(db_session, tournament.id, 8)
 
-    with pytest.raises(ValueError, match="Abre la ventana de respin de roster"):
-        generate_roulette_teams(
-            db_session,
-            tournament,
-            schemas.RouletteGenerationRequest(shuffle_seed="blocked", reset=True),
-        )
+    teams, bench, updated_tournament = generate_roulette_teams(
+        db_session,
+        tournament,
+        schemas.RouletteGenerationRequest(shuffle_seed="idle-ok", reset=True),
+    )
+
+    assert len(teams) == 4
+    assert bench == []
+    assert updated_tournament.status == "teams_generated"
 
 
 def test_roulette_rejects_regeneration_after_roster_lock(db_session):
     tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
     add_players(db_session, tournament.id, 8)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
     generate_roulette_teams(
         db_session,
         tournament,
         schemas.RouletteGenerationRequest(shuffle_seed="initial", reset=True),
     )
+    tournament = close_roster_respin(db_session, tournament)
     tournament = lock_roster(db_session, tournament)
 
     with pytest.raises(ValueError, match="roster ya esta locked"):
@@ -398,12 +403,13 @@ def test_roulette_rejects_regeneration_after_roster_lock(db_session):
 def test_bracket_remains_locked_after_lock_endpoint(db_session):
     tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
     add_players(db_session, tournament.id, 8)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
     generate_roulette_teams(
         db_session,
         tournament,
         schemas.RouletteGenerationRequest(shuffle_seed="initial", reset=True),
     )
+    tournament = close_roster_respin(db_session, tournament)
     tournament = lock_roster(db_session, tournament)
     tournament = open_bracket_respin(db_session, tournament, 3)
     matches, _ = generate_bracket(db_session, tournament)
@@ -416,12 +422,13 @@ def test_bracket_remains_locked_after_lock_endpoint(db_session):
 def test_first_saved_map_moves_locked_bracket_to_running(db_session):
     tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
     add_players(db_session, tournament.id, 8)
-    tournament = open_roster_respin(db_session, tournament, 3)
+    tournament = open_roster_respin(db_session, tournament, 180)
     generate_roulette_teams(
         db_session,
         tournament,
         schemas.RouletteGenerationRequest(shuffle_seed="initial", reset=True),
     )
+    tournament = close_roster_respin(db_session, tournament)
     tournament = lock_roster(db_session, tournament)
     tournament = open_bracket_respin(db_session, tournament, 3)
     generate_bracket(db_session, tournament)
