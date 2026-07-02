@@ -1,0 +1,13 @@
+Blackout Crew,NightLord,SmokeZed,VenomTap,ArcticFox
+Meta Breakers,PatchLord,NerfThis,LoadoutKing,SlideCancel
+Gulag Legends,GulagTony,LastChance,RespawnGod,OneMoreTap
+Tactical Monkeys,BananaRush,MonkeyADS,PrimateAim,ChangoX
+Pixel Demons,PixelWraith,DemonByte,GlitchLord,CyberRage
+Iron Ravens,RavenX,SteelScope,DarkFeather,RedTalon
+Storm Division,StormAK,ThunderVic,CloudNine,FurySense
+Ghost Protocol,GhostNico,SilentAim,PhantomZ,NoPing
+Neon Hunters,NeonWolf,HunterCL,LaserDuck,FluxShot
+Royal Operators,KingSmoke,QueenRush,PrinceAim,DukeMeta
+Chaos Unit,ChaosRex,RiotGun,MayhemX,CrashLord
+Blue Zone,ZoneMaster,BluePulse,SafeRotate,GasMaskPro
+Omega Squad,OmegaOne,OmegaTwo,OmegaThree,OmegaFour
