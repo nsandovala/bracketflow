@@ -48,6 +48,20 @@ def ensure_sqlite_schema() -> None:
                     "ALTER TABLE tournaments ADD COLUMN bracket_locked_at TEXT NULL"
                 )
 
+        player_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(players)").all()
+        }
+        if player_columns:
+            if "display_name" not in player_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE players ADD COLUMN display_name TEXT NULL"
+                )
+            if "activision_id" not in player_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE players ADD COLUMN activision_id TEXT NULL"
+                )
+
         match_columns = {
             row[1]
             for row in connection.exec_driver_sql("PRAGMA table_info(matches)").all()

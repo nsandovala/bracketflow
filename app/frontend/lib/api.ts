@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8001";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -88,7 +88,28 @@ export type Tournament = {
 export type Player = {
   id: number;
   nickname: string;
+  display_name?: string | null;
+  activision_id?: string | null;
   tournament_id: number;
+};
+
+export type ParticipantImportAccepted = {
+  line: number;
+  raw: string;
+  display_name: string;
+  activision_id: string | null;
+};
+
+export type ParticipantImportRejected = {
+  line: number;
+  raw: string;
+  reason: string;
+};
+
+export type ParticipantImportResult = {
+  accepted: ParticipantImportAccepted[];
+  rejected: ParticipantImportRejected[];
+  persisted_count: number;
 };
 
 export type TeamMember = {
@@ -266,6 +287,16 @@ export function createPlayer(tournamentId: number, payload: { nickname: string }
 
 export function bulkImportPlayers(tournamentId: number, payload: { nicknames: string[] }) {
   return request<Player[]>(`/tournaments/${tournamentId}/players/bulk`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function importParticipantRows(
+  tournamentId: number,
+  payload: { rows: string[]; confirm?: boolean }
+) {
+  return request<ParticipantImportResult>(`/tournaments/${tournamentId}/players/import`, {
     method: "POST",
     body: payload,
   });

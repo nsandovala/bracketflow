@@ -10,7 +10,6 @@ import {
   Tournament,
   addTeamMember,
   archiveTournament,
-  bulkImportPlayers,
   clearPlayers,
   createBattleRoyaleMatch,
   createPlayer,
@@ -28,6 +27,7 @@ import {
   getTournamentResults,
   getTournaments,
   getTeams,
+  importParticipantRows,
   lockBracketRespin,
   lockRosterRespin,
   openBracketRespin,
@@ -532,7 +532,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     });
   }
 
-  async function importParticipants(nicknames: string[]) {
+  async function previewParticipantImport(rows: string[]) {
     if (selectedTournamentId === null) {
       return null;
     }
@@ -541,11 +541,35 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setMessage(null);
 
     try {
-      const created = await bulkImportPlayers(selectedTournamentId, { nicknames });
+      return await importParticipantRows(selectedTournamentId, {
+        rows,
+        confirm: false,
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo validar la importación.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function importParticipants(rows: string[]) {
+    if (selectedTournamentId === null) {
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      const created = await importParticipantRows(selectedTournamentId, {
+        rows,
+        confirm: true,
+      });
       await refreshSelectedTournament(selectedTournamentId);
       setMessage(
-        created.length > 0
-          ? `Participantes cargados: ${created.length}.`
+        created.persisted_count > 0
+          ? `Participantes cargados: ${created.persisted_count}.`
           : "No se cargaron participantes nuevos."
       );
       return created;
@@ -1069,6 +1093,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     createEngineTournament,
     updateEngineTournament,
     createWorldSeriesTournament,
+    previewParticipantImport,
     importParticipants,
     removeParticipant,
     clearParticipants,

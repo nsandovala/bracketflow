@@ -184,6 +184,28 @@ def bulk_import_players(
     return crud.create_players_bulk(db, tournament_id, payload.nicknames)
 
 
+@app.post(
+    "/tournaments/{tournament_id}/players/import",
+    response_model=schemas.ParticipantImportResult,
+)
+def import_players_preview(
+    tournament_id: int,
+    payload: schemas.ParticipantImportRequest,
+    db: Session = Depends(get_db),
+) -> schemas.ParticipantImportResult:
+    get_tournament_or_404(db, tournament_id)
+    result = (
+        crud.import_participant_rows(db, tournament_id, payload.rows)
+        if payload.confirm
+        else crud.preview_participant_rows(db, tournament_id, payload.rows)
+    )
+    return schemas.ParticipantImportResult(
+        accepted=result["accepted"],
+        rejected=result["rejected"],
+        persisted_count=int(result.get("persisted_count", 0)),
+    )
+
+
 @app.get("/tournaments/{tournament_id}/players", response_model=list[schemas.Player])
 def list_players(
     tournament_id: int,
@@ -290,7 +312,19 @@ def open_roster_respin(
 ) -> schemas.Tournament:
     tournament = get_tournament_or_404(db, tournament_id)
     try:
-        return crud.open_roster_respin(db, tournament, payload.duration_minutes)
+        return crud.open_roster_respin(db, tournament, payload.resolve_duration_seconds())
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/tournaments/{tournament_id}/roster-respin/close", response_model=schemas.Tournament)
+def close_roster_respin(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.close_roster_respin(db, tournament)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 

@@ -47,6 +47,8 @@ class Player(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     nickname: Mapped[str] = mapped_column(String, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    activision_id: Mapped[str | None] = mapped_column(String, nullable=True)
     tournament_id: Mapped[int] = mapped_column(
         ForeignKey("tournaments.id"), nullable=False, index=True
     )

@@ -1,7 +1,7 @@
 import json
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TournamentConfig(BaseModel):
@@ -25,10 +25,28 @@ class TournamentConfig(BaseModel):
     rouletteTeamSize: Literal[1, 2, 3, 4] | None = None
     rouletteBench: list[str] | None = None
     rouletteStatus: Literal["generated", "confirmed"] | None = None
+    rouletteRespinCount: int | None = Field(default=None, ge=0)
+    rouletteLastSpinAt: str | None = None
+    rouletteRosterTimerState: Literal["idle", "running", "closed"] | None = None
+    rouletteRosterDurationSeconds: int | None = Field(default=None, ge=1, le=240)
 
 
 class RespinWindowOpen(BaseModel):
-    duration_minutes: int = Field(ge=3, le=5)
+    duration_seconds: int | None = Field(default=None, ge=1, le=240)
+    duration_minutes: int | None = Field(default=None, ge=1, le=5)
+
+    @model_validator(mode="after")
+    def validate_duration(self) -> "RespinWindowOpen":
+        if self.duration_seconds is None and self.duration_minutes is None:
+            self.duration_seconds = 180
+        return self
+
+    def resolve_duration_seconds(self) -> int:
+        if self.duration_seconds is not None:
+            return self.duration_seconds
+        if self.duration_minutes is not None:
+            return self.duration_minutes * 60
+        return 180
 
 
 class TournamentBase(BaseModel):
@@ -98,19 +116,9 @@ def _validate_nickname(value: str) -> str:
 class PlayerCreate(BaseModel):
     nickname: str
 
-    @field_validator("nickname")
-    @classmethod
-    def check_nickname(cls, v: str) -> str:
-        return _validate_nickname(v)
-
 
 class PlayerBulkImport(BaseModel):
     nicknames: list[str]
-
-    @field_validator("nicknames")
-    @classmethod
-    def check_nicknames(cls, v: list[str]) -> list[str]:
-        return [_validate_nickname(n) for n in v]
 
 
 class PlayerUpdate(BaseModel):
@@ -125,9 +133,35 @@ class PlayerUpdate(BaseModel):
 class Player(BaseModel):
     id: int
     nickname: str
+    display_name: str | None = None
+    activision_id: str | None = None
     tournament_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ParticipantImportRequest(BaseModel):
+    rows: list[str]
+    confirm: bool = False
+
+
+class ParticipantImportAccepted(BaseModel):
+    line: int
+    raw: str
+    display_name: str
+    activision_id: str | None = None
+
+
+class ParticipantImportRejected(BaseModel):
+    line: int
+    raw: str
+    reason: str
+
+
+class ParticipantImportResult(BaseModel):
+    accepted: list[ParticipantImportAccepted]
+    rejected: list[ParticipantImportRejected]
+    persisted_count: int = 0
 
 
 class TeamMember(BaseModel):
