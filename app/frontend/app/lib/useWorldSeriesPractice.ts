@@ -732,9 +732,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         reset: true,
         confirm: false,
       });
-      await lockRosterRespin(selectedTournamentId);
       await refreshSelectedTournament(selectedTournamentId);
-      setMessage(`Ruleta generada: ${result.teams_created.length} equipos.`);
+      setMessage(
+        `Ruleta generada: ${result.teams_created.length} equipos. Puedes confirmar o regenerar dentro de la ventana de respin.`
+      );
       return result;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo generar la ruleta.");
@@ -913,10 +914,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     try {
       const tournament = await lockRosterRespin(selectedTournamentId);
       await refreshSelectedTournament(selectedTournamentId);
-      setMessage("Roster locked.");
+      setMessage("Equipos confirmados. Ya puedes preparar bracket.");
       return tournament;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo locked el roster.");
+      setMessage(error instanceof Error ? error.message : "No se pudo confirmar el roster.");
       return null;
     } finally {
       setSubmitting(false);
@@ -924,7 +925,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   }
 
   async function generateBracketForSelected() {
-    if (selectedTournamentId === null || !selectedEngine) {
+    if (selectedTournamentId === null || !selectedEngine || !selectedTournament) {
       return null;
     }
     if (selectedEngine.primaryView !== "bracket") {
@@ -936,13 +937,21 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setMessage(null);
 
     try {
+      try {
+        await openBracketRespin(selectedTournamentId, { duration_minutes: 3 });
+      } catch (error) {
+        const tournament = await getTournament(selectedTournamentId);
+        if (tournament.bracket_status !== "respin_open") {
+          throw error;
+        }
+      }
       const result = await generateBracket(selectedTournamentId);
       await lockBracketRespin(selectedTournamentId);
       await refreshSelectedTournament(selectedTournamentId);
       setMessage(`Bracket generado: ${result.matches_created} matches.`);
       return result;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo generar el bracket.");
+      setMessage(error instanceof Error ? error.message : "No se pudo preparar el bracket.");
       return null;
     } finally {
       setSubmitting(false);
@@ -1028,19 +1037,63 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setMessage(null);
 
     try {
-      const updatedMatch = await saveMatchMap(matchId, {
+      const mapPayload = {
         match_id: matchId,
         map_number: mapNumberResult.value,
         kills_a: killsAResult.value,
         kills_b: killsBResult.value,
-      });
+      };
+      const savedMatch = await saveMatchMap(matchId, mapPayload);
+      const winsNeeded = Math.ceil(savedMatch.best_of / 2);
+      const savedScoreClosed =
+        savedMatch.maps_won_a >= winsNeeded || savedMatch.maps_won_b >= winsNeeded;
+      const updatedMatch =
+        savedScoreClosed && savedMatch.winner_id === null && savedMatch.status !== "completed"
+          ? await saveMatchMap(matchId, mapPayload)
+          : savedMatch;
       await refreshSelectedTournament(selectedTournamentId);
+      const updatedWinsNeeded = Math.ceil(updatedMatch.best_of / 2);
+      const seriesClosed =
+        updatedMatch.winner_id !== null ||
+        updatedMatch.status === "completed" ||
+        updatedMatch.maps_won_a >= updatedWinsNeeded ||
+        updatedMatch.maps_won_b >= updatedWinsNeeded;
+      if (seriesClosed) {
+        const nextMatches = await getMatches(selectedTournamentId);
+        setKillRaceMapDrafts((current) => {
+          const next = { ...current };
+          delete next[matchId];
+          return next;
+        });
+        const nextReadyMatch = nextMatches
+          .filter(
+            (match) =>
+              match.id !== matchId &&
+              match.team_a_id !== null &&
+              match.team_b_id !== null &&
+              match.winner_id === null &&
+              match.status !== "completed"
+          )
+          .sort((left, right) => left.round - right.round || left.id - right.id)[0];
+        setMessage(
+          nextReadyMatch
+            ? "Serie cerrada: el ganador avanzó."
+            : "Serie cerrada: el ganador avanzó. No hay otra serie lista en este momento."
+        );
+        return updatedMatch;
+      }
+
       setKillRaceMapDrafts((current) => {
         const nextMap = updatedMatch.maps.length + 1;
+        if (nextMap > updatedMatch.best_of) {
+          const next = { ...current };
+          delete next[matchId];
+          return next;
+        }
         return {
           ...current,
           [matchId]: {
-            mapNumber: String(nextMap <= updatedMatch.best_of ? nextMap : updatedMatch.best_of),
+            mapNumber: String(nextMap),
             killsA: "",
             killsB: "",
           },
@@ -1109,5 +1162,6 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     createNextGame,
     saveTeamReport,
     saveKillRaceMap,
+    selectMatch: setSelectedMatchId,
   };
 }

@@ -52,6 +52,7 @@ type WorldSeriesOperatorProps = {
   onLockBracketRespin: () => Promise<unknown>;
   onUpdateDraft: (matchId: number, teamId: number, patch: Partial<ResultDraft>) => void;
   onUpdateKillRaceMapDraft: (matchId: number, patch: Partial<KillRaceMapDraft>) => void;
+  onSelectKillRaceMatch: (matchId: number | null) => void;
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onSaveKillRaceMap: (matchId: number) => void;
   onCreateNextGame: () => void;
@@ -131,6 +132,7 @@ export default function WorldSeriesOperator({
   onLockBracketRespin,
   onUpdateDraft,
   onUpdateKillRaceMapDraft,
+  onSelectKillRaceMatch,
   onSaveTeamReport,
   onSaveKillRaceMap,
   onCreateNextGame,
@@ -207,6 +209,24 @@ export default function WorldSeriesOperator({
         killsB: "",
       }
     : null;
+  const activeKillRaceSeriesClosed = activeMatch
+    ? activeMatch.winner_id !== null ||
+      activeMatch.status === "completed" ||
+      activeMatch.maps_won_a >= Math.ceil(activeMatch.best_of / 2) ||
+      activeMatch.maps_won_b >= Math.ceil(activeMatch.best_of / 2)
+    : false;
+  const nextReadyKillRaceMatch = activeMatch
+    ? matches
+        .filter(
+          (match) =>
+            match.id !== activeMatch.id &&
+            match.team_a_id !== null &&
+            match.team_b_id !== null &&
+            match.winner_id === null &&
+            match.status !== "completed"
+        )
+        .sort((left, right) => left.round - right.round || left.id - right.id)[0] ?? null
+    : null;
 
   return (
     <main className="bf-page bf-page-operator">
@@ -241,6 +261,7 @@ export default function WorldSeriesOperator({
             onConfirmRoulette={onGenerateRoulette}
             onOpenRosterRespin={onOpenRosterRespin}
             onLockRosterRespin={onLockRosterRespin}
+            onGenerateBracket={onGenerateBracket}
             canRegenerate={canRegenerateRoulette}
           />
         </>
@@ -458,46 +479,61 @@ export default function WorldSeriesOperator({
                   </div>
                 </div>
 
-                <div className="opr-inputs">
-                  <div className="opr-field">
-                    <label>Mapa</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max={activeMatch.best_of}
-                      value={killRaceDraft?.mapNumber ?? ""}
-                      onChange={(event) =>
-                        onUpdateKillRaceMapDraft(activeMatch.id, { mapNumber: event.target.value })
-                      }
-                    />
+                {activeKillRaceSeriesClosed ? (
+                  <div className="opr-teamgrid">
+                    <div className="opr-teamcard">
+                      <div className="h">
+                        <span className="n">Serie cerrada</span>
+                        <span className="opr-tag t-saved">
+                          <i />
+                          {activeMatch.maps_won_a}-{activeMatch.maps_won_b}
+                        </span>
+                      </div>
+                      <span className="r">El ganador ya avanzó al siguiente match.</span>
+                    </div>
                   </div>
-                  <div className="opr-field">
-                    <label>Kills A</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={killRaceDraft?.killsA ?? ""}
-                      onChange={(event) =>
-                        onUpdateKillRaceMapDraft(activeMatch.id, { killsA: event.target.value })
-                      }
-                    />
+                ) : (
+                  <div className="opr-inputs">
+                    <div className="opr-field">
+                      <label>Mapa</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={activeMatch.best_of}
+                        value={killRaceDraft?.mapNumber ?? ""}
+                        onChange={(event) =>
+                          onUpdateKillRaceMapDraft(activeMatch.id, { mapNumber: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="opr-field">
+                      <label>Kills A</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={killRaceDraft?.killsA ?? ""}
+                        onChange={(event) =>
+                          onUpdateKillRaceMapDraft(activeMatch.id, { killsA: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="opr-field">
+                      <label>Kills B</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={killRaceDraft?.killsB ?? ""}
+                        onChange={(event) =>
+                          onUpdateKillRaceMapDraft(activeMatch.id, { killsB: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="opr-total">
+                      <label>Estado</label>
+                      <b className="has-val">{activeMatch.maps_won_a}-{activeMatch.maps_won_b}</b>
+                    </div>
                   </div>
-                  <div className="opr-field">
-                    <label>Kills B</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={killRaceDraft?.killsB ?? ""}
-                      onChange={(event) =>
-                        onUpdateKillRaceMapDraft(activeMatch.id, { killsB: event.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="opr-total">
-                    <label>Estado</label>
-                    <b className="has-val">{activeMatch.maps_won_a}-{activeMatch.maps_won_b}</b>
-                  </div>
-                </div>
+                )}
 
                 {activeMatch.maps.length > 0 ? (
                   <div className="opr-teamgrid">
@@ -523,16 +559,41 @@ export default function WorldSeriesOperator({
                   </div>
                 ) : null}
 
-                <div className="bf-hub-form-actions">
-                  <button
-                    type="button"
-                    className="opr-save"
-                    disabled={submitting || activeMatch.status === "completed"}
-                    onClick={() => onSaveKillRaceMap(activeMatch.id)}
-                  >
-                    {activeMatch.status === "completed" ? "Serie finalizada" : "Guardar mapa"}
-                  </button>
-                </div>
+                {activeKillRaceSeriesClosed ? (
+                  <div className="bf-hub-form-actions">
+                    <button
+                      type="button"
+                      className="bf-button bf-button-ghost"
+                      onClick={() => setMode("bracket")}
+                    >
+                      Ver bracket actualizado
+                    </button>
+                    {nextReadyKillRaceMatch ? (
+                      <button
+                        type="button"
+                        className="opr-save"
+                        disabled={submitting}
+                        onClick={() => {
+                          onSelectKillRaceMatch(nextReadyKillRaceMatch.id);
+                          setMode("op");
+                        }}
+                      >
+                        Continuar con siguiente serie
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="bf-hub-form-actions">
+                    <button
+                      type="button"
+                      className="opr-save"
+                      disabled={submitting}
+                      onClick={() => onSaveKillRaceMap(activeMatch.id)}
+                    >
+                      Guardar mapa
+                    </button>
+                  </div>
+                )}
               </section>
             ) : (
               <section className="opr-panel">
@@ -580,6 +641,7 @@ export default function WorldSeriesOperator({
                 onConfirmRoulette={onGenerateRoulette}
                 onOpenRosterRespin={onOpenRosterRespin}
                 onLockRosterRespin={onLockRosterRespin}
+                onGenerateBracket={onGenerateBracket}
                 canRegenerate={canRegenerateRoulette}
               />
             ) : null
@@ -889,6 +951,7 @@ export default function WorldSeriesOperator({
                 onConfirmRoulette={onGenerateRoulette}
                 onOpenRosterRespin={onOpenRosterRespin}
                 onLockRosterRespin={onLockRosterRespin}
+                onGenerateBracket={onGenerateBracket}
                 canRegenerate={canRegenerateRoulette}
               />
             ) : (

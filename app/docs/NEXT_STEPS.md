@@ -1,5 +1,44 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - E2B Front Kill Race Flow
+
+**Fecha:** 2026-07-03
+**Rama:** `fix/e2b-front-clean`
+
+**Qué se hizo:**
+- `generateRouletteForSelected()` ahora solo genera la ruleta con `confirm:false`, refresca torneo y muestra mensaje claro. Ya no bloquea roster automaticamente.
+- `lockRosterWindow()` conserva `lockRosterRespin()` y usa copy en español: `Equipos confirmados. Ya puedes preparar bracket.` / `No se pudo confirmar el roster.`
+- `generateBracketForSelected()` ejecuta la cadena correcta: `openBracketRespin` -> `generateBracket` -> `lockBracketRespin` -> `refreshSelectedTournament`.
+- `Preparar bracket` en Kill Race ahora dispara la generacion real del bracket desde la UI en vez de ser solo navegacion.
+- `saveKillRaceMap()` detecta cierre de serie por `winner_id`, `status=completed` o mayoria de mapas ganados. Si la serie cierra, elimina el draft, no calcula mapa siguiente y enfoca el siguiente match listo.
+- La UI de la serie actual no muestra inputs ni boton `Guardar mapa` cuando la serie ya esta cerrada. Muestra `Serie cerrada`, `El ganador ya avanzo al siguiente match.`, CTA `Ver bracket actualizado` y, si aplica, `Continuar con siguiente serie`.
+
+**Archivos modificados:**
+- `frontend/app/lib/useWorldSeriesPractice.ts`
+- `frontend/app/components/WorldSeriesOperator.tsx`
+- `frontend/app/components/RouletteArena.tsx`
+- `frontend/app/(operator)/operator/page.tsx`
+- `docs/NEXT_STEPS.md`
+- `docs/QA_CONTEXT.md`
+
+**Validacion tecnica:**
+- `cd app/frontend && PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run lint` -> 0 errores, warnings preexistentes.
+- `cd app/frontend && PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run build` -> exitoso.
+- No se toco backend.
+- No se instalo ninguna libreria.
+- No hubo commit ni push.
+
+**Smoke navegador real:**
+- Ruleta -> bracket -> F5: generado y persistido en torneo QA `6`.
+- BO3 2-0: torneo QA `7`, mapa 1 `20-10`, mapa 2 `15-11`; cerro 2-0, avanzo ganador, no pidio mapa 3, F5 mantuvo bracket.
+- BO3 2-1: torneo QA `9`, mapas `20-10`, `10-20`, `15-11`; cerro 2-1, avanzo ganador, F5 mantuvo bracket.
+- Error empate: `10-10` mostro en pantalla el mensaje backend exacto: `Empate de kills en un mapa: define desempate manual antes de guardar.`
+
+**Pendiente real / contrato backend:**
+- En flujo ruleta con ventana roster abierta 3 minutos, `lockRosterRespin()` responde `Cierra el respin antes de bloquear el roster.`. El frontend no tiene `closeRosterRespin()` y este sprint no podia crear endpoint ni tocar backend. Confirmar producto/contrato: o se expone close en frontend, o backend permite lock dentro de ventana, o la UI debe esperar/cerrar ventana por otro flujo existente.
+
+---
+
 ## ULTIMO SPRINT EJECUTADO - UX-P0 Rescue Parte 5 (Rediseño Ruleta Casino + Efecto Portal)
 
 **Fecha:** 2026-07-01

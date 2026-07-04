@@ -4,6 +4,53 @@
 > Fecha: 2026-06-30
 > Estado: rescate P0 de Kill Race BO3 validado.
 
+## Sprint E2B Front - Kill Race Flow
+
+**Fecha:** 2026-07-03
+**Rama:** `fix/e2b-front-clean`
+
+### QA ejecutado
+
+| Check | Comando / metodo | Resultado |
+|---|---|---|
+| Preflight git | `git status --short`, `git diff --stat`, `git log --oneline -5` | Rama limpia creada desde `origin/master` |
+| Frontend lint | `cd app/frontend && PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run lint` | 0 errores, warnings preexistentes |
+| Frontend build | `cd app/frontend && PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run build` | Build exitoso |
+| Navegador real | Brave en `127.0.0.1:3000/operator` | Smoke manual ejecutado |
+
+### Smoke ejecutado
+
+1. Ruleta -> bracket:
+   - Torneo QA `6`.
+   - `Preparar bracket` ejecuto `openBracketRespin` -> `generateBracket` -> `lockBracketRespin` -> refresh.
+   - Mensaje visible: `Bracket generado: 3 matches.`
+   - F5 mantuvo bracket generado.
+
+2. BO3 2-0:
+   - Torneo QA `7`.
+   - Match inicial: mapa 1 `20-10`, mapa 2 `15-11`.
+   - Serie cerro 2-0, el ganador avanzo y la UI salto al siguiente match listo.
+   - No aparecio input para mapa 3.
+   - F5 mantuvo bracket y siguiente serie lista.
+
+3. BO3 2-1:
+   - Torneo QA `9`.
+   - Match inicial: mapa 1 `20-10`, mapa 2 `10-20`, mapa 3 `15-11`.
+   - Serie cerro 2-1, el ganador avanzo y la UI salto al siguiente match listo.
+   - F5 mantuvo bracket y estado listo.
+
+4. Errores visibles:
+   - Empate forzado `10-10` mostro en pantalla el mensaje backend exacto: `Empate de kills en un mapa: define desempate manual antes de guardar.`
+   - Intento de confirmar roster mientras la ventana roster-respin seguia abierta mostro en pantalla el mensaje backend exacto: `Cierra el respin antes de bloquear el roster.`
+
+### Riesgos / pendientes reales
+
+- El contrato actual impide cerrar roster dentro de una ventana abierta usando solo `lockRosterRespin()`. Como el frontend no expone `closeRosterRespin()` y este sprint no podia tocar backend ni crear endpoints, queda pendiente resolver la decision de producto/contrato para `Confirmar equipos`.
+- El backend local contiene `POST /tournaments/{id}/roster-respin/close`, pero no se uso ni se conecto desde frontend por restriccion explicita del sprint.
+- La UI muestra errores backend en pantalla; no hay flujo de desempate manual para mapas empatados.
+
+---
+
 ## Sprint B - Respins persistidos / import / stream
 
 ### QA ejecutado

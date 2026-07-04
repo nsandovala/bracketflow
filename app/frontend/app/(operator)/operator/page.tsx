@@ -42,6 +42,7 @@ function OperatorPageClient() {
     killRaceMapDrafts,
     updateResultDraft,
     updateKillRaceMapDraft,
+    selectMatch,
     selectTournament,
     importParticipants,
     removeParticipant,
@@ -143,6 +144,7 @@ function OperatorPageClient() {
       onLockBracketRespin={lockBracketWindow}
       onUpdateDraft={updateResultDraft}
       onUpdateKillRaceMapDraft={updateKillRaceMapDraft}
+      onSelectKillRaceMatch={selectMatch}
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);
       }}
