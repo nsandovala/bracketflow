@@ -4959,6 +4959,14 @@ a:focus-visible {
   letter-spacing: .04em;
 }
 
+.opr-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .opr-context-standings {
   display: inline-flex;
   align-items: center;

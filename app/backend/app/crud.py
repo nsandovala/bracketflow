@@ -885,6 +885,17 @@ def get_match_maps_won(match: models.Match) -> tuple[int, int]:
     return maps_won_a, maps_won_b
 
 
+def _get_match_maps_won_from_db(db: Session, match: models.Match) -> tuple[int, int]:
+    maps = (
+        db.query(models.MatchMap)
+        .filter(models.MatchMap.match_id == match.id)
+        .all()
+    )
+    maps_won_a = sum(1 for item in maps if item.map_winner_id == match.team_a_id)
+    maps_won_b = sum(1 for item in maps if item.map_winner_id == match.team_b_id)
+    return maps_won_a, maps_won_b
+
+
 def build_match_schema(match: models.Match) -> schemas.Match:
     maps_won_a, maps_won_b = get_match_maps_won(match)
     return schemas.Match(
@@ -922,22 +933,47 @@ def _refresh_match_status(match: models.Match) -> None:
         match.status = "pending"
 
 
+def _seed_order(slot_count: int) -> list[int]:
+    if slot_count <= 1:
+        return [1]
+
+    previous = _seed_order(slot_count // 2)
+    return [seed for item in previous for seed in (item, slot_count + 1 - item)]
+
+
 def _propagate_bye_winners(db: Session, matches_by_id: dict[int, models.Match]) -> None:
+    feeders_by_match_id: dict[int, dict[str, models.Match]] = {}
+    for feeder in matches_by_id.values():
+        if feeder.next_match_id is None or feeder.next_slot not in {"a", "b"}:
+            continue
+        feeders = feeders_by_match_id.setdefault(feeder.next_match_id, {})
+        feeders[feeder.next_slot] = feeder
+
     changed = True
     while changed:
         changed = False
         for match in sorted(matches_by_id.values(), key=lambda item: (item.round, item.id)):
             if match.winner_id is not None:
                 continue
-            if match.round == 1 and match.team_a_id is not None and match.team_b_id is None:
-                match.winner_id = match.team_a_id
-                match.status = "completed"
-            elif match.round == 1 and match.team_b_id is not None and match.team_a_id is None:
-                match.winner_id = match.team_b_id
-                match.status = "completed"
+
+            if match.team_a_id is not None and match.team_b_id is None:
+                empty_slot = "b"
+                winner_id = match.team_a_id
+            elif match.team_b_id is not None and match.team_a_id is None:
+                empty_slot = "a"
+                winner_id = match.team_b_id
             else:
                 _refresh_match_status(match)
                 continue
+
+            unresolved_feeder = feeders_by_match_id.get(match.id, {}).get(empty_slot)
+            if unresolved_feeder is not None and unresolved_feeder.winner_id is None:
+                _refresh_match_status(match)
+                continue
+
+            match.winner_id = winner_id
+            match.status = "completed"
+            changed = True
 
             if match.next_match_id is not None:
                 next_match = matches_by_id[match.next_match_id]
@@ -1005,7 +1041,11 @@ def generate_bracket(
             match.next_slot = "a" if match_index % 2 == 0 else "b"
 
     first_round = rounds[0]
-    seeded_team_ids = [team.id for team in teams] + [None] * (total_slots - len(teams))
+    seed_order = _seed_order(total_slots)
+    seeded_team_ids = [
+        teams[seed - 1].id if seed <= len(teams) else None
+        for seed in seed_order
+    ]
     for match_index, match in enumerate(first_round):
         match.team_a_id = seeded_team_ids[match_index * 2]
         match.team_b_id = seeded_team_ids[match_index * 2 + 1]
@@ -1430,7 +1470,7 @@ def upsert_map_result(
 
     db.flush()
 
-    maps_won_a, maps_won_b = get_match_maps_won(match)
+    maps_won_a, maps_won_b = _get_match_maps_won_from_db(db, match)
     wins_needed = ceil(match.best_of / 2)
     if maps_won_a >= wins_needed or maps_won_b >= wins_needed:
         winner_id = match.team_a_id if maps_won_a > maps_won_b else match.team_b_id

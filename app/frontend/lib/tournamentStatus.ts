@@ -29,11 +29,44 @@ export function getMatchStatusLabel(status: string | null | undefined): string {
 
 export type ChampionInfo = {
   team: Team;
+  displayName: string;
   finalScore: string;
   rosterText: string;
   round: number;
   matchId: number;
 };
+
+const GENERIC_TEAM_NAME = /^(team|equipo)\s+\d+$/i;
+
+export function isGenericTeamName(name: string | null | undefined) {
+  return GENERIC_TEAM_NAME.test((name ?? "").trim());
+}
+
+export function getTeamRosterText(team: Team) {
+  return team.members
+    .map((m) => m.player.nickname.trim())
+    .filter((nickname) => nickname.length > 0)
+    .join(" / ");
+}
+
+export function getTeamDisplayName(team: Team, fallback = "Equipo sin nombre") {
+  const rosterText = getTeamRosterText(team);
+  const name = team.name.trim();
+  if (name.length > 0 && !isGenericTeamName(name)) {
+    return name;
+  }
+  return rosterText || fallback;
+}
+
+export function getTeamShortDisplayName(team: Team, maxNames: number, fallback = "Equipo sin nombre") {
+  const roster = getTeamRosterText(team);
+  if (roster.length > 0 && isGenericTeamName(team.name)) {
+    const players = roster.split(" / ");
+    const visible = players.slice(0, maxNames).join(" / ");
+    return players.length > maxNames ? `${visible} +${players.length - maxNames}` : visible;
+  }
+  return getTeamDisplayName(team, fallback);
+}
 
 export function findChampion(matches: Match[], teams: Team[]): ChampionInfo | null {
   if (matches.length === 0 || teams.length === 0) {
@@ -47,12 +80,11 @@ export function findChampion(matches: Match[], teams: Team[]): ChampionInfo | nu
     if (match.status === "completed" && match.winner_id !== null) {
       const championTeam = teams.find((t) => t.id === match.winner_id);
       if (championTeam) {
-        const roster = championTeam.members
-          .map((m) => m.player.nickname)
-          .join(" / ");
+        const roster = getTeamRosterText(championTeam);
         const finalScore = `${match.maps_won_a ?? 0}-${match.maps_won_b ?? 0}`;
         return {
           team: championTeam,
+          displayName: getTeamDisplayName(championTeam),
           finalScore,
           rosterText: roster || "Roster pendiente",
           round: match.round,

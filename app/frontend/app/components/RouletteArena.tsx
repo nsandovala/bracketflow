@@ -44,6 +44,7 @@ type RouletteArenaProps = {
   onConfirmRoulette: (shuffleSeed: string) => Promise<unknown>;
   onOpenRosterRespin: (durationMinutes: number) => Promise<unknown>;
   onLockRosterRespin: () => Promise<unknown>;
+  onGenerateBracket?: () => Promise<unknown>;
   canRegenerate?: boolean;
 };
 
@@ -183,6 +184,7 @@ export default function RouletteArena({
   onConfirmRoulette,
   onOpenRosterRespin,
   onLockRosterRespin,
+  onGenerateBracket,
   canRegenerate = true,
 }: RouletteArenaProps) {
   const [bulkValue, setBulkValue] = useState("");
@@ -709,7 +711,7 @@ export default function RouletteArena({
                   disabled={submitting}
                   onClick={() => void onLockRosterRespin()}
                 >
-                  Locked
+                  Cerrar respin y bloquear equipos
                 </button>
               ) : null}
             </div>
@@ -750,8 +752,8 @@ export default function RouletteArena({
                   </div>
                   <em className="bf-roulette-seed-vs-v3">VS</em>
                   <div className="bf-roulette-seed-team-v3">
-                    <strong>{right ? getTeamShortDisplayName(right, teamSize <= 2 ? 2 : 3) : "BYE"}</strong>
-                    {right ? <small>{getTeamSeedLabel(right, index * 2 + 2)}</small> : null}
+                    <strong>{right ? getTeamShortDisplayName(right, teamSize <= 2 ? 2 : 3) : "Pasa directo"}</strong>
+                    <small>{right ? getTeamSeedLabel(right, index * 2 + 2) : "Libre por seed"}</small>
                   </div>
                 </div>
               ))}
@@ -770,10 +772,15 @@ export default function RouletteArena({
           <div className="bf-hub-form-actions bf-roulette-bottom-actions-v3">
             {isKillRace ? (
               <>
-                <Link href={`/operator?tournamentId=${tournament.id}&tab=bracket`} className="bf-button bf-button-primary">
+                <button
+                  type="button"
+                  className="bf-button bf-button-primary"
+                  disabled={submitting || tournament.roster_status !== "locked" || !onGenerateBracket}
+                  onClick={() => void onGenerateBracket?.()}
+                >
                   Preparar bracket
-                </Link>
-                <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                </button>
+                <Link href={`/operator?tournamentId=${tournament.id}&tab=bracket`} className="bf-button bf-button-ghost">
                   Ver bracket
                 </Link>
               </>

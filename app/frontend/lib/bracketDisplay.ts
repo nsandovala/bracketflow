@@ -1,4 +1,8 @@
 import type { Match, Team } from "./api";
+import {
+  getTeamDisplayName as getApiTeamDisplayName,
+  getTeamShortDisplayName as getApiTeamShortDisplayNameRaw,
+} from "./tournamentStatus";
 
 export type PreviewRosterTeam = {
   id?: number;
@@ -31,14 +35,20 @@ export function getTeamPlayers(team: BracketTeam) {
 }
 
 export function getTeamDisplayName(team: BracketTeam) {
+  if ("members" in team) {
+    return getApiTeamDisplayName(team);
+  }
   const players = getTeamPlayers(team);
-  return players.length > 0 ? players.join(" / ") : team.name;
+  return players.length > 0 ? players.join(" / ") : team.name || "Equipo sin nombre";
 }
 
 export function getTeamShortDisplayName(team: BracketTeam, maxNames: number = 3) {
+  if ("members" in team) {
+    return getApiTeamShortDisplayNameRaw(team, maxNames);
+  }
   const players = getTeamPlayers(team);
   if (players.length === 0) {
-    return team.name;
+    return team.name || "Equipo sin nombre";
   }
   const visible = players.slice(0, maxNames).join(" / ");
   return players.length > maxNames ? `${visible} +${players.length - maxNames}` : visible;
@@ -80,7 +90,7 @@ function getSeriesMeta(match: Match, side: "a" | "b") {
 }
 
 function getFutureSlotLabel(matchId: number) {
-  return `Ganador M${matchId}`;
+  return `Esperando ganador M${matchId}`;
 }
 
 export function buildSingleElimBracket(
@@ -111,12 +121,12 @@ export function buildSingleElimBracket(
           ? getTeamShortDisplayName(leftTeam, maxNames)
           : leftFeeder && matchesById.get(leftFeeder.id)?.winner_id === null
             ? getFutureSlotLabel(leftFeeder.id)
-            : "Slot pendiente";
+            : "Esperando ganador";
         const right = rightTeam
           ? getApiTeamShortDisplayName(rightTeam, maxNames)
           : rightFeeder && matchesById.get(rightFeeder.id)?.winner_id === null
             ? getFutureSlotLabel(rightFeeder.id)
-            : "Slot pendiente";
+            : "Esperando ganador";
         const leftDisplay = leftTeam
           ? getApiTeamShortDisplayName(leftTeam, maxNames)
           : left;

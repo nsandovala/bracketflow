@@ -60,7 +60,7 @@ export default function WorldSeriesStandings({
           <p>
             {isBracket
               ? isCompleted
-                ? `Campeón: ${champion?.team.name ?? "—"} · Serie final ${champion?.finalScore ?? "—"}.`
+                ? `Campeón: ${champion?.displayName ?? "—"} · Serie final ${champion?.finalScore ?? "—"}.`
                 : totalTeams > 0
                   ? `${teams.length} equipos sembrados. Bracket listo.`
                   : "Falta generar bracket. Carga participantes y confirma equipos."

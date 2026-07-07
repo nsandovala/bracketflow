@@ -106,7 +106,7 @@ function ChampionBlock({
       <div className="bf-champion-glow" aria-hidden="true" />
       <div className="bf-champion-content">
         <div className="bf-champion-kicker">Campeón coronado</div>
-        <h3 className="bf-champion-name">{champion.team.name}</h3>
+        <h3 className="bf-champion-name">{champion.displayName}</h3>
         <p className="bf-champion-roster">{champion.rosterText}</p>
         <div className="bf-champion-meta">
           <span className="bf-champion-score">Serie final: {champion.finalScore}</span>
@@ -174,7 +174,7 @@ export default function BracketView({
 
   const title = isCompleted ? "Torneo finalizado" : hasMatches ? "Bracket" : "Falta generar bracket";
   const subtitle = isCompleted
-    ? `Campeón: ${champion?.team.name ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
+    ? `Campeón: ${champion?.displayName ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
     : hasMatches
       ? `${teams.length} equipos sembrados - ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
       : hasTeams
