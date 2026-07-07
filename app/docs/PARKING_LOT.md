@@ -124,3 +124,10 @@ Eso después puede ser roster_policy: "switcharo" dentro del mismo motor Kill Ra
 - Cobrar porcentaje sobre apuestas con dinero real queda fuera del alcance actual.
 - Ese tema requiere validacion legal antes de cualquier implementacion.
 - No debe mezclarse con el SaaS base hasta tener claridad regulatoria.
+
+## Kill Race — futuras mejoras
+
+- Mostrar en campeón: total de kills del torneo / serie final.
+- Switcharo/KD: ruleta por buckets KD bajo-medio y KD medio-alto para formar equipos balanceados.
+- OCR/prints para carga asistida de resultados.
+- Agentes/copilot solo como propuesta pendiente; el core debe funcionar manual-first.
