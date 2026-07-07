@@ -239,9 +239,9 @@ Rama: fix/e2c-close-respin
 - Preparar bracket: PASA
 - Semifinales: PASA
 - Final: PASA
-- Campeón con roster real: PASA/FALLA
-- F5 survival: PASA/FALLA
-- 2-0 no pide mapa 3: PASA/FALLA
+- Campeón con roster real: PASA
+- F5 survival: PASA
+- 2-0 no pide mapa 3: PASA
 
 ### Kill Race 6 equipos / 12 jugadores
 - Setup ruleta: PASA
@@ -251,11 +251,11 @@ Rama: fix/e2c-close-respin
 - F5 survival: PASA
 
 ### Kill Race 8 equipos / 16 jugadores
-- Setup ruleta: PASA/FALLA
-- Bracket sin BYE: PASA/FALLA
-- Cuartos/semis/final: PASA/FALLA
-- Campeón: PASA/FALLA
-- F5 survival: PASA/FALLA
+- Setup ruleta: PASA
+- Bracket sin BYE: PASA
+- Cuartos/semis/final: PASA
+- Campeón: PASA
+- F5 survival: PASA
 
 ### Notas visuales
 - Pendiente mejorar labels Kills A/B.

@@ -12,7 +12,11 @@ import {
   IconTrophy,
 } from "./icons";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
-import { buildSingleElimBracket } from "../../lib/bracketDisplay";
+import {
+  findChampion,
+  getTeamDisplayName,
+  isTournamentCompleted,
+} from "../../lib/tournamentStatus";
 
 function parseTournamentId(value: string | null) {
   if (!value) {
@@ -59,14 +63,42 @@ export default function DashboardHome() {
   const engine = selectedTournament ? selectedEngine ?? resolveTournamentEngine(selectedTournament) : null;
   const needsRoulette = engine?.rosterPolicy === "roulette" && totalTeams === 0;
   const isKillRace = engine?.engineKey === "kill_race_bracket";
-  const bracketPreview = isKillRace ? buildSingleElimBracket(matches, teams, engine?.teamSize ?? 2)[0] : null;
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  const getDashboardTeamLabel = (teamId: number | null) => {
+    const team = teamId ? teamsById.get(teamId) : null;
+    return team ? getTeamDisplayName(team) : "Equipo sin nombre";
+  };
+  const killRaceCompletedSeries = matches
+    .filter((match) => match.status === "completed" && match.winner_id !== null)
+    .sort((left, right) => left.round - right.round || left.id - right.id);
+  const killRacePlayableMatches = matches
+    .filter(
+      (match) =>
+        match.team_a_id !== null &&
+        match.team_b_id !== null &&
+        match.winner_id === null &&
+        match.status !== "completed"
+    )
+    .sort((left, right) => left.round - right.round || left.id - right.id);
+  const killRaceCurrentMatch = killRacePlayableMatches[0] ?? null;
+  const killRaceChampion = isKillRace ? findChampion(matches, teams) : null;
+  const killRaceCompleted = isKillRace ? isTournamentCompleted(matches) : false;
+  const killRaceProgress =
+    matches.length > 0 ? `${killRaceCompletedSeries.length}/${matches.length} series cerradas` : "Bracket pendiente";
+  const killRaceCurrentLabel =
+    killRaceCurrentMatch?.team_a_id && killRaceCurrentMatch?.team_b_id
+      ? `${getDashboardTeamLabel(killRaceCurrentMatch.team_a_id)} vs ${getDashboardTeamLabel(killRaceCurrentMatch.team_b_id)}`
+      : null;
   const setupMissing = Boolean(selectedTournament && totalTeams === 0);
   const cta = !selectedTournament
     ? { label: "Completar setup", href: "/torneos" }
     : needsRoulette
       ? { label: "Abrir Ruleta", href: `/operator${query}&roulette=1` }
       : isKillRace
-        ? { label: "Preparar bracket", href: `/operator${query}&tab=bracket` }
+        ? {
+            label: matches.length === 0 ? "Preparar bracket" : killRaceCompleted ? "Ver bracket final" : "Operar serie actual",
+            href: `/operator${query}&tab=bracket`,
+          }
         : setupMissing
           ? { label: "Completar setup", href: `/operator${query}` }
           : { label: "Ir a Operator · cargar partida", href: `/operator${query}` };
@@ -102,9 +134,13 @@ export default function DashboardHome() {
             <span aria-hidden="true">·</span>
             <span>
               {isKillRace
-                ? totalTeams > 0
-                  ? "Seed listo"
-                  : "Falta generar bracket"
+                ? matches.length > 0
+                  ? killRaceCompleted
+                    ? `Campeón: ${killRaceChampion?.displayName ?? "—"}`
+                    : killRaceCurrentLabel ?? "Esperando ganador"
+                  : totalTeams > 0
+                    ? "Falta preparar bracket"
+                    : "Falta generar equipos"
                 : gameNumber > 0
                   ? `Partida ${gameNumber}`
                   : "Sin partida abierta"}
@@ -115,6 +151,8 @@ export default function DashboardHome() {
                 <>
                   Líder: <strong>{leader.team_name}</strong>
                 </>
+              ) : isKillRace ? (
+                killRaceProgress
               ) : (
                 "Sin líder todavía"
               )}
@@ -167,9 +205,15 @@ export default function DashboardHome() {
           </span>
           <div className="bf-dash-stat-body">
             <span className="bf-dash-stat-label">{isKillRace ? "Ronda actual" : "Partidas jugadas"}</span>
-            <span className="bf-dash-stat-value">{stat(gamesCount)}</span>
+            <span className="bf-dash-stat-value">
+              {isKillRace ? stat(killRaceCompletedSeries.length) : stat(gamesCount)}
+            </span>
             <span className="bf-dash-stat-sub">
-              {isKillRace ? "Bracket real pendiente" : "Partidas con resultados"}
+              {isKillRace
+                ? matches.length > 0
+                  ? `${matches.length} series totales`
+                  : "Bracket pendiente"
+                : "Partidas con resultados"}
             </span>
           </div>
         </article>
@@ -200,7 +244,53 @@ export default function DashboardHome() {
             <span className="bf-dash-badge">{gameNumber > 0 ? `Partida ${gameNumber}` : "Sin resultados"}</span>
           </div>
 
-          {top3.length > 0 ? (
+          {isKillRace ? (
+            matches.length === 0 ? (
+              <p className="bf-dash-empty">
+                {totalTeams > 0
+                  ? "Equipos confirmados. Prepara bracket para ver la serie actual."
+                  : "Falta generar equipos. No hay tabla WSOW para Kill Race."}
+              </p>
+            ) : killRaceCompleted ? (
+              <div className="bf-dash-seed-preview">
+                <article className="bf-dash-seed-row">
+                  <span>Campeón</span>
+                  <strong>{killRaceChampion?.displayName ?? "—"}</strong>
+                  <em>Final</em>
+                  <strong>Serie {killRaceChampion?.finalScore ?? "—"}</strong>
+                </article>
+              </div>
+            ) : (
+              <div className="bf-dash-seed-preview">
+                {killRaceCurrentMatch && killRaceCurrentLabel ? (
+                  <article className="bf-dash-seed-row">
+                    <span>Serie actual</span>
+                    <strong>{killRaceCurrentLabel}</strong>
+                    <em>BO3</em>
+                    <strong>{killRaceProgress}</strong>
+                  </article>
+                ) : (
+                  <article className="bf-dash-seed-row">
+                    <span>Bracket</span>
+                    <strong>No hay serie jugable</strong>
+                    <em>—</em>
+                    <strong>Revisa propagación de BYE</strong>
+                  </article>
+                )}
+                {killRaceCompletedSeries.slice(-2).map((match) => {
+                  const winner = match.winner_id ? teamsById.get(match.winner_id) : null;
+                  return (
+                    <article key={match.id} className="bf-dash-seed-row">
+                      <span>Ganador M{match.id}</span>
+                      <strong>{winner ? getTeamDisplayName(winner) : "—"}</strong>
+                      <em>Serie</em>
+                      <strong>{match.maps_won_a}-{match.maps_won_b}</strong>
+                    </article>
+                  );
+                })}
+              </div>
+            )
+          ) : top3.length > 0 ? (
             <div className="bf-dash-podium-list">
               {top3.map((entry, index) => (
                 <article
@@ -219,17 +309,6 @@ export default function DashboardHome() {
                 </article>
               ))}
             </div>
-          ) : isKillRace && bracketPreview ? (
-            <div className="bf-dash-seed-preview">
-              {bracketPreview.matches.slice(0, 4).map((match) => (
-                <article key={match.id} className="bf-dash-seed-row">
-                  <span>{match.label}</span>
-                  <strong>{match.left}</strong>
-                  <em>vs</em>
-                  <strong>{match.right}</strong>
-                </article>
-              ))}
-            </div>
           ) : (
             <p className="bf-dash-empty">
               {loading
@@ -241,7 +320,7 @@ export default function DashboardHome() {
           )}
 
           <Link href={isKillRace ? `/operator${query}&tab=bracket` : `/standings${query}`} className="bf-dash-cta">
-            {isKillRace ? "Preparar bracket" : "Ver clasificación completa"}
+            {isKillRace ? cta.label : "Ver clasificación completa"}
             <IconArrowRight size={16} />
           </Link>
         </div>

@@ -752,8 +752,8 @@ export default function RouletteArena({
                   </div>
                   <em className="bf-roulette-seed-vs-v3">VS</em>
                   <div className="bf-roulette-seed-team-v3">
-                    <strong>{right ? getTeamShortDisplayName(right, teamSize <= 2 ? 2 : 3) : "BYE"}</strong>
-                    {right ? <small>{getTeamSeedLabel(right, index * 2 + 2)}</small> : null}
+                    <strong>{right ? getTeamShortDisplayName(right, teamSize <= 2 ? 2 : 3) : "Pasa directo"}</strong>
+                    <small>{right ? getTeamSeedLabel(right, index * 2 + 2) : "Libre por seed"}</small>
                   </div>
                 </div>
               ))}

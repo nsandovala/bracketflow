@@ -18,7 +18,7 @@ type ContextBarProps = {
 const BACK_CONFIG: Record<string, { label: string; hrefFn: (id: number) => string }> = {
   kill_race_bracket: {
     label: "← Volver al bracket",
-    hrefFn: (id) => `/standings?tournamentId=${id}`,
+    hrefFn: (id) => `/operator?tournamentId=${id}&tab=bracket`,
   },
   wsow_br: {
     label: "← Volver",
@@ -72,19 +72,32 @@ export default function ContextBar({
             <>
               <span className="opr-context-sep">·</span>
               <span className="opr-context-champion">
-                Campeón: {findChampion(matches, teams)?.team.name ?? "—"}
+                Campeón: {findChampion(matches, teams)?.displayName ?? "—"}
               </span>
             </>
           ) : null}
         </div>
       </div>
 
-      <Link
-        href={`/standings?tournamentId=${tournamentId}`}
-        className="opr-context-standings"
-      >
-        Standings →
-      </Link>
+      <div className="opr-context-actions">
+        <Link
+          href={`/standings?tournamentId=${tournamentId}`}
+          className="opr-context-standings"
+        >
+          Standings →
+        </Link>
+        {engineKey === "kill_race_bracket" ? (
+          <Link
+            href={`/stream?tournamentId=${tournamentId}&obs=1`}
+            className="opr-context-standings"
+          >
+            Stream →
+          </Link>
+        ) : null}
+        <Link href="/torneos" className="opr-context-standings">
+          Torneos →
+        </Link>
+      </div>
     </div>
   );
 }

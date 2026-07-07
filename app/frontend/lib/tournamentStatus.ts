@@ -38,19 +38,34 @@ export type ChampionInfo = {
 
 const GENERIC_TEAM_NAME = /^(team|equipo)\s+\d+$/i;
 
-function getTeamRosterText(team: Team) {
+export function isGenericTeamName(name: string | null | undefined) {
+  return GENERIC_TEAM_NAME.test((name ?? "").trim());
+}
+
+export function getTeamRosterText(team: Team) {
   return team.members
     .map((m) => m.player.nickname.trim())
     .filter((nickname) => nickname.length > 0)
     .join(" / ");
 }
 
-function getChampionDisplayName(team: Team, rosterText: string) {
+export function getTeamDisplayName(team: Team, fallback = "Equipo sin nombre") {
+  const rosterText = getTeamRosterText(team);
   const name = team.name.trim();
-  if (name.length > 0 && !GENERIC_TEAM_NAME.test(name)) {
+  if (name.length > 0 && !isGenericTeamName(name)) {
     return name;
   }
-  return rosterText || name || "Campeón";
+  return rosterText || fallback;
+}
+
+export function getTeamShortDisplayName(team: Team, maxNames: number, fallback = "Equipo sin nombre") {
+  const roster = getTeamRosterText(team);
+  if (roster.length > 0 && isGenericTeamName(team.name)) {
+    const players = roster.split(" / ");
+    const visible = players.slice(0, maxNames).join(" / ");
+    return players.length > maxNames ? `${visible} +${players.length - maxNames}` : visible;
+  }
+  return getTeamDisplayName(team, fallback);
 }
 
 export function findChampion(matches: Match[], teams: Team[]): ChampionInfo | null {
@@ -69,7 +84,7 @@ export function findChampion(matches: Match[], teams: Team[]): ChampionInfo | nu
         const finalScore = `${match.maps_won_a ?? 0}-${match.maps_won_b ?? 0}`;
         return {
           team: championTeam,
-          displayName: getChampionDisplayName(championTeam, roster),
+          displayName: getTeamDisplayName(championTeam),
           finalScore,
           rosterText: roster || "Roster pendiente",
           round: match.round,

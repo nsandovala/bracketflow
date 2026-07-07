@@ -7,7 +7,11 @@ import { useSearchParams } from "next/navigation";
 import { Match, Player, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
-import { getTournamentPhase, isTournamentCompleted, findChampion } from "../../lib/tournamentStatus";
+import {
+  getTeamDisplayName,
+  isTournamentCompleted,
+  findChampion,
+} from "../../lib/tournamentStatus";
 import { KillRaceMapDraft, ResultDraft } from "../lib/useWorldSeriesPractice";
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
@@ -196,6 +200,8 @@ export default function WorldSeriesOperator({
   const activeMatchTeamB = activeMatch?.team_b_id
     ? teams.find((team) => team.id === activeMatch.team_b_id) ?? null
     : null;
+  const activeMatchTeamALabel = activeMatchTeamA ? getTeamDisplayName(activeMatchTeamA) : "";
+  const activeMatchTeamBLabel = activeMatchTeamB ? getTeamDisplayName(activeMatchTeamB) : "";
   const bracketCountdown = formatCountdown(
     selectedTournament?.bracket_respin_deadline_at ?? null,
     now
@@ -261,7 +267,13 @@ export default function WorldSeriesOperator({
             onClearParticipants={onClearParticipants}
             onConfirmRoulette={onGenerateRoulette}
             onOpenRosterRespin={onOpenRosterRespin}
-            onLockRosterRespin={onLockRosterRespin}
+            onLockRosterRespin={async () => {
+              const result = await onLockRosterRespin();
+              if (result) {
+                setMode("bracket");
+              }
+              return result;
+            }}
             onGenerateBracket={onGenerateBracket}
             canRegenerate={canRegenerateRoulette}
           />
@@ -452,7 +464,7 @@ export default function WorldSeriesOperator({
             activeMatch && activeMatchTeamA && activeMatchTeamB ? (
               <section className="opr-panel">
                 <div className="opr-eyebrow">Serie actual</div>
-                <h2>{activeMatchTeamA.name} vs {activeMatchTeamB.name}</h2>
+                <h2>{activeMatchTeamALabel} vs {activeMatchTeamBLabel}</h2>
                 <p className="sub">
                   Match {activeMatch.id} · Round {activeMatch.round} · BO{activeMatch.best_of} · Serie {activeMatch.maps_won_a}-{activeMatch.maps_won_b}
                 </p>
@@ -460,7 +472,7 @@ export default function WorldSeriesOperator({
                 <div className="opr-teamgrid">
                   <div className="opr-teamcard">
                     <div className="h">
-                      <span className="n">{activeMatchTeamA.name}</span>
+                      <span className="n">{activeMatchTeamALabel}</span>
                       <span className="opr-tag t-saved">
                         <i />
                         {activeMatch.maps_won_a} mapas
@@ -470,7 +482,7 @@ export default function WorldSeriesOperator({
                   </div>
                   <div className="opr-teamcard">
                     <div className="h">
-                      <span className="n">{activeMatchTeamB.name}</span>
+                      <span className="n">{activeMatchTeamBLabel}</span>
                       <span className="opr-tag t-saved">
                         <i />
                         {activeMatch.maps_won_b} mapas
@@ -508,7 +520,7 @@ export default function WorldSeriesOperator({
                       />
                     </div>
                     <div className="opr-field">
-                      <label>Kills A</label>
+                      <label>Kills · {activeMatchTeamALabel}</label>
                       <input
                         type="number"
                         min="0"
@@ -519,7 +531,7 @@ export default function WorldSeriesOperator({
                       />
                     </div>
                     <div className="opr-field">
-                      <label>Kills B</label>
+                      <label>Kills · {activeMatchTeamBLabel}</label>
                       <input
                         type="number"
                         min="0"
@@ -552,8 +564,8 @@ export default function WorldSeriesOperator({
                           </div>
                           <span className="r">
                             {map.map_winner_id === activeMatch.team_a_id
-                              ? `Gana ${activeMatchTeamA.name}`
-                              : `Gana ${activeMatchTeamB.name}`}
+                              ? `Gana ${activeMatchTeamALabel}`
+                              : `Gana ${activeMatchTeamBLabel}`}
                           </span>
                         </div>
                       ))}
@@ -641,7 +653,13 @@ export default function WorldSeriesOperator({
                 onClearParticipants={onClearParticipants}
                 onConfirmRoulette={onGenerateRoulette}
                 onOpenRosterRespin={onOpenRosterRespin}
-                onLockRosterRespin={onLockRosterRespin}
+                onLockRosterRespin={async () => {
+                  const result = await onLockRosterRespin();
+                  if (result) {
+                    setMode("bracket");
+                  }
+                  return result;
+                }}
                 onGenerateBracket={async () => {
                   const result = await onGenerateBracket();
                   if (result) {

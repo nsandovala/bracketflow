@@ -174,7 +174,7 @@ export default function BracketView({
 
   const title = isCompleted ? "Torneo finalizado" : hasMatches ? "Bracket" : "Falta generar bracket";
   const subtitle = isCompleted
-    ? `Campeón: ${champion?.team.name ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
+    ? `Campeón: ${champion?.displayName ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
     : hasMatches
       ? `${teams.length} equipos sembrados - ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
       : hasTeams

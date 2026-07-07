@@ -1,6 +1,10 @@
 import type { ISeedProps, IRoundProps } from "react-brackets";
 
 import type { Match, Team } from "./api";
+import {
+  getTeamRosterText,
+  getTeamShortDisplayName,
+} from "./tournamentStatus";
 
 type ReactBracketStatusTone = "completed" | "live" | "ready" | "future";
 
@@ -28,36 +32,8 @@ export type ReactBracketSeed = ISeedProps & {
   teams: [ReactBracketTeam, ReactBracketTeam];
 };
 
-const GENERIC_TEAM_NAME = /^(team|equipo)\s+\d+$/i;
-
 function getTeamRoster(team: Team) {
-  const players = team.members
-    .map((member) => member.player.nickname.trim())
-    .filter((nickname) => nickname.length > 0);
-
-  return players.length > 0 ? players.join(" / ") : "Roster pendiente";
-}
-
-function getRosterLabel(team: Team, maxNames: number) {
-  const players = team.members
-    .map((member) => member.player.nickname.trim())
-    .filter((nickname) => nickname.length > 0);
-
-  if (players.length === 0) {
-    return team.name.trim() || "Equipo pendiente";
-  }
-
-  const visible = players.slice(0, maxNames).join(" / ");
-  return players.length > maxNames ? `${visible} +${players.length - maxNames}` : visible;
-}
-
-function hasRealTeamName(team: Team) {
-  const name = team.name.trim();
-  return name.length > 0 && !GENERIC_TEAM_NAME.test(name);
-}
-
-function getTeamDisplayName(team: Team, maxNames: number) {
-  return hasRealTeamName(team) ? team.name.trim() : getRosterLabel(team, maxNames);
+  return getTeamRosterText(team) || "Roster pendiente";
 }
 
 function roundTitle(roundNumber: number, totalRounds: number) {
@@ -87,12 +63,8 @@ function getStatusMeta(status: Match["status"]): {
     case "waiting_opponent":
     case "pending":
     default:
-      return { label: "Slot futuro", tone: "future" };
+      return { label: "Esperando ganador", tone: "future" };
   }
-}
-
-function getFutureSlotLabel(matchId: number) {
-  return `Ganador M${matchId}`;
 }
 
 function getTeamStateLabel(match: Match, teamId: number) {
@@ -120,10 +92,10 @@ function buildPlaceholderTeam(
   if (feeder && feeder.winner_id === null) {
     return {
       id: `future-${match.id}-${side}`,
-      name: getFutureSlotLabel(feeder.id),
-      roster: "Slot futuro",
+      name: "Esperando ganador",
+      roster: "Se completa al cerrar la serie anterior",
       score: null,
-      stateLabel: "Slot futuro",
+      stateLabel: `M${feeder.id}`,
       isBye: false,
       isEmpty: false,
       isFuture: true,
@@ -135,10 +107,10 @@ function buildPlaceholderTeam(
   if (otherTeamExists && match.round === 1) {
     return {
       id: `bye-${match.id}-${side}`,
-      name: "BYE",
-      roster: "Libre",
+      name: "Pasa directo",
+      roster: "Libre por seed",
       score: null,
-      stateLabel: "BYE",
+      stateLabel: "No jugable",
       isBye: true,
       isEmpty: false,
       isFuture: false,
@@ -149,10 +121,10 @@ function buildPlaceholderTeam(
 
   return {
     id: `pending-${match.id}-${side}`,
-    name: "Slot pendiente",
-    roster: "Serie pendiente",
+    name: "Esperando ganador",
+    roster: "Se completa al cerrar la serie anterior",
     score: null,
-    stateLabel: "Pendiente",
+    stateLabel: "No jugable",
     isBye: false,
     isEmpty: true,
     isFuture: false,
@@ -199,7 +171,7 @@ export function toBracketRounds(
         const left = teamA
           ? {
               id: String(teamA.id),
-              name: getTeamDisplayName(teamA, maxNames),
+              name: getTeamShortDisplayName(teamA, maxNames),
               roster: getTeamRoster(teamA),
               score: match.maps_won_a,
               badge: match.winner_id === teamA.id ? "Avanza" : undefined,
@@ -215,7 +187,7 @@ export function toBracketRounds(
         const right = teamB
           ? {
               id: String(teamB.id),
-              name: getTeamDisplayName(teamB, maxNames),
+              name: getTeamShortDisplayName(teamB, maxNames),
               roster: getTeamRoster(teamB),
               score: match.maps_won_b,
               badge: match.winner_id === teamB.id ? "Avanza" : undefined,

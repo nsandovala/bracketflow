@@ -45,6 +45,7 @@ import {
   isOperatorSupportedTournament,
   resolveTournamentEngine,
 } from "../../lib/tournamentModel";
+import { getTeamDisplayName } from "../../lib/tournamentStatus";
 
 export const ACTIVE_WORLD_SERIES_TOURNAMENT_KEY = "bf:world-series-practice:tournament-id";
 
@@ -1023,10 +1024,14 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       setMessage("No hay serie activa para guardar.");
       return null;
     }
+    const teamA = teams.find((team) => team.id === activeKillRaceMatch.team_a_id);
+    const teamB = teams.find((team) => team.id === activeKillRaceMatch.team_b_id);
+    const teamALabel = teamA ? getTeamDisplayName(teamA) : "equipo A";
+    const teamBLabel = teamB ? getTeamDisplayName(teamB) : "equipo B";
 
     const mapNumberResult = parseRequiredNumber(draft.mapNumber, "Mapa es requerido.");
-    const killsAResult = parseRequiredNumber(draft.killsA, "Kills A es requerido.");
-    const killsBResult = parseRequiredNumber(draft.killsB, "Kills B es requerido.");
+    const killsAResult = parseRequiredNumber(draft.killsA, `Kills de ${teamALabel} es requerido.`);
+    const killsBResult = parseRequiredNumber(draft.killsB, `Kills de ${teamBLabel} es requerido.`);
     if (!mapNumberResult.ok) {
       setMessage(mapNumberResult.message);
       return null;
