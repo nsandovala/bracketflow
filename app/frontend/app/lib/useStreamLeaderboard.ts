@@ -141,23 +141,28 @@ export function useStreamLeaderboard(
           return;
         }
 
-        const [tournament, teams, results, matches] = await Promise.all([
-          getTournament(tournamentId),
-          getTeams(tournamentId),
-          getTournamentResults(tournamentId),
-          getMatches(tournamentId),
-        ]);
+        const tournament = await getTournament(tournamentId);
         const engine = resolveTournamentEngine(tournament);
         const isBracket =
           engine.scoringProfile === "kill_race" ||
           engine.tournamentStructure !== "cumulative";
+        const [teams, results, matches] = await Promise.all([
+          getTeams(tournamentId),
+          isBracket ? Promise.resolve([]) : getTournamentResults(tournamentId),
+          getMatches(tournamentId),
+        ]);
         const leaderboard = isBracket ? [] : await getLeaderboard(tournamentId);
 
         if (!active) return;
 
         const standings = buildStandings(leaderboard, teams);
-        const afterGameNumber =
-          results.length === 0 ? 0 : Math.max(...results.map((result) => result.round));
+        const afterGameNumber = isBracket
+          ? matches.some((match) => match.maps.length > 0 || match.winner_id !== null)
+            ? 1
+            : 0
+          : results.length === 0
+            ? 0
+            : Math.max(...results.map((result) => result.round));
         const nextSignature = buildSignature(tournament, teams, standings, afterGameNumber);
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.

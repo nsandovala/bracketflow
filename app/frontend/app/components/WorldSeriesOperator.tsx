@@ -215,6 +215,7 @@ export default function WorldSeriesOperator({
       activeMatch.maps_won_a >= Math.ceil(activeMatch.best_of / 2) ||
       activeMatch.maps_won_b >= Math.ceil(activeMatch.best_of / 2)
     : false;
+  const killRaceChampion = isKillRace ? findChampion(matches, teams) : null;
   const nextReadyKillRaceMatch = activeMatch
     ? matches
         .filter(
@@ -440,7 +441,7 @@ export default function WorldSeriesOperator({
                     disabled={submitting}
                     onClick={() => void onLockBracketRespin()}
                   >
-                    Locked bracket ahora
+                    Bloquear bracket ahora
                   </button>
                 </div>
               ) : null}
@@ -600,7 +601,7 @@ export default function WorldSeriesOperator({
                 {isTournamentCompleted(matches) ? (
                   <>
                     <div className="opr-eyebrow">Torneo finalizado</div>
-                    <h2>Campeón: {findChampion(matches, teams)?.team.name ?? "—"}</h2>
+                    <h2>Campeón: {killRaceChampion?.displayName ?? "—"}</h2>
                     <p className="sub">
                       No quedan series pendientes. El bracket está completo.
                     </p>
@@ -608,11 +609,11 @@ export default function WorldSeriesOperator({
                 ) : (
                   <>
                     <div className="opr-eyebrow">Serie actual</div>
-                    <h2>Bracket listo para operar</h2>
+                    <h2>{matches.length === 0 ? "Falta generar bracket" : "No hay serie jugable"}</h2>
                     <p className="sub">
                       {matches.length === 0
                         ? "Genera la llave para habilitar el BO3."
-                        : "No hay un match con dos equipos listos en este momento."}
+                        : "No hay serie jugable. Revisa propagación de BYE en bracket."}
                     </p>
                   </>
                 )}
@@ -641,7 +642,13 @@ export default function WorldSeriesOperator({
                 onConfirmRoulette={onGenerateRoulette}
                 onOpenRosterRespin={onOpenRosterRespin}
                 onLockRosterRespin={onLockRosterRespin}
-                onGenerateBracket={onGenerateBracket}
+                onGenerateBracket={async () => {
+                  const result = await onGenerateBracket();
+                  if (result) {
+                    setMode("bracket");
+                  }
+                  return result;
+                }}
                 canRegenerate={canRegenerateRoulette}
               />
             ) : null

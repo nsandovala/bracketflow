@@ -374,6 +374,12 @@ export function openRosterRespin(tournamentId: number, payload: { duration_minut
   });
 }
 
+export function closeRosterRespin(tournamentId: number) {
+  return request<Tournament>(`/tournaments/${tournamentId}/roster-respin/close`, {
+    method: "POST",
+  });
+}
+
 export function lockRosterRespin(tournamentId: number) {
   return request<Tournament>(`/tournaments/${tournamentId}/roster-respin/lock`, {
     method: "POST",

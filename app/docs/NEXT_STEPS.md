@@ -1,5 +1,74 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - E2.d Kill Race bracket con BYE
+
+**Fecha:** 2026-07-06
+**Rama:** `fix/e2c-close-respin`
+
+**Contexto real corregido:**
+- E2.c close/lock quedo OK: cerrar respin y bloquear roster habilita `Preparar bracket`.
+- El bloqueo posterior estaba en la data del bracket para 6 equipos: se generaba un match de ronda 1 con `team_a_id=NULL` y `team_b_id=NULL`, cableado hacia semifinal, dejando un slot imposible de resolver.
+- No se reprodujo un `404` real durante la generacion. El endpoint equivocado detectado para Kill Race fue `GET /tournaments/{id}/results`, que responde `400` porque es WSOW/standings-only. No debe bloquear Kill Race.
+
+**Qué se hizo:**
+- `generate_bracket()` ahora usa orden de seeds de bracket (`1 vs N`, etc.) y distribuye BYE como slots reales, no al final como match vacio.
+- BYE se auto-completa con `status=completed` y `winner_id` real, y se propaga al `next_match_id/next_slot`.
+- La propagacion de BYE ya no depende solo de round 1: evita autocerrar un match si el slot vacio viene de un feeder pendiente.
+- `upsert_map_result()` cuenta mapas desde DB despues del flush, evitando que una relacion ORM stale permita mapa 3 tras un 2-0.
+- La serie actual de Kill Race filtra solo matches con dos equipos, sin `winner_id` y no `completed`.
+- Si no hay serie jugable y no hay campeon, Operator muestra mensaje tecnico de propagacion en vez de decir que el bracket esta listo para operar.
+- El stream Kill Race no consulta `/results`; para bracket usa `matches`.
+- `Ver bracket` desde ruleta Kill Race navega a `/operator?tournamentId=...&tab=bracket`.
+- El campeon visible usa nombre real o roster (`Jugador / Jugador`) cuando el equipo se llama `Team N` / `Equipo N`.
+
+**QA ejecutado:**
+- Backend `./.venv/bin/python -m pytest` -> 51 passed.
+- Backend `qa_killrace.py` -> no ejecutable en este entorno porque falta `requests` y no se instalaron paquetes por regla dura.
+- Smoke API 4 equipos: 3 matches, semifinal 2-0, semifinal 2-1, final 2-0, bracket `completed`, campeon real persistido.
+- Smoke API 6 equipos: 7 matches, 2 BYE auto-completados, 5 series manuales, final `completed`, campeon real persistido.
+- Smoke API 8 equipos: 7 matches reales, sin BYE, primer match 2-0 completado y ganador propagado.
+- Smoke 2-0: intento de guardar mapa 3 responde `422 {"detail":"La serie ya esta cerrada."}`.
+- Frontend `npm run lint` -> 0 errores, 12 warnings preexistentes.
+- Frontend `npm run build` -> exitoso.
+
+**Pendiente real:**
+- Validacion visual manual en navegador por Vito si se quiere confirmar copy/layout final; la validacion funcional se hizo por API/DB.
+
+---
+
+## ULTIMO SPRINT EJECUTADO - E2.c Close Roster Respin
+
+**Fecha:** 2026-07-04
+**Rama:** `fix/e2c-close-respin`
+
+**Qué se hizo:**
+- Se agrego wrapper frontend `closeRosterRespin()` para `POST /tournaments/{id}/roster-respin/close`.
+- `lockRosterWindow()` ahora ejecuta `closeRosterRespin()` antes de `lockRosterRespin()` cuando el roster esta en `respin_open`.
+- `generateBracketForSelected()` relee el torneo antes de preparar bracket y corta con `Primero cierra el respin y bloquea equipos.` si el roster todavia no esta locked.
+- El boton de ruleta cambio de `Locked` a `Cerrar respin y bloquear equipos`, porque ahora representa la accion real: cerrar respin y confirmar equipos.
+- El boton de bracket cambio de `Locked bracket ahora` a `Bloquear bracket ahora`.
+
+**Archivos modificados:**
+- `frontend/lib/api.ts`
+- `frontend/app/lib/useWorldSeriesPractice.ts`
+- `frontend/app/components/RouletteArena.tsx`
+- `frontend/app/components/WorldSeriesOperator.tsx`
+- `docs/NEXT_STEPS.md`
+- `docs/QA_CONTEXT.md`
+
+**Pendiente del sprint anterior resuelto:**
+- El operador ya no queda atrapado cuando intenta confirmar equipos con la ventana de roster-respin abierta. El frontend usa el endpoint existente del backend para cerrar la ventana antes de bloquear roster.
+
+**Smoke real ejecutado:**
+- Torneo QA `6`: la accion de cerrar/bloquear llamo `POST /roster-respin/close` 200 y `POST /roster-respin/lock` 200.
+- El timer desaparecio, el estado quedo `Confirmado`, mensaje visible `Equipos confirmados. Ya puedes preparar bracket.` y `Preparar bracket` quedo habilitado.
+- `Preparar bracket` llamo `POST /bracket-respin/open` 200, `POST /generate-bracket` 200 y `POST /bracket-respin/lock` 200.
+- F5 mantuvo `LISTO PARA OPERAR`, roster locked y bracket visible.
+- `npm run lint` -> 0 errores, 12 warnings preexistentes.
+- `npm run build` -> exitoso.
+
+---
+
 ## ULTIMO SPRINT EJECUTADO - E2B Front Kill Race Flow
 
 **Fecha:** 2026-07-03

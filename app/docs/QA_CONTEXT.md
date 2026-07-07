@@ -4,6 +4,87 @@
 > Fecha: 2026-06-30
 > Estado: rescate P0 de Kill Race BO3 validado.
 
+## Sprint E2.d - Kill Race bracket con BYE
+
+**Fecha:** 2026-07-06
+**Rama:** `fix/e2c-close-respin`
+
+### Diagnostico
+
+| Check | Resultado |
+|---|---|
+| E2.c close/lock roster | OK: `closeRosterRespin()` + `lockRosterRespin()` habilitan preparar bracket |
+| 404 reportado | No se reprodujo 404 real. Endpoint equivocado detectado: `GET /tournaments/{id}/results` -> `400`, WSOW-only, no debe usarse para Kill Race |
+| Bracket 6 equipos antes del fix | Creaba 7 matches, pero uno era `team_a_id=NULL`, `team_b_id=NULL` y bloqueaba semifinal/final |
+| Serie actual frontend | Seleccionaba primer match con dos equipos y sin winner; ahora excluye tambien `completed` |
+| Campeon `Team 1` | Corregido: si el nombre es generico y hay roster, muestra `Jugador / Jugador` |
+
+### SQL clave - 6 equipos despues de generar
+
+Torneo QA `13`:
+
+```text
+(48, 1, 'completed', 70, None, 70, 52, 'a')
+(49, 1, 'ready', 73, 74, None, 52, 'b')
+(50, 1, 'completed', 71, None, 71, 53, 'a')
+(51, 1, 'ready', 72, 75, None, 53, 'b')
+(52, 2, 'waiting_opponent', 70, None, None, 54, 'a')
+(53, 2, 'waiting_opponent', 71, None, None, 54, 'b')
+(54, 3, 'pending', None, None, None, None, None)
+```
+
+### SQL clave - 6 equipos finalizado
+
+```text
+(48, 1, 'completed', 70, None, 70, 52, 'a')
+(49, 1, 'completed', 73, 74, 73, 52, 'b')
+(50, 1, 'completed', 71, None, 71, 53, 'a')
+(51, 1, 'completed', 72, 75, 72, 53, 'b')
+(52, 2, 'completed', 70, 73, 70, 54, 'a')
+(53, 2, 'completed', 71, 72, 71, 54, 'b')
+(54, 3, 'completed', 70, 71, 70, None, None)
+```
+
+### QA ejecutado
+
+| Check | Resultado |
+|---|---|
+| 4 equipos / 8 jugadores | PASO: 3 series manuales, final completed, campeon real |
+| 6 equipos / 12 jugadores | PASO: 2 BYE auto-completados, 5 series manuales, final completed, campeon real |
+| 8 equipos / 16 jugadores | PASO: 7 matches reales, sin BYE, primer 2-0 completed y ganador propagado |
+| BO3 2-0 | PASO: mapa 3 responde `422 La serie ya esta cerrada.` |
+| Persistencia F5 equivalente | PASO: re-fetch API/DB mantiene `winner_id`, slots y bracket_status |
+| Backend tests | `./.venv/bin/python -m pytest` -> 51 passed |
+| Backend qa script | Bloqueado: falta `requests` en entorno, no se instalaron paquetes |
+| Frontend lint | 0 errores, 12 warnings preexistentes |
+| Frontend build | Exitoso |
+
+---
+
+## Sprint E2.c - Close Roster Respin
+
+**Fecha:** 2026-07-04
+**Rama:** `fix/e2c-close-respin`
+
+### QA ejecutado
+
+| Check | Metodo | Resultado |
+|---|---|---|
+| Confirmar roster con respin abierto | Brave en torneo QA `6`, UI `Cerrar y confirmar` | `POST /roster-respin/close` 200 -> `POST /roster-respin/lock` 200 -> roster `locked` |
+| Preparar bracket despues de confirmar | UI `Preparar bracket` | `POST /bracket-respin/open` 200 -> `POST /generate-bracket` 200 -> `POST /bracket-respin/lock` 200 |
+| Persistencia | F5 despues de bracket | Sigue `LISTO PARA OPERAR`, roster locked y bracket visible |
+| Frontend lint | `cd app/frontend && PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run lint` | 0 errores, 12 warnings preexistentes |
+| Frontend build | `cd app/frontend && PATH=/Users/mac/.nvm/versions/node/v22.22.2/bin:$PATH npm run build` | Exitoso |
+
+### Cambio funcional
+
+- El wrapper frontend `closeRosterRespin()` conecta el endpoint backend existente `POST /tournaments/{id}/roster-respin/close`.
+- `lockRosterWindow()` cierra respin solo si `roster_status === "respin_open"` y luego bloquea roster.
+- `generateBracketForSelected()` relee torneo y no prepara bracket si `roster_status !== "locked"`.
+- No se toco backend, scoring BO3, WSOW/Rebirth ni parser.
+
+---
+
 ## Sprint E2B Front - Kill Race Flow
 
 **Fecha:** 2026-07-03
@@ -146,3 +227,37 @@
 - No agregar demo data, seeders, fixtures permanentes ni mocks persistentes.
 - No redisenar la ruleta en este sprint.
 - No tocar placement/scoring de WSOW BR o Rebirth al resolver Kill Race.
+
+## QA Manual — Kill Race 4/6/8 equipos
+
+Fecha: 2026-07-07
+Rama: fix/e2c-close-respin
+
+### Kill Race 4 equipos / 8 jugadores
+- Setup ruleta: PASA
+- Cerrar respin roster: PASA
+- Preparar bracket: PASA
+- Semifinales: PASA
+- Final: PASA
+- Campeón con roster real: PASA/FALLA
+- F5 survival: PASA/FALLA
+- 2-0 no pide mapa 3: PASA/FALLA
+
+### Kill Race 6 equipos / 12 jugadores
+- Setup ruleta: PASA
+- BYE/Pasa directo: PASA
+- Semifinales/final: PASA
+- Campeón: PASA
+- F5 survival: PASA
+
+### Kill Race 8 equipos / 16 jugadores
+- Setup ruleta: PASA/FALLA
+- Bracket sin BYE: PASA/FALLA
+- Cuartos/semis/final: PASA/FALLA
+- Campeón: PASA/FALLA
+- F5 survival: PASA/FALLA
+
+### Notas visuales
+- Pendiente mejorar labels Kills A/B.
+- Pendiente mejorar copy BYE.
+- Pendiente dashboard activo con último ganador/stats.

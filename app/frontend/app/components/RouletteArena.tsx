@@ -711,7 +711,7 @@ export default function RouletteArena({
                   disabled={submitting}
                   onClick={() => void onLockRosterRespin()}
                 >
-                  Locked
+                  Cerrar respin y bloquear equipos
                 </button>
               ) : null}
             </div>
@@ -780,7 +780,7 @@ export default function RouletteArena({
                 >
                   Preparar bracket
                 </button>
-                <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
+                <Link href={`/operator?tournamentId=${tournament.id}&tab=bracket`} className="bf-button bf-button-ghost">
                   Ver bracket
                 </Link>
               </>

@@ -106,7 +106,7 @@ function ChampionBlock({
       <div className="bf-champion-glow" aria-hidden="true" />
       <div className="bf-champion-content">
         <div className="bf-champion-kicker">Campeón coronado</div>
-        <h3 className="bf-champion-name">{champion.team.name}</h3>
+        <h3 className="bf-champion-name">{champion.displayName}</h3>
         <p className="bf-champion-roster">{champion.rosterText}</p>
         <div className="bf-champion-meta">
           <span className="bf-champion-score">Serie final: {champion.finalScore}</span>

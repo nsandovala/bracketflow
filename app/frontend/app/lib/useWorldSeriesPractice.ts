@@ -15,6 +15,7 @@ import {
   createPlayer,
   createTeam,
   createTournament,
+  closeRosterRespin,
   deletePlayer,
   deleteTournament,
   generateBracket,
@@ -135,7 +136,11 @@ function parseRequiredNumber(value: string, missingMessage: string) {
 
 function getKillRaceOperableMatches(matches: Match[]) {
   return matches.filter(
-    (match) => match.team_a_id !== null && match.team_b_id !== null && match.winner_id === null
+    (match) =>
+      match.team_a_id !== null &&
+      match.team_b_id !== null &&
+      match.winner_id === null &&
+      match.status !== "completed"
   );
 }
 
@@ -912,6 +917,9 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setSubmitting(true);
     setMessage(null);
     try {
+      if (selectedTournament?.roster_status === "respin_open") {
+        await closeRosterRespin(selectedTournamentId);
+      }
       const tournament = await lockRosterRespin(selectedTournamentId);
       await refreshSelectedTournament(selectedTournamentId);
       setMessage("Equipos confirmados. Ya puedes preparar bracket.");
@@ -937,6 +945,13 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     setMessage(null);
 
     try {
+      const currentTournament = await getTournament(selectedTournamentId);
+      if (currentTournament.roster_status !== "locked") {
+        await refreshSelectedTournament(selectedTournamentId);
+        setMessage("Primero cierra el respin y bloquea equipos.");
+        return null;
+      }
+
       try {
         await openBracketRespin(selectedTournamentId, { duration_minutes: 3 });
       } catch (error) {
@@ -1065,15 +1080,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
           delete next[matchId];
           return next;
         });
-        const nextReadyMatch = nextMatches
-          .filter(
-            (match) =>
-              match.id !== matchId &&
-              match.team_a_id !== null &&
-              match.team_b_id !== null &&
-              match.winner_id === null &&
-              match.status !== "completed"
-          )
+        const nextReadyMatch = getKillRaceOperableMatches(nextMatches)
+          .filter((match) => match.id !== matchId)
           .sort((left, right) => left.round - right.round || left.id - right.id)[0];
         setMessage(
           nextReadyMatch

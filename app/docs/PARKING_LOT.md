@@ -90,6 +90,17 @@ type ReportEvidence = {
 };
 ```
 
+Switcharo Team Builder
+
+Contrato futuro:
+
+Switcharo no cambia el bracket ni el scoring.
+Solo cambia la política de armado de equipos:
+1 jugador de pool KD bajo/medio + 1 jugador de pool KD medio/alto.
+Luego el torneo sigue como Kill Race BO3 normal.
+
+Eso después puede ser roster_policy: "switcharo" dentro del mismo motor Kill Race. No inventes otro motor todavía.
+
 - No implementar upload, OCR ni agentes hasta abrir un sprint especifico.
 
 ## Juegos futuros
