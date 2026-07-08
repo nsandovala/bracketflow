@@ -21,7 +21,7 @@ const TOURNAMENT_MOTORS = [
     id: "world-series",
     engineKey: "wsow_br",
     name: "World Series BR",
-    tags: ["BR", "4v4", "WSOW"],
+    tags: ["BR", "3v3", "WSOW"],
     status: "Disponible",
     tone: "available",
   },

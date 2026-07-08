@@ -252,6 +252,12 @@ export default function WorldSeriesOperator({
         )
         .sort((left, right) => left.round - right.round || left.id - right.id)[0] ?? null
     : null;
+  const missingBracketTitle =
+    selectedTournament?.roster_status !== "locked"
+      ? "Falta bloquear equipos"
+      : bracketOpen
+        ? "Listo para generar bracket"
+        : "Falta generar bracket";
 
   return (
     <main className="bf-page bf-page-operator">
@@ -422,8 +428,10 @@ export default function WorldSeriesOperator({
 
           {(mode === "bracket" || mode === "op") && matches.length === 0 ? (
             <section className="opr-panel">
-              <div className="opr-eyebrow">Bracket respin</div>
-              <h2>Semilla persistida</h2>
+              <div className="opr-eyebrow">
+                {bracketOpen ? "Bracket respin" : "Estado del bracket"}
+              </div>
+              <h2>{missingBracketTitle}</h2>
               <p className="sub">
                 {selectedTournament.roster_status !== "locked"
                   ? "Primero bloquea el roster para habilitar el bracket."
