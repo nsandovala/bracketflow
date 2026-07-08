@@ -8,24 +8,30 @@ y puntos negativos cuando placement > equipos inscritos.
 import json
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import schemas
+from app.main import create_match, upsert_match_map, upsert_match_result
 from app.crud import (
     calculate_points,
     close_roster_respin,
     create_battle_royale_match,
     create_players_bulk,
+    create_team,
     create_tournament,
+    evaluate_match_point,
     generate_bracket,
     generate_roulette_teams,
     get_effective_format,
     get_effective_lobby_size,
+    get_match_point_threshold,
     get_matches_by_tournament,
     get_placement_multiplier,
     get_rebirth_placement_multiplier,
+    get_tournament,
     is_wsow_like_tournament,
     lock_bracket,
     lock_roster,
@@ -38,7 +44,7 @@ from app.crud import (
     validate_tournament_contract,
 )
 from app.database import Base
-from app.models import Tournament
+from app.models import TeamResult, Tournament
 
 WORLD_SERIES_FORMAT = "battle_royale_points"
 
@@ -210,34 +216,52 @@ def test_wsow_contract_rejects_elimination_structure():
         validate_tournament_contract(
             engine_key="wsow_br",
             scoring_profile="wsow_like",
-            team_size=4,
+            team_size=3,
             config={
                 "engine_key": "wsow_br",
                 "game_mode": "br",
                 "roster_policy": "fixed_squad",
                 "tournament_structure": "single_elim",
-                "teamSize": 4,
+                "teamSize": 3,
                 "lobbySize": 50,
                 "matchPointThreshold": 125,
             },
         )
 
 
-def test_world_series_br_contract_accepts_four_player_roster():
+def test_world_series_br_contract_accepts_three_player_roster():
     validate_tournament_contract(
         engine_key="wsow_br",
         scoring_profile="wsow_like",
-        team_size=4,
+        team_size=3,
         config={
             "engine_key": "wsow_br",
             "game_mode": "br",
             "roster_policy": "fixed_squad",
             "tournament_structure": "cumulative",
-            "teamSize": 4,
+            "teamSize": 3,
             "lobbySize": 50,
             "matchPointThreshold": 125,
         },
     )
+
+
+def test_world_series_br_contract_rejects_four_player_roster():
+    with pytest.raises(ValueError, match="team_size=3"):
+        validate_tournament_contract(
+            engine_key="wsow_br",
+            scoring_profile="wsow_like",
+            team_size=4,
+            config={
+                "engine_key": "wsow_br",
+                "game_mode": "br",
+                "roster_policy": "fixed_squad",
+                "tournament_structure": "cumulative",
+                "teamSize": 4,
+                "lobbySize": 50,
+                "matchPointThreshold": 125,
+            },
+        )
 
 
 def create_engine_tournament(db_session, engine_key: str, team_size: int, game_mode: str):
@@ -274,9 +298,10 @@ def add_players(db_session, tournament_id: int, count: int):
     )
 
 
-def test_roulette_ws_br_generates_teams_of_four(db_session):
-    tournament = create_engine_tournament(db_session, "roulette_ws", 4, "br")
-    add_players(db_session, tournament.id, 8)
+def test_roulette_ws_br_generates_teams_of_three(db_session):
+    # Override de producto 2026-07-07: Gedeon BR tambien opera con 3.
+    tournament = create_engine_tournament(db_session, "roulette_ws", 3, "br")
+    add_players(db_session, tournament.id, 6)
     tournament = open_roster_respin(db_session, tournament, 180)
 
     teams, bench, updated = generate_roulette_teams(
@@ -285,11 +310,11 @@ def test_roulette_ws_br_generates_teams_of_four(db_session):
         schemas.RouletteGenerationRequest(shuffle_seed="br-seed", reset=True),
     )
 
-    assert resolve_roulette_team_size(updated) == 4
+    assert resolve_roulette_team_size(updated) == 3
     assert len(teams) == 2
-    assert all(len(team.members) == 4 for team in teams)
+    assert all(len(team.members) == 3 for team in teams)
     assert bench == []
-    assert json.loads(updated.config)["rouletteTeamSize"] == 4
+    assert json.loads(updated.config)["rouletteTeamSize"] == 3
 
 
 def test_roulette_ws_rebirth_generates_teams_of_three_with_bench(db_session):
@@ -328,11 +353,11 @@ def test_kill_race_2v2_generates_teams_of_two(db_session):
 
 
 def test_roulette_requires_minimum_two_teams(db_session):
-    tournament = create_engine_tournament(db_session, "roulette_ws", 4, "br")
-    add_players(db_session, tournament.id, 7)
+    tournament = create_engine_tournament(db_session, "roulette_ws", 3, "br")
+    add_players(db_session, tournament.id, 5)
     tournament = open_roster_respin(db_session, tournament, 180)
 
-    with pytest.raises(ValueError, match="tienes 7, necesitas mínimo 8"):
+    with pytest.raises(ValueError, match="tienes 5, necesitas mínimo 6"):
         generate_roulette_teams(
             db_session,
             tournament,
@@ -341,7 +366,7 @@ def test_roulette_requires_minimum_two_teams(db_session):
 
 
 def test_roulette_does_not_regenerate_after_results(db_session):
-    tournament = create_engine_tournament(db_session, "roulette_ws", 4, "br")
+    tournament = create_engine_tournament(db_session, "roulette_ws", 3, "br")
     add_players(db_session, tournament.id, 8)
     tournament = open_roster_respin(db_session, tournament, 180)
     teams, _, _ = generate_roulette_teams(
@@ -456,9 +481,264 @@ def test_effective_lobby_size_comes_from_config_not_registered_teams():
         name="WS",
         game="Warzone",
         format="battle_royale_points",
-        team_size=4,
+        team_size=3,
         scoring_profile="wsow_like",
         config=json.dumps({"engine_key": "wsow_br", "lobbySize": 50}),
     )
 
     assert get_effective_lobby_size(tournament) == 50
+
+
+def _create_wsow_br_tournament(db_session, threshold: int):
+    return create_tournament(
+        db_session,
+        schemas.TournamentCreate(
+            name="WSOW MatchPoint",
+            game="Warzone",
+            format="battle_royale_points",
+            team_size=3,
+            scoring_profile="wsow_like",
+            config=schemas.TournamentConfig(
+                engine_key="wsow_br",
+                game_mode="br",
+                roster_policy="fixed_squad",
+                tournament_structure="cumulative",
+                teamSize=3,
+                lobbySize=50,
+                matchPointThreshold=threshold,
+            ),
+        ),
+    )
+
+
+def _seed_match_point_results(db_session, tournament, rows):
+    """rows: list of (team_name, kills, placement). Inserta resultados directos
+    (bypass del guard de placement unico) para armar un leaderboard controlado."""
+    match = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=1))
+    team_ids = {}
+    for name, kills, placement in rows:
+        team = create_team(db_session, tournament.id, schemas.TeamCreate(name=name))
+        team_ids[name] = team.id
+        db_session.add(
+            TeamResult(
+                tournament_id=tournament.id,
+                match_id=match.id,
+                team_id=team.id,
+                kills=kills,
+                placement=placement,
+            )
+        )
+    db_session.commit()
+    return match, team_ids
+
+
+def test_match_point_crowns_unique_leader_over_threshold(db_session):
+    tournament = _create_wsow_br_tournament(db_session, threshold=30)
+    _, team_ids = _seed_match_point_results(
+        db_session, tournament, [("Alpha", 20, 1), ("Bravo", 5, 2)]
+    )
+
+    champion = evaluate_match_point(db_session, tournament)
+    db_session.commit()
+
+    assert champion == team_ids["Alpha"]
+    assert tournament.status == "completed"
+
+    reloaded = get_tournament(db_session, tournament.id)
+    assert reloaded.status == "completed"
+    assert json.loads(reloaded.config)["championTeamId"] == team_ids["Alpha"]
+
+
+def test_match_point_does_not_crown_on_tie_over_threshold(db_session):
+    tournament = _create_wsow_br_tournament(db_session, threshold=30)
+    _seed_match_point_results(
+        db_session, tournament, [("Alpha", 15, 1), ("Bravo", 15, 1)]
+    )
+
+    champion = evaluate_match_point(db_session, tournament)
+
+    assert champion is None
+    assert tournament.status != "completed"
+    assert json.loads(tournament.config or "{}").get("championTeamId") is None
+
+
+def test_match_point_does_not_crown_below_threshold(db_session):
+    tournament = _create_wsow_br_tournament(db_session, threshold=100)
+    _seed_match_point_results(
+        db_session, tournament, [("Alpha", 20, 1), ("Bravo", 5, 2)]
+    )
+
+    assert evaluate_match_point(db_session, tournament) is None
+    assert tournament.status != "completed"
+
+
+def test_match_point_not_applicable_to_kill_race(db_session):
+    tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
+
+    assert get_match_point_threshold(tournament) is None
+    assert evaluate_match_point(db_session, tournament) is None
+
+
+def test_upsert_result_crowns_only_when_partida_completes(db_session):
+    tournament = _create_wsow_br_tournament(db_session, threshold=30)
+    team_a = create_team(db_session, tournament.id, schemas.TeamCreate(name="Alpha"))
+    team_b = create_team(db_session, tournament.id, schemas.TeamCreate(name="Bravo"))
+    match = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=1))
+
+    # Primer reporte: aunque Alpha ya cruzo el umbral, la partida no termino
+    # (falta Bravo). No se corona a mitad de partida.
+    upsert_team_result(
+        db_session,
+        tournament,
+        match,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=20, placement=1),
+    )
+    db_session.refresh(tournament)
+    assert tournament.status != "completed"
+    assert json.loads(tournament.config or "{}").get("championTeamId") is None
+
+    # Segundo reporte: la partida cierra y ahora si se evalua Match Point.
+    upsert_team_result(
+        db_session,
+        tournament,
+        match,
+        schemas.TeamResultUpsert(team_id=team_b.id, kills=5, placement=2),
+    )
+    db_session.refresh(tournament)
+    assert tournament.status == "completed"
+    assert json.loads(tournament.config)["championTeamId"] == team_a.id
+
+
+def test_match_point_tie_stays_active_until_a_tiebreak_partida_decides(db_session):
+    tournament = _create_wsow_br_tournament(db_session, threshold=30)
+    team_a = create_team(db_session, tournament.id, schemas.TeamCreate(name="Alpha"))
+    team_b = create_team(db_session, tournament.id, schemas.TeamCreate(name="Bravo"))
+
+    # Partida 1: ambos cierran empatados en 30 sobre el umbral -> NO corona.
+    partida1 = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=1))
+    upsert_team_result(
+        db_session, tournament, partida1,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=15, placement=1),  # 15 * 2.0 = 30
+    )
+    upsert_team_result(
+        db_session, tournament, partida1,
+        schemas.TeamResultUpsert(team_id=team_b.id, kills=30, placement=36),  # 30 * 1.0 = 30
+    )
+    db_session.refresh(tournament)
+    assert tournament.status != "completed"
+    assert json.loads(tournament.config or "{}").get("championTeamId") is None
+
+    # Partida 2 (desempate): Alpha se despega -> lider unico sobre umbral -> corona.
+    partida2 = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=2))
+    upsert_team_result(
+        db_session, tournament, partida2,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=10, placement=1),  # +20 = 50
+    )
+    upsert_team_result(
+        db_session, tournament, partida2,
+        schemas.TeamResultUpsert(team_id=team_b.id, kills=0, placement=2),  # +0 = 30
+    )
+    db_session.refresh(tournament)
+    assert tournament.status == "completed"
+    assert json.loads(tournament.config)["championTeamId"] == team_a.id
+
+
+# ---------------------------------------------------------------------------
+# Guard de torneo finalizado (F0): el backend rechaza mutaciones operativas
+# cuando el torneo ya esta completed / tiene championTeamId.
+# ---------------------------------------------------------------------------
+
+
+# Se prueban las funciones-endpoint directamente (sin TestClient/httpx) para no
+# agregar dependencias de red a la suite; el guard vive en la capa de endpoint.
+FINALIZED_DETAIL = "Torneo finalizado: no se permiten nuevas operaciones."
+
+
+def _crown_wsow_champion(db_session):
+    """Arma un torneo WSOW coronado: status completed + championTeamId persistido."""
+    tournament = _create_wsow_br_tournament(db_session, threshold=30)
+    match, team_ids = _seed_match_point_results(
+        db_session, tournament, [("Alpha", 20, 1), ("Bravo", 5, 2)]
+    )
+    champion = evaluate_match_point(db_session, tournament)
+    db_session.commit()
+    assert champion == team_ids["Alpha"]
+    assert tournament.status == "completed"
+    assert json.loads(tournament.config)["championTeamId"] == team_ids["Alpha"]
+    return tournament, match, team_ids
+
+
+def test_finalized_tournament_rejects_new_match(db_session):
+    tournament, _, _ = _crown_wsow_champion(db_session)
+    before = len(get_matches_by_tournament(db_session, tournament.id))
+
+    with pytest.raises(HTTPException) as exc:
+        create_match(tournament.id, schemas.MatchCreate(round=2), db_session)
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == FINALIZED_DETAIL
+    assert len(get_matches_by_tournament(db_session, tournament.id)) == before
+
+
+def test_finalized_tournament_rejects_result_upsert(db_session):
+    tournament, match, team_ids = _crown_wsow_champion(db_session)
+
+    with pytest.raises(HTTPException) as exc:
+        upsert_match_result(
+            match.id,
+            schemas.TeamResultUpsert(team_id=team_ids["Alpha"], kills=999, placement=1),
+            db_session,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == FINALIZED_DETAIL
+
+    saved = (
+        db_session.query(TeamResult)
+        .filter(TeamResult.match_id == match.id, TeamResult.team_id == team_ids["Alpha"])
+        .first()
+    )
+    assert saved.kills == 20  # sin alterar
+    db_session.refresh(tournament)
+    assert json.loads(tournament.config)["championTeamId"] == team_ids["Alpha"]
+
+
+def test_finalized_tournament_rejects_kill_race_map(db_session):
+    tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
+    add_players(db_session, tournament.id, 8)
+    tournament = open_roster_respin(db_session, tournament, 180)
+    generate_roulette_teams(
+        db_session,
+        tournament,
+        schemas.RouletteGenerationRequest(shuffle_seed="finalized", reset=True),
+    )
+    tournament = close_roster_respin(db_session, tournament)
+    tournament = lock_roster(db_session, tournament)
+    tournament = open_bracket_respin(db_session, tournament, 3)
+    generate_bracket(db_session, tournament)
+    tournament = lock_bracket(db_session, tournament)
+    first_match = get_matches_by_tournament(db_session, tournament.id)[0]
+
+    # Simula torneo cerrado (campeon decidido). El guard por torneo debe cerrar
+    # la escritura de mapas aun cuando el match individual siga sin winner.
+    tournament.status = "completed"
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        upsert_match_map(
+            first_match.id,
+            schemas.MapResultUpsert(
+                match_id=first_match.id,
+                map_number=1,
+                kills_a=12,
+                kills_b=8,
+            ),
+            db_session,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == FINALIZED_DETAIL
+
+    db_session.refresh(first_match)
+    assert first_match.maps == []  # ningun mapa persistido
+    assert first_match.winner_id is None

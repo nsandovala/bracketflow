@@ -65,6 +65,8 @@ export type TournamentConfig = {
   rouletteTeamSize?: 1 | 2 | 3 | 4;
   rouletteBench?: string[];
   rouletteStatus?: "generated" | "confirmed";
+  championTeamId?: number;
+  championDecidedAt?: string;
 };
 
 export type Tournament = {

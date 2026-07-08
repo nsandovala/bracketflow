@@ -51,8 +51,14 @@ export default function BracketStreamView({
 
           <div className="bf-stream-status">
             <div className="bf-stream-badge">
-              <span>{teams.length > 0 ? "Bracket preparado" : "Seed pendiente"}</span>
-              <strong>{teams.length}</strong>
+              <span>
+                {matches.length > 0
+                  ? "Bracket preparado"
+                  : teams.length > 0
+                    ? "Llave lista"
+                    : "Llave pendiente"}
+              </span>
+              <strong>{matches.length > 0 ? matches.length : teams.length}</strong>
             </div>
             <div className={`bf-stream-live${connected ? "" : " is-off"}`}>
               <span className="bf-stream-live-dot" />

@@ -69,6 +69,10 @@ function buildSignature(
   standings: StreamStanding[],
   afterGameNumber: number
 ) {
+  const championKey =
+    tournament?.config?.championTeamId != null
+      ? `${tournament.config.championTeamId}:${tournament.config.championDecidedAt ?? ""}`
+      : "";
   const roster = teams
     .map(
       (team) =>
@@ -81,7 +85,7 @@ function buildSignature(
         `${entry.team_id}:${entry.total_points}:${entry.kills}:${entry.best_placement ?? "-"}:${entry.matches_played}:${entry.players.join(",")}`
     )
     .join("|");
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${afterGameNumber}:${roster}:${rows}`;
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${afterGameNumber}:${roster}:${rows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {

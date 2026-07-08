@@ -29,6 +29,8 @@ class TournamentConfig(BaseModel):
     rouletteLastSpinAt: str | None = None
     rouletteRosterTimerState: Literal["idle", "running", "closed"] | None = None
     rouletteRosterDurationSeconds: int | None = Field(default=None, ge=1, le=240)
+    championTeamId: int | None = Field(default=None, ge=1)
+    championDecidedAt: str | None = None
 
 
 class RespinWindowOpen(BaseModel):

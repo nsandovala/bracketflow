@@ -1,4 +1,4 @@
-import type { Match, Team } from "./api";
+import type { LeaderboardEntry, Match, Team, Tournament } from "./api";
 
 export const STATUS_LABELS: Record<string, string> = {
   active: "Activo",
@@ -36,6 +36,25 @@ export type ChampionInfo = {
   matchId: number;
 };
 
+type MatchPointStanding = Pick<LeaderboardEntry, "team_id" | "team_name" | "total_points">;
+
+export type MatchPointStatus =
+  | { state: "idle" }
+  | {
+      state: "champion";
+      champion: Team;
+      championLabel: string;
+      threshold: number;
+      decidedAt?: string;
+    }
+  | {
+      state: "threshold_reached";
+      leaderName: string;
+      leaderPoints: number;
+      threshold: number;
+      reason: "incomplete_match" | "tie" | "pending_sync";
+    };
+
 const GENERIC_TEAM_NAME = /^(team|equipo)\s+\d+$/i;
 
 export function isGenericTeamName(name: string | null | undefined) {
@@ -66,6 +85,89 @@ export function getTeamShortDisplayName(team: Team, maxNames: number, fallback =
     return players.length > maxNames ? `${visible} +${players.length - maxNames}` : visible;
   }
   return getTeamDisplayName(team, fallback);
+}
+
+function getLatestStandingsMatch(matches: Match[]) {
+  return matches
+    .filter((match) => match.team_a_id === null && match.team_b_id === null)
+    .sort((left, right) => left.round - right.round || left.id - right.id)
+    .at(-1) ?? null;
+}
+
+export function getMatchPointStatus({
+  tournament,
+  threshold,
+  standings,
+  teams,
+  matches,
+}: {
+  tournament: Tournament | null;
+  threshold?: number;
+  standings: readonly MatchPointStanding[];
+  teams: Team[];
+  matches: Match[];
+}): MatchPointStatus {
+  if (!tournament || !threshold || threshold <= 0 || standings.length === 0) {
+    return { state: "idle" };
+  }
+
+  const championTeamId = tournament.config?.championTeamId;
+  if (typeof championTeamId === "number" && championTeamId > 0) {
+    const champion = teams.find((team) => team.id === championTeamId);
+    if (champion) {
+      return {
+        state: "champion",
+        champion,
+        championLabel: getTeamDisplayName(champion),
+        threshold,
+        decidedAt: tournament.config?.championDecidedAt,
+      };
+    }
+  }
+
+  const leader = standings[0];
+  if (!leader || leader.total_points < threshold) {
+    return { state: "idle" };
+  }
+
+  if (standings[1] && standings[1].total_points === leader.total_points) {
+    return {
+      state: "threshold_reached",
+      leaderName: leader.team_name,
+      leaderPoints: leader.total_points,
+      threshold,
+      reason: "tie",
+    };
+  }
+
+  const latestMatch = getLatestStandingsMatch(matches);
+  if (latestMatch && latestMatch.status !== "completed") {
+    return {
+      state: "threshold_reached",
+      leaderName: leader.team_name,
+      leaderPoints: leader.total_points,
+      threshold,
+      reason: "incomplete_match",
+    };
+  }
+
+  return {
+    state: "threshold_reached",
+    leaderName: leader.team_name,
+    leaderPoints: leader.total_points,
+    threshold,
+    reason: "pending_sync",
+  };
+}
+
+export function getMatchPointStatusMessage(status: MatchPointStatus) {
+  if (status.state === "champion") {
+    return `Campeón por Match Point: ${status.championLabel}.`;
+  }
+  if (status.state !== "threshold_reached") {
+    return null;
+  }
+  return "Match Point alcanzado: falta cerrar partida completa o resolver desempate.";
 }
 
 export function findChampion(matches: Match[], teams: Team[]): ChampionInfo | null {

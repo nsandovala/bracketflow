@@ -106,7 +106,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - uses kills + placement
 - placement is relevant
 - placement must be unique per partida
-- team_size: 4 jugadores por equipo en BracketFlow/Gedeon
+- team_size: 3 jugadores por equipo (override de producto 2026-07-07; antes 4)
 - lobby_size default: 50 squads
 - matchPointThreshold configurable
 
@@ -133,7 +133,7 @@ SQLite now has `Tournament.config TEXT NULL` as a JSON string for engine metadat
 - roster_policy: `roulette`
 - tournament_structure: `cumulative`
 - teams are mixed by roulette
-- team_size: 4 si `game_mode=br`, 3 si `game_mode=rebirth`
+- team_size: 3 (BR y Rebirth) — override de producto 2026-07-07; antes BR=4
 - still uses WSOW-like points
 - placement remains part of scoring
 - matchPointThreshold configurable

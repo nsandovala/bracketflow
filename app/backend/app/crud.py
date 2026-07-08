@@ -75,6 +75,18 @@ def write_tournament_config(tournament: models.Tournament, config: dict) -> None
     tournament.config = json.dumps(config) if config else None
 
 
+def is_tournament_finalized(tournament: models.Tournament) -> bool:
+    """Torneo cerrado: campeon ya decidido. No admite mutaciones operativas.
+
+    Se considera finalizado si status == "completed" o si config.championTeamId
+    existe y es > 0 (persistido por evaluate_match_point / cierre de bracket).
+    """
+    if tournament.status == "completed":
+        return True
+    champion_team_id = read_tournament_config(tournament).get("championTeamId")
+    return isinstance(champion_team_id, int) and champion_team_id > 0
+
+
 def uses_roulette_timer(engine_key: str | None, config: dict) -> bool:
     return config.get("roster_policy") == "roulette" or engine_key in {
         "roulette_ws",
@@ -182,8 +194,8 @@ def validate_tournament_contract(
             raise ValueError("World Series BR requires game_mode=br")
         if tournament_structure not in {None, "cumulative"}:
             raise ValueError("WSOW/Rebirth engines cannot use single/double elimination")
-        if team_size != 4 or config.get("teamSize") not in {None, 4}:
-            raise ValueError("World Series BR requires team_size=4")
+        if team_size != 3 or config.get("teamSize") not in {None, 3}:
+            raise ValueError("World Series BR requires team_size=3")
 
     if engine_key == "rebirth_ws":
         if scoring_profile != "wsow_like":
@@ -208,11 +220,9 @@ def validate_tournament_contract(
             raise ValueError("Gedeon Roulette WS requires game_mode=br or rebirth")
         if tournament_structure not in {None, "cumulative"}:
             raise ValueError("Gedeon Roulette WS cannot use single/double elimination")
-        expected_team_size = 4 if game_mode == "br" else 3
-        if team_size != expected_team_size or config.get("teamSize") not in {None, expected_team_size}:
-            raise ValueError(
-                "Gedeon Roulette WS requires team_size=4 for BR and team_size=3 for Rebirth"
-            )
+        # Override de producto 2026-07-07: Gedeon opera con 3 tanto en BR como Rebirth.
+        if team_size != 3 or config.get("teamSize") not in {None, 3}:
+            raise ValueError("Gedeon Roulette WS requires team_size=3")
 
     if engine_key == "kill_race_bracket":
         if scoring_profile != "kill_race":
@@ -300,7 +310,7 @@ def resolve_roulette_team_size(tournament: models.Tournament) -> int:
     config = read_tournament_config(tournament)
     engine_key = get_engine_key(tournament)
     if engine_key == "roulette_ws":
-        return 4 if config.get("game_mode") == "br" else 3
+        return 3
     if engine_key == "kill_race_bracket":
         team_size = config.get("teamSize")
         return int(team_size) if team_size in {1, 2, 3} else tournament.team_size
@@ -1363,6 +1373,53 @@ def get_conflicting_placement(
     )
 
 
+def get_match_point_threshold(tournament: models.Tournament) -> int | None:
+    """Umbral de Match Point solo para motores wsow_like / standings.
+
+    Kill Race no usa Match Point (el contrato lo rechaza en create/update)."""
+    if not is_wsow_like_tournament(tournament):
+        return None
+    config = read_tournament_config(tournament)
+    threshold = config.get("matchPointThreshold")
+    if isinstance(threshold, int) and threshold > 0:
+        return threshold
+    return None
+
+
+def evaluate_match_point(db: Session, tournament: models.Tournament) -> int | None:
+    """Cierra el torneo si hay un lider unico sobre el umbral de Match Point.
+
+    Contrato minimo (F0 residual):
+    - Solo aplica a motores wsow_like / standings.
+    - Se recalcula el leaderboard real tras cada resultado.
+    - Corona solo si el primer lugar es UNICO y su score total >= umbral.
+    - Si hay empate de score en el primer lugar sobre el umbral, NO corona:
+      el torneo queda activo para revision manual.
+    - El campeon se persiste en config para sobrevivir F5.
+    """
+    threshold = get_match_point_threshold(tournament)
+    if threshold is None:
+        return None
+
+    leaderboard = get_leaderboard(db, tournament)
+    if not leaderboard:
+        return None
+
+    top = leaderboard[0]
+    if top.total_points < threshold:
+        return None
+    # Empate de score en primer lugar sobre el umbral: no coronar automatico.
+    if len(leaderboard) > 1 and leaderboard[1].total_points == top.total_points:
+        return None
+
+    config = read_tournament_config(tournament)
+    config["championTeamId"] = top.team_id
+    config["championDecidedAt"] = utc_now_iso()
+    write_tournament_config(tournament, config)
+    tournament.status = "completed"
+    return top.team_id
+
+
 def upsert_team_result(
     db: Session,
     tournament: models.Tournament,
@@ -1415,6 +1472,13 @@ def upsert_team_result(
         .count()
     )
     match.status = "completed" if tournament_team_count and result_count >= tournament_team_count else "in_progress"
+
+    # Match Point: solo se evalua cuando la partida TERMINA (todos los equipos
+    # reportaron). En el ultimo circulo de zona el 2do lugar puede igualar al 1ro,
+    # asi que no coronamos a mitad de partida: recalculamos leaderboard al cierre
+    # y, si hay lider unico sobre el umbral, cerramos el torneo y persistimos campeon.
+    if match.status == "completed":
+        evaluate_match_point(db, tournament)
 
     db.commit()
     db.refresh(db_result)

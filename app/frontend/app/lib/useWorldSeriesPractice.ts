@@ -163,6 +163,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const [killRaceMapDrafts, setKillRaceMapDrafts] = useState<Record<number, KillRaceMapDraft>>({});
 
   const selectedMatchIdRef = useRef<number | null>(selectedMatchId);
+  const refreshRequestRef = useRef(0);
 
   useEffect(() => {
     selectedMatchIdRef.current = selectedMatchId;
@@ -170,6 +171,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
   const refreshSelectedTournament = useCallback(
     async (tournamentId: number, options?: { preferLatestMatch?: boolean }) => {
+      const requestId = ++refreshRequestRef.current;
       const tournament = await getTournament(tournamentId);
       if (!isOperatorSupportedTournament(tournament)) {
         throw new Error("Selected tournament is not supported by Operator yet");
@@ -202,6 +204,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
             relevantMatches.some((match) => match.id === selectedMatchIdRef.current)
           ? selectedMatchIdRef.current
           : latestMatchId;
+
+      if (requestId !== refreshRequestRef.current) {
+        return;
+      }
 
       setSelectedTournament(tournament);
       setTeams(nextTeams);
@@ -532,7 +538,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     return createEngineTournament({
       ...payload,
       preset: ENGINE_PRESETS.wsow_br,
-      teamSize: 4,
+      teamSize: 3,
       lobbySize: 50,
       matchPointThreshold: 125,
     });
@@ -793,7 +799,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       return { ok: false, message: "No active tournament" };
     }
 
-    const killsResult = parseRequiredNumber(killsValue, "Kills es requerido.");
+    const killsResult = parseRequiredNumber(killsValue, "Agrega kills antes de guardar el reporte.");
     if (!killsResult.ok) {
       return { ok: false, message: killsResult.message };
     }
@@ -808,7 +814,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
     const placementResult = parseRequiredNumber(
       placementValue,
-      "Placement es requerido."
+      "Agrega placement antes de guardar el reporte."
     );
     if (!placementResult.ok) {
       return { ok: false, message: placementResult.message };
@@ -836,7 +842,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       if (conflict) {
         return {
           ok: false,
-          message: `Placement #${placementResult.value} ya fue reportado por ${conflict.team_name}.`,
+          message: `Placement repetido: el puesto ${placementResult.value} ya fue usado por ${conflict.team_name}.`,
         };
       }
     }
@@ -950,6 +956,18 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       if (currentTournament.roster_status !== "locked") {
         await refreshSelectedTournament(selectedTournamentId);
         setMessage("Primero cierra el respin y bloquea equipos.");
+        return null;
+      }
+
+      // El bracket ya existe (locked/running/completed): reabrir respin daria 409.
+      // No reintentamos: el bracket ya esta listo para operar.
+      if (
+        currentTournament.bracket_status === "locked" ||
+        currentTournament.bracket_status === "running" ||
+        currentTournament.bracket_status === "completed"
+      ) {
+        await refreshSelectedTournament(selectedTournamentId);
+        setMessage("El bracket ya esta generado. Abrelo desde Ver bracket.");
         return null;
       }
 

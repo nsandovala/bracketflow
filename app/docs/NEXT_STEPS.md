@@ -1,5 +1,48 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - F0 residual four-engines backend/state
+
+**Fecha:** 2026-07-07
+**Rama:** `fix/f0-four-engines-residual` (sin commit)
+
+**Contexto:** QA manual de los 4 motores post-merge. Objetivo: que el sistema no mienta (botones, estados, reglas, transiciones). Diagnostico backend/state primero, luego fixes minimos.
+
+**Decisiones de producto (Vito, 2026-07-07):**
+- **Todos los motores wsow_like pasan a `team_size=3`**: WSOW BR=3, Rebirth WS=3, **Gedeon Roulette WS BR=3 y Rebirth=3**. Kill Race se mantiene 1/2/3 segun config. Override explicito del owner (antes WSOW BR y Gedeon BR eran 4). `lobby_size` no cambia (50 BR / 16 Rebirth).
+- **Match Point: cierre minimo activado** (adelanto parcial de D4). Empate en primer lugar sobre umbral → NO corona; el torneo **continua activo** hasta que una partida de desempate deje un lider unico. Coronacion solo al **cierre de partida completa**.
+
+**Qué se hizo (backend primero):**
+- `crud.validate_tournament_contract`: WSOW BR ahora exige `team_size=3` (antes 4).
+- **Match Point minimo** (`crud.evaluate_match_point` + `get_match_point_threshold`, wired en `upsert_team_result`): **al cerrar cada partida** (todos reportaron) se recalcula leaderboard; si el 1er lugar es unico y su score `>= matchPointThreshold`, cierra torneo (`status=completed`) y persiste `config.championTeamId` + `championDecidedAt`. No corona a mitad de partida (el 2do puede igualar en el ultimo circulo). Empate de score en 1er lugar sobre umbral → NO corona (queda activo). Solo wsow_like; Kill Race excluido por contrato. Sobrevive F5.
+- `schemas.TournamentConfig`: expone `championTeamId` y `championDecidedAt` (si no, el response los descartaba).
+- `main.py`: eliminado codigo muerto inalcanzable tras el `return` de `lock_bracket_respin` (referenciaba variables inexistentes).
+
+**Qué se hizo (frontend, contrato ya correcto):**
+- Preset `wsow_br.team_size` 4→3 (`tournamentModel.ts`), default de `createWorldSeriesTournament` 4→3 (`useWorldSeriesPractice.ts`), tipo `TournamentConfig` + resolver leen `championTeamId`.
+- **Fix 409 `bracket-respin/open`:** el backend rechazaba correctamente el re-open sobre bracket ya `locked/running/completed`; faltaba guard en front. `RouletteArena` ahora oculta "Preparar bracket" y muestra solo "Ver bracket" cuando el bracket ya existe; `generateBracketForSelected` corta temprano sin reintentar `open`.
+- **Fix "Ver bracket":** `mode` se calculaba solo en el mount; se agrego reconciliacion en render (patron oficial React, sin setState-en-effect) para que `?tab=bracket` cambie de vista aunque el operator ya este montado.
+- Standings WSOW muestra "Campeón por Match Point: …" cuando `config.championTeamId` existe.
+
+**QA ejecutado:**
+- Backend `pytest` → **57 passed** (51 previos + 6 nuevos: 5 Match Point + rechazo team_size=4 en WSOW BR).
+- Frontend `npm run lint` → 0 errores, 11 warnings preexistentes.
+- Frontend `npm run build` → exitoso.
+
+**NO se hizo (fuera de scope / decision):**
+- No se implemento el estado "Match Point" persistente ni la coronacion por primer ganador en Match Point (eso es D4 completo).
+- No se cambio Gedeon Roulette WS BR (sigue 4).
+- No se toco Switcharo/KD, agentes/copilot, react-brackets, ni se redisenó UI.
+- No hubo commit.
+
+**Pendiente / a confirmar con Vito:**
+- Gedeon Roulette WS BR ya bajo a 3 (confirmado 2026-07-07). Todos los wsow_like en 3.
+- Fit/Reset del bracket (`BracketView`) SÍ estan implementados; "no funcionan" es porque el board no desborda (scale=1). Pulido front P2 (Vito: no tocar este sprint).
+- Empate en Match Point: NO se creo estado `needs_review` (decision Vito: no inventar estados). El torneo sigue activo y se resuelve con partida de desempate.
+- Historial de archivados → PARKING_LOT (no en este sprint).
+- D4 completo (estado "Match Point" persistente + coronacion por primer ganador en Match Point) sigue pendiente.
+
+---
+
 ## ULTIMO SPRINT EJECUTADO - E2.d Kill Race bracket con BYE
 
 **Fecha:** 2026-07-06

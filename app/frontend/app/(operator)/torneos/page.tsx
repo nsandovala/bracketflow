@@ -21,7 +21,7 @@ const TOURNAMENT_MOTORS = [
     id: "world-series",
     engineKey: "wsow_br",
     name: "World Series BR",
-    tags: ["BR", "4v4", "WSOW"],
+    tags: ["BR", "3v3", "WSOW"],
     status: "Disponible",
     tone: "available",
   },
@@ -79,7 +79,7 @@ export default function TorneosPage() {
   const [tournamentGame, setTournamentGame] = useState("Warzone");
   const [selectedEngineKey, setSelectedEngineKey] =
     useState<TournamentEngineKey>("wsow_br");
-  const [teamSize, setTeamSize] = useState<TeamSize>(4);
+  const [teamSize, setTeamSize] = useState<TeamSize>(3);
   const [lobbySize, setLobbySize] = useState("50");
   const [rouletteGameMode, setRouletteGameMode] = useState<"br" | "rebirth">("rebirth");
   const [matchPointPreset, setMatchPointPreset] = useState<"125" | "150" | "custom">("125");
@@ -141,7 +141,8 @@ export default function TorneosPage() {
 
   function updateRouletteMode(mode: "br" | "rebirth") {
     setRouletteGameMode(mode);
-    setTeamSize(mode === "br" ? 4 : 3);
+    // Override de producto 2026-07-07: Gedeon opera con 3 tanto en BR como Rebirth.
+    setTeamSize(3);
     setLobbySize(mode === "br" ? "50" : "16");
   }
 

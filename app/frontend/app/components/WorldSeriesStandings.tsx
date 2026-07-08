@@ -4,7 +4,13 @@ import ContextBar from "./ContextBar";
 
 import { Match, Team, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
-import { findChampion, isTournamentCompleted } from "../../lib/tournamentStatus";
+import {
+  findChampion,
+  getMatchPointStatus,
+  getMatchPointStatusMessage,
+  getTeamRosterText,
+  isTournamentCompleted,
+} from "../../lib/tournamentStatus";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 
 type WorldSeriesStandingsProps = {
@@ -39,6 +45,21 @@ export default function WorldSeriesStandings({
     : false;
   const champion = isBracket ? findChampion(matches, teams) : null;
   const isCompleted = isBracket ? isTournamentCompleted(matches) : false;
+  const matchPointStatus =
+    selectedEngine && !isBracket
+      ? getMatchPointStatus({
+          tournament: selectedTournament,
+          threshold: selectedEngine.matchPointThreshold,
+          standings,
+          teams,
+          matches,
+        })
+      : { state: "idle" as const };
+  const matchPointMessage = isBracket ? null : getMatchPointStatusMessage(matchPointStatus);
+  const matchPointRoster =
+    matchPointStatus.state === "champion"
+      ? getTeamRosterText(matchPointStatus.champion) || "Roster pendiente"
+      : null;
 
   return (
     <main className="bf-shell-standings">
@@ -64,9 +85,11 @@ export default function WorldSeriesStandings({
                 : totalTeams > 0
                   ? `${teams.length} equipos sembrados. Bracket listo.`
                   : "Falta generar bracket. Carga participantes y confirma equipos."
-              : afterGameNumber > 0
-                ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
-                : "Los resultados aparecerán al reportar la primera partida."}
+              : matchPointMessage
+                ? matchPointMessage
+                : afterGameNumber > 0
+                  ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
+                  : "Los resultados aparecerán al reportar la primera partida."}
           </p>
         </div>
 
@@ -85,6 +108,22 @@ export default function WorldSeriesStandings({
           </select>
         </label>
       </section>
+
+      {!isBracket && matchPointStatus.state !== "idle" ? (
+        <section className={`bf-status-banner ${matchPointStatus.state === "champion" ? "is-success" : "is-warning"}`}>
+          <span className="bf-status-banner-kicker">
+            {matchPointStatus.state === "champion" ? "Campeon por Match Point" : "Estado Match Point"}
+          </span>
+          <strong className="bf-status-banner-title">
+            {matchPointStatus.state === "champion"
+              ? matchPointStatus.championLabel
+              : "Match Point alcanzado"}
+          </strong>
+          <span className="bf-status-banner-sub">
+            {matchPointStatus.state === "champion" ? matchPointRoster : matchPointMessage}
+          </span>
+        </section>
+      ) : null}
 
       <section className="bf-standings-panel">
         {isBracket ? (
