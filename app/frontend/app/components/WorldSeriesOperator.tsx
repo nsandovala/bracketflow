@@ -219,6 +219,13 @@ export default function WorldSeriesOperator({
     matchPointStatus.state === "champion"
       ? getTeamRosterText(matchPointStatus.champion) || "Roster pendiente"
       : null;
+  // Torneo finalizado: no se opera despues de campeon / Match Point resuelto.
+  // No inventamos campeon en frontend; solo reflejamos estado ya decidido por backend.
+  const isFinalized =
+    selectedTournament?.status === "completed" ||
+    (typeof selectedTournament?.config?.championTeamId === "number" &&
+      selectedTournament.config.championTeamId > 0) ||
+    matchPointStatus.state === "champion";
   const importFormatExample = useMemo(() => {
     const expectedTeamSize = Math.max(selectedEngine?.teamSize ?? 3, 1);
     const playersHint = Array.from(
@@ -904,14 +911,42 @@ export default function WorldSeriesOperator({
               </div>
             </div>
 
-            <button
-              type="button"
-              className={`opr-next${canCreateNextGame ? " is-ready" : ""}`}
-              disabled={!canCreateNextGame || submitting}
-              onClick={onCreateNextGame}
-            >
-              Crear Partida {nextGameNumber} <span className="arrow">→</span>
-            </button>
+            {isFinalized ? (
+              <div className="opr-finalized-cta">
+                <span className="bf-inline-note">
+                  Torneo finalizado. No se crean nuevas partidas.
+                </span>
+                <div className="bf-hub-form-actions">
+                  <Link
+                    href={`/standings?tournamentId=${selectedTournament.id}`}
+                    className="bf-button bf-button-ghost"
+                  >
+                    Ver Standings
+                  </Link>
+                  <Link
+                    href={`/stream?tournamentId=${selectedTournament.id}`}
+                    className="bf-button bf-button-ghost"
+                  >
+                    Ver Stream
+                  </Link>
+                  <Link href="/dashboard" className="bf-button bf-button-ghost">
+                    Dashboard
+                  </Link>
+                  <Link href="/torneos" className="bf-button bf-button-ghost">
+                    Volver a Torneos
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={`opr-next${canCreateNextGame ? " is-ready" : ""}`}
+                disabled={!canCreateNextGame || submitting}
+                onClick={onCreateNextGame}
+              >
+                Crear Partida {nextGameNumber} <span className="arrow">→</span>
+              </button>
+            )}
           </section>
 
           <div className="opr-stats">
@@ -1087,6 +1122,7 @@ export default function WorldSeriesOperator({
                             inputMode="numeric"
                             value={draft.kills}
                             placeholder="0"
+                            disabled={isFinalized}
                             onChange={(event) =>
                               onUpdateDraft(activeMatch.id, team.id, { kills: event.target.value })
                             }
@@ -1100,6 +1136,7 @@ export default function WorldSeriesOperator({
                               inputMode="numeric"
                               value={draft.placement}
                               placeholder={`1-${effectiveLobbySize}`}
+                              disabled={isFinalized}
                               onChange={(event) =>
                                 onUpdateDraft(activeMatch.id, team.id, {
                                   placement: event.target.value,
@@ -1118,10 +1155,10 @@ export default function WorldSeriesOperator({
                         <button
                           type="button"
                           className="opr-save"
-                          disabled={submitting}
+                          disabled={submitting || isFinalized}
                           onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
                         >
-                          {isSaved ? "Editar" : "Guardar reporte"}
+                          {isFinalized ? "Torneo finalizado" : isSaved ? "Editar" : "Guardar reporte"}
                         </button>
                       </div>
                     </article>

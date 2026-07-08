@@ -35,6 +35,14 @@ def ensure_battle_royale_tournament(tournament) -> None:
         )
 
 
+def ensure_tournament_is_mutable(tournament) -> None:
+    if crud.is_tournament_finalized(tournament):
+        raise HTTPException(
+            status_code=409,
+            detail="Torneo finalizado: no se permiten nuevas operaciones.",
+        )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -407,6 +415,7 @@ def create_match(
 ) -> schemas.Match:
     tournament = get_tournament_or_404(db, tournament_id)
     ensure_battle_royale_tournament(tournament)
+    ensure_tournament_is_mutable(tournament)
     if crud.requires_roulette(tournament) and not crud.get_teams_by_tournament(db, tournament_id):
         raise HTTPException(
             status_code=400,
@@ -427,6 +436,7 @@ def upsert_match_result(
 
     tournament = get_tournament_or_404(db, match.tournament_id)
     ensure_battle_royale_tournament(tournament)
+    ensure_tournament_is_mutable(tournament)
 
     team = crud.get_team(db, payload.team_id)
     if team is None or team.tournament_id != tournament.id:
@@ -470,6 +480,7 @@ def upsert_match_map(
             status_code=400,
             detail="This endpoint is only available for Kill Race tournaments",
         )
+    ensure_tournament_is_mutable(tournament)
 
     try:
         return crud.upsert_map_result(db, tournament, match, payload)

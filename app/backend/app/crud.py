@@ -75,6 +75,18 @@ def write_tournament_config(tournament: models.Tournament, config: dict) -> None
     tournament.config = json.dumps(config) if config else None
 
 
+def is_tournament_finalized(tournament: models.Tournament) -> bool:
+    """Torneo cerrado: campeon ya decidido. No admite mutaciones operativas.
+
+    Se considera finalizado si status == "completed" o si config.championTeamId
+    existe y es > 0 (persistido por evaluate_match_point / cierre de bracket).
+    """
+    if tournament.status == "completed":
+        return True
+    champion_team_id = read_tournament_config(tournament).get("championTeamId")
+    return isinstance(champion_team_id, int) and champion_team_id > 0
+
+
 def uses_roulette_timer(engine_key: str | None, config: dict) -> bool:
     return config.get("roster_policy") == "roulette" or engine_key in {
         "roulette_ws",

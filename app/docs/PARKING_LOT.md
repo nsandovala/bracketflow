@@ -131,3 +131,27 @@ Eso después puede ser roster_policy: "switcharo" dentro del mismo motor Kill Ra
 - Switcharo/KD: ruleta por buckets KD bajo-medio y KD medio-alto para formar equipos balanceados.
 - OCR/prints para carga asistida de resultados.
 - Agentes/copilot solo como propuesta pendiente; el core debe funcionar manual-first.
+
+## UI/UX — Arena dorada Gedeon
+
+Feature visual futura para rediseño de Gedeon Roulette y momentos de torneo.
+
+Objetivo:
+Convertir la experiencia de ruleta/bracket/campeón en una arena digital premium.
+
+Aplicaciones:
+- partículas doradas tipo arena en ruleta;
+- glow dorado al generar equipos;
+- efecto de campeón con borde/trofeo/casco;
+- líneas doradas sutiles en bracket ganador;
+- variantes de partículas por estado: operativo, arena, campeón.
+
+Reglas:
+- no usar efectos que tapen datos;
+- no romper performance;
+- no parecer casino;
+- animaciones cortas y con propósito;
+- accesible/reducible con prefers-reduced-motion.
+
+Prioridad:
+Después de cerrar F0 y durante `feat/ui-ux-operator-bracket-polish`.

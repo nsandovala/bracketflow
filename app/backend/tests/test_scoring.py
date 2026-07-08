@@ -8,11 +8,13 @@ y puntos negativos cuando placement > equipos inscritos.
 import json
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import schemas
+from app.main import create_match, upsert_match_map, upsert_match_result
 from app.crud import (
     calculate_points,
     close_roster_respin,
@@ -639,3 +641,104 @@ def test_match_point_tie_stays_active_until_a_tiebreak_partida_decides(db_sessio
     db_session.refresh(tournament)
     assert tournament.status == "completed"
     assert json.loads(tournament.config)["championTeamId"] == team_a.id
+
+
+# ---------------------------------------------------------------------------
+# Guard de torneo finalizado (F0): el backend rechaza mutaciones operativas
+# cuando el torneo ya esta completed / tiene championTeamId.
+# ---------------------------------------------------------------------------
+
+
+# Se prueban las funciones-endpoint directamente (sin TestClient/httpx) para no
+# agregar dependencias de red a la suite; el guard vive en la capa de endpoint.
+FINALIZED_DETAIL = "Torneo finalizado: no se permiten nuevas operaciones."
+
+
+def _crown_wsow_champion(db_session):
+    """Arma un torneo WSOW coronado: status completed + championTeamId persistido."""
+    tournament = _create_wsow_br_tournament(db_session, threshold=30)
+    match, team_ids = _seed_match_point_results(
+        db_session, tournament, [("Alpha", 20, 1), ("Bravo", 5, 2)]
+    )
+    champion = evaluate_match_point(db_session, tournament)
+    db_session.commit()
+    assert champion == team_ids["Alpha"]
+    assert tournament.status == "completed"
+    assert json.loads(tournament.config)["championTeamId"] == team_ids["Alpha"]
+    return tournament, match, team_ids
+
+
+def test_finalized_tournament_rejects_new_match(db_session):
+    tournament, _, _ = _crown_wsow_champion(db_session)
+    before = len(get_matches_by_tournament(db_session, tournament.id))
+
+    with pytest.raises(HTTPException) as exc:
+        create_match(tournament.id, schemas.MatchCreate(round=2), db_session)
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == FINALIZED_DETAIL
+    assert len(get_matches_by_tournament(db_session, tournament.id)) == before
+
+
+def test_finalized_tournament_rejects_result_upsert(db_session):
+    tournament, match, team_ids = _crown_wsow_champion(db_session)
+
+    with pytest.raises(HTTPException) as exc:
+        upsert_match_result(
+            match.id,
+            schemas.TeamResultUpsert(team_id=team_ids["Alpha"], kills=999, placement=1),
+            db_session,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == FINALIZED_DETAIL
+
+    saved = (
+        db_session.query(TeamResult)
+        .filter(TeamResult.match_id == match.id, TeamResult.team_id == team_ids["Alpha"])
+        .first()
+    )
+    assert saved.kills == 20  # sin alterar
+    db_session.refresh(tournament)
+    assert json.loads(tournament.config)["championTeamId"] == team_ids["Alpha"]
+
+
+def test_finalized_tournament_rejects_kill_race_map(db_session):
+    tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
+    add_players(db_session, tournament.id, 8)
+    tournament = open_roster_respin(db_session, tournament, 180)
+    generate_roulette_teams(
+        db_session,
+        tournament,
+        schemas.RouletteGenerationRequest(shuffle_seed="finalized", reset=True),
+    )
+    tournament = close_roster_respin(db_session, tournament)
+    tournament = lock_roster(db_session, tournament)
+    tournament = open_bracket_respin(db_session, tournament, 3)
+    generate_bracket(db_session, tournament)
+    tournament = lock_bracket(db_session, tournament)
+    first_match = get_matches_by_tournament(db_session, tournament.id)[0]
+
+    # Simula torneo cerrado (campeon decidido). El guard por torneo debe cerrar
+    # la escritura de mapas aun cuando el match individual siga sin winner.
+    tournament.status = "completed"
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        upsert_match_map(
+            first_match.id,
+            schemas.MapResultUpsert(
+                match_id=first_match.id,
+                map_number=1,
+                kills_a=12,
+                kills_b=8,
+            ),
+            db_session,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == FINALIZED_DETAIL
+
+    db_session.refresh(first_match)
+    assert first_match.maps == []  # ningun mapa persistido
+    assert first_match.winner_id is None
