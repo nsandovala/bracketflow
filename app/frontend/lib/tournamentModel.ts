@@ -63,7 +63,7 @@ export const TOURNAMENT_ENGINES: Record<TournamentEngineKey, EnginePreset> = {
     game_mode: "br",
     roster_policy: "fixed_squad",
     tournament_structure: "cumulative",
-    team_size: 4,
+    team_size: 3,
     requiresPlacement: true,
     requiresUniquePlacement: true,
     defaultLobbySize: 50,
@@ -261,6 +261,14 @@ function readConfig(tournament: Tournament): TournamentConfig {
       config.rouletteStatus === "generated" || config.rouletteStatus === "confirmed"
         ? config.rouletteStatus
         : undefined,
+    championTeamId:
+      typeof config.championTeamId === "number" &&
+      Number.isFinite(config.championTeamId) &&
+      config.championTeamId > 0
+        ? config.championTeamId
+        : undefined,
+    championDecidedAt:
+      typeof config.championDecidedAt === "string" ? config.championDecidedAt : undefined,
   };
 }
 

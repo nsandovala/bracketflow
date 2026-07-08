@@ -214,6 +214,12 @@ export default function RouletteArena({
   const missingPlayers = Math.max(minimumPlayers - players.length, 0);
   const hasConfirmedTeams = teams.length > 0;
   const isKillRace = engine.engineKey === "kill_race_bracket";
+  // El bracket ya fue generado y no admite re-open: evita disparar
+  // bracket-respin/open y recibir 409. En ese caso solo se ofrece "Ver bracket".
+  const bracketAlreadyExists =
+    tournament.bracket_status === "locked" ||
+    tournament.bracket_status === "running" ||
+    tournament.bracket_status === "completed";
   const rosterCountdown = formatCountdown(tournament.roster_respin_deadline_at, now);
   const rosterOpen = tournament.roster_status === "respin_open" && rosterCountdown !== "00:00";
   const timerSecondsRaw = (() => {
@@ -226,7 +232,7 @@ export default function RouletteArena({
   const modeBadge =
     engine.engineKey === "roulette_ws"
       ? engine.gameMode === "br"
-        ? "BR 4v4"
+        ? "BR 3v3"
         : "Rebirth 3v3"
       : `${teamSize}v${teamSize}`;
   const confirmedBench = engine.config.rouletteBench ?? [];
@@ -772,17 +778,28 @@ export default function RouletteArena({
           <div className="bf-hub-form-actions bf-roulette-bottom-actions-v3">
             {isKillRace ? (
               <>
-                <button
-                  type="button"
-                  className="bf-button bf-button-primary"
-                  disabled={submitting || tournament.roster_status !== "locked" || !onGenerateBracket}
-                  onClick={() => void onGenerateBracket?.()}
-                >
-                  Preparar bracket
-                </button>
-                <Link href={`/operator?tournamentId=${tournament.id}&tab=bracket`} className="bf-button bf-button-ghost">
-                  Ver bracket
-                </Link>
+                {bracketAlreadyExists ? (
+                  <Link
+                    href={`/operator?tournamentId=${tournament.id}&tab=bracket`}
+                    className="bf-button bf-button-primary"
+                  >
+                    Ver bracket
+                  </Link>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="bf-button bf-button-primary"
+                      disabled={submitting || tournament.roster_status !== "locked" || !onGenerateBracket}
+                      onClick={() => void onGenerateBracket?.()}
+                    >
+                      Preparar bracket
+                    </button>
+                    <Link href={`/operator?tournamentId=${tournament.id}&tab=bracket`} className="bf-button bf-button-ghost">
+                      Ver bracket
+                    </Link>
+                  </>
+                )}
               </>
             ) : (
               <>

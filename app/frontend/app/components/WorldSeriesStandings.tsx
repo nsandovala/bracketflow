@@ -4,7 +4,7 @@ import ContextBar from "./ContextBar";
 
 import { Match, Team, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
-import { findChampion, isTournamentCompleted } from "../../lib/tournamentStatus";
+import { findChampion, getTeamDisplayName, isTournamentCompleted } from "../../lib/tournamentStatus";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 
 type WorldSeriesStandingsProps = {
@@ -39,6 +39,11 @@ export default function WorldSeriesStandings({
     : false;
   const champion = isBracket ? findChampion(matches, teams) : null;
   const isCompleted = isBracket ? isTournamentCompleted(matches) : false;
+  const matchPointChampionId = selectedEngine?.config.championTeamId ?? null;
+  const matchPointChampion =
+    !isBracket && matchPointChampionId
+      ? teams.find((team) => team.id === matchPointChampionId) ?? null
+      : null;
 
   return (
     <main className="bf-shell-standings">
@@ -64,9 +69,11 @@ export default function WorldSeriesStandings({
                 : totalTeams > 0
                   ? `${teams.length} equipos sembrados. Bracket listo.`
                   : "Falta generar bracket. Carga participantes y confirma equipos."
-              : afterGameNumber > 0
-                ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
-                : "Los resultados aparecerán al reportar la primera partida."}
+              : matchPointChampion
+                ? `Campeón por Match Point: ${getTeamDisplayName(matchPointChampion)}.`
+                : afterGameNumber > 0
+                  ? `Resultados acumulados después de la Partida ${afterGameNumber}.`
+                  : "Los resultados aparecerán al reportar la primera partida."}
           </p>
         </div>
 

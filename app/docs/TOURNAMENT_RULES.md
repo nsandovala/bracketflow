@@ -24,7 +24,7 @@ Frase dura: Kill Race NO es un standing, es una llave. El standing puede existir
 - scoring: `wsow_like`
 - Vista principal: standings acumulativos.
 - Input por partida: kills + placement.
-- `team_size`: 4 jugadores por equipo. En BracketFlow/Gedeon, BR opera con 4 jugadores por equipo; Rebirth opera con 3.
+- `team_size`: **3 jugadores por equipo** (override de producto Vito, 2026-07-07). Antes era 4; se bajo a 3 a pedido explicito del owner en `fix/f0-four-engines-residual`. Rebirth WS tambien opera con 3. Gedeon Roulette WS **BR sigue en 4** hasta confirmacion.
 - `lobby_size`: default 50 squads.
 - Placement: obligatorio, unico por partida, validado contra `lobby_size`.
 
@@ -73,7 +73,7 @@ Multiplicadores Rebirth:
 - Vista principal: standings.
 - La ruleta solo arma rosters; el scoring sigue siendo WSOW-like.
 - Flujo: crear torneo, cargar lista de participantes, definir mode/team_size/lobby_size, generar equipos aleatorios, cargar kills + placement, ver standings.
-- `team_size`: 3 si Rebirth, 4 si BR.
+- `team_size`: **3 tanto en BR como en Rebirth** (override de producto Vito, 2026-07-07; antes BR=4). `lobby_size` sigue 50 en BR / 16 en Rebirth.
 - No es Kill Race.
 
 ## Kill Race Bracket
@@ -100,8 +100,10 @@ Aplica a `wsow_br`, `rebirth_ws` y `roulette_ws`. No aplica a `kill_race_bracket
 - Configurable por torneo.
 - No hardcodear el umbral: oficial uso 125; comunidad usa 125 o 150.
 - UI: sugerencias 125 / 150 / custom.
-- Logica futura: al cruzar el umbral, el equipo queda en estado "Match Point" desde la siguiente partida; el primer equipo en Match Point que gana una partida es campeon.
-- En este sprint se documenta y persiste config; la coronacion se implementa en scoring completo.
+- Cierre minimo implementado (2026-07-07, `fix/f0-four-engines-residual`): **al cerrar cada partida** (todos los equipos reportaron) se recalcula el leaderboard real; si el primer lugar es **unico** y su score total `>= matchPointThreshold`, el torneo se cierra (`status=completed`) y se persiste el campeon en `config.championTeamId` (+ `championDecidedAt`). Sobrevive a F5. No se corona a mitad de partida: en el ultimo circulo de zona el 2do lugar puede igualar al 1ro.
+- Si hay **empate de score en el primer lugar** sobre el umbral, NO se corona automatico: el torneo queda activo para revision manual.
+- Solo aplica a motores wsow_like / standings; Kill Race lo rechaza a nivel de contrato.
+- Pendiente D4 (scoring completo): estado explicito "Match Point" desde la siguiente partida y coronacion por primer ganador en Match Point. Este cierre F0 es el minimo por lider unico.
 
 ## Tie-Breakers Standings
 

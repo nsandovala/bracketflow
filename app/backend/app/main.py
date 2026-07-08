@@ -364,10 +364,6 @@ def lock_bracket_respin(
         return crud.lock_bracket(db, tournament)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    return schemas.BracketGenerationResult(
-        matches_created=len(created_matches),
-        status=updated_tournament.status,
-    )
 
 
 @app.post(

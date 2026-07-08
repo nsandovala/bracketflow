@@ -4,6 +4,44 @@
 > Fecha: 2026-06-30
 > Estado: rescate P0 de Kill Race BO3 validado.
 
+## Sprint F0 residual - four-engines backend/state
+
+**Fecha:** 2026-07-07
+**Rama:** `fix/f0-four-engines-residual` (sin commit)
+
+### Diagnostico (con archivo/linea)
+
+| Hallazgo QA | Diagnostico real | Resolucion |
+|---|---|---|
+| `409` repetido en `bracket-respin/open` | Backend correcto (`crud.py:539-548`): rechaza re-open sobre bracket `locked/running/completed`. Faltaba guard en front (`RouletteArena` botón "Preparar bracket" seguia activo tras generar). | Guard en front: "Ver bracket" reemplaza a "Preparar bracket" si el bracket ya existe; `generateBracketForSelected` corta temprano. |
+| "Ver bracket" no lleva al lugar correcto | `mode` en `WorldSeriesOperator` se calculaba solo en el mount; `?tab=bracket` no cambiaba de vista con el componente ya montado. | Reconciliacion en render (patron React, sin setState-en-effect). |
+| Match Point 125 "no cierra" | No estaba implementado: cero logica que leyera `matchPointThreshold` para cerrar (grep confirmado). No era "mal leido/persistido". | Cierre minimo por lider unico ≥ umbral; empate no corona. |
+| WSOW BR "deberia ser 3" | Backend YA usaba 4 (correcto vs Warzone real). Contradecia hallazgo QA. Owner decidio override a 3. | `team_size=3` en contrato, preset, default, docs. |
+| Gedeon "arma equipos mal" | Backend correcto (tests verdes 4 BR / 3 Rebirth). Es visual/nav, no estado. | Fuera de scope (Fase 3 / P2). |
+| Fit/Reset "no funcionan" | SÍ estan implementados (`BracketView.tsx:184-198`); no hay cambio visible si el board no desborda (scale=1). | Pulido front P2, sin backend. |
+
+### QA ejecutado
+
+| Check | Resultado |
+|---|---|
+| Backend `pytest` | **57 passed** (51 previos + 6 nuevos) |
+| Match Point: corona lider unico ≥ umbral | PASA (test + wiring via `upsert_team_result`) |
+| Match Point: empate en 1er lugar sobre umbral | PASA: NO corona, torneo activo |
+| Match Point: bajo umbral | PASA: no corona |
+| Match Point: Kill Race excluido | PASA: threshold None |
+| Campeon persiste (F5) | PASA: `config.championTeamId` + `status=completed` reload real |
+| WSOW BR rechaza team_size=4 | PASA (contrato ahora exige 3) |
+| Frontend `npm run lint` | 0 errores, 11 warnings preexistentes |
+| Frontend `npm run build` | Exitoso |
+
+### Pendiente real
+- Todos los motores wsow_like quedaron en `team_size=3` (WSOW BR, Rebirth, Gedeon BR y Rebirth). Confirmado por Vito 2026-07-07.
+- Empate en Match Point: NO corona, torneo sigue activo, se resuelve con partida de desempate; al cerrar esa partida completa se recalcula y solo corona si hay lider unico. Sin estado `needs_review` nuevo (decision Vito). Cubierto por `test_match_point_tie_stays_active_until_a_tiebreak_partida_decides`.
+- D4 completo (estado Match Point persistente + coronacion por primer ganador) sigue pendiente; esto es el cierre minimo por lider unico.
+- Validacion visual navegador por Vito de "Ver bracket" y del banner de campeon en Standings.
+
+---
+
 ## Sprint E2.d - Kill Race bracket con BYE
 
 **Fecha:** 2026-07-06

@@ -157,6 +157,24 @@ export default function WorldSeriesOperator({
         ? "bracket"
         : "op"
   );
+
+  const rouletteParam = searchParams.get("roulette");
+  const tabParam = searchParams.get("tab");
+
+  // "Ver bracket" navega con ?tab=bracket, pero el operator puede estar ya montado.
+  // Sin este sync, mode se calculaba solo en el mount y el link parecia no hacer nada.
+  // Patron oficial de React: reconciliar en render cuando cambia el parametro de nav,
+  // en vez de setState dentro de un effect.
+  const navKey = `${rouletteParam ?? ""}|${tabParam ?? ""}`;
+  const [syncedNavKey, setSyncedNavKey] = useState(navKey);
+  if (navKey !== syncedNavKey) {
+    setSyncedNavKey(navKey);
+    if (rouletteParam === "1") {
+      setMode("setup");
+    } else if (tabParam === "bracket") {
+      setMode("bracket");
+    }
+  }
   const [filter, setFilter] = useState<ResultFilter>("all");
   const [teamImportMessage, setTeamImportMessage] = useState<string | null>(null);
   const teamFileInputRef = useRef<HTMLInputElement>(null);

@@ -532,7 +532,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     return createEngineTournament({
       ...payload,
       preset: ENGINE_PRESETS.wsow_br,
-      teamSize: 4,
+      teamSize: 3,
       lobbySize: 50,
       matchPointThreshold: 125,
     });
@@ -950,6 +950,18 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       if (currentTournament.roster_status !== "locked") {
         await refreshSelectedTournament(selectedTournamentId);
         setMessage("Primero cierra el respin y bloquea equipos.");
+        return null;
+      }
+
+      // El bracket ya existe (locked/running/completed): reabrir respin daria 409.
+      // No reintentamos: el bracket ya esta listo para operar.
+      if (
+        currentTournament.bracket_status === "locked" ||
+        currentTournament.bracket_status === "running" ||
+        currentTournament.bracket_status === "completed"
+      ) {
+        await refreshSelectedTournament(selectedTournamentId);
+        setMessage("El bracket ya esta generado. Abrelo desde Ver bracket.");
         return null;
       }
 
