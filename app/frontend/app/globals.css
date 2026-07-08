@@ -5681,6 +5681,57 @@ a:focus-visible {
   opacity: 0.85;
 }
 
+.bf-roulette-team-list-v3 {
+  display: grid;
+  gap: 10px;
+  max-height: min(56vh, 560px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.bf-roulette-team-list-row-v3 {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--bf-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+    rgba(7, 12, 18, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.bf-roulette-team-list-head-v3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bf-roulette-team-list-head-v3 strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--bf-text);
+}
+
+.bf-roulette-team-list-head-v3 span {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--bf-accent) 62%, white 38%);
+}
+
+.bf-roulette-team-list-roster-v3 {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--bf-text) 76%, var(--bf-muted) 24%);
+  word-break: break-word;
+}
+
 /* Seed rows v3 */
 .bf-roulette-seed-rows-v3 {
   display: grid;
@@ -5801,6 +5852,14 @@ a:focus-visible {
   .bf-roulette-portal-ring.ring-4 { width: 240px; height: 240px; }
   .bf-roulette-teams-grid-v3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bf-roulette-team-list-v3 {
+    max-height: 420px;
+  }
+  .bf-roulette-team-list-head-v3 {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
   .bf-roulette-seed-row-v3 {
     grid-template-columns: 28px minmax(0, 1fr) 24px minmax(0, 1fr);

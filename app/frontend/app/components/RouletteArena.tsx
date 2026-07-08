@@ -14,6 +14,7 @@ import {
 import {
   BracketTeam,
   getTeamDisplayName,
+  getTeamPlayers,
   getTeamSeedLabel,
   getTeamShortDisplayName,
 } from "../../lib/bracketDisplay";
@@ -214,6 +215,7 @@ export default function RouletteArena({
   const missingPlayers = Math.max(minimumPlayers - players.length, 0);
   const hasConfirmedTeams = teams.length > 0;
   const isKillRace = engine.engineKey === "kill_race_bracket";
+  const isRouletteWs = engine.engineKey === "roulette_ws";
   // El bracket ya fue generado y no admite re-open: evita disparar
   // bracket-respin/open y recibir 409. En ese caso solo se ofrece "Ver bracket".
   const bracketAlreadyExists =
@@ -394,6 +396,35 @@ export default function RouletteArena({
                 {playerNames}
               </div>
             </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderGeneratedTeamList = () => {
+    if (resultTeams.length === 0) {
+      return <p className="bf-empty">Gira la ruleta para ver equipos.</p>;
+    }
+    return (
+      <div className="bf-roulette-team-list-v3">
+        {resultTeams.map((team, index) => {
+          const numericName = team.name.match(/\d+/)?.[0];
+          const teamLabel = numericName ? `Equipo ${numericName}` : `Equipo ${index + 1}`;
+          const seedLabel = getTeamSeedLabel(team, index + 1);
+          const playerNames = getTeamPlayers(team).join(" / ");
+          return (
+            <article
+              key={team.name || index}
+              className={`bf-roulette-team-list-row-v3${preview ? " is-stagger" : ""}`}
+              style={preview ? { animationDelay: `${index * 60}ms` } : undefined}
+            >
+              <div className="bf-roulette-team-list-head-v3">
+                <strong>{teamLabel}</strong>
+                <span>{seedLabel}</span>
+              </div>
+              <p className="bf-roulette-team-list-roster-v3">{playerNames || "Sin roster"}</p>
+            </article>
           );
         })}
       </div>
@@ -764,6 +795,8 @@ export default function RouletteArena({
                 </div>
               ))}
             </div>
+          ) : isRouletteWs ? (
+            renderGeneratedTeamList()
           ) : (
             renderTeamGrid()
           )}
