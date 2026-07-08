@@ -46,7 +46,7 @@ function roundTitle(roundNumber: number, totalRounds: number) {
   if (roundNumber === totalRounds - 2) {
     return "Cuartos";
   }
-  return `Round ${roundNumber}`;
+  return `Ronda ${roundNumber}`;
 }
 
 function getStatusMeta(status: Match["status"]): {

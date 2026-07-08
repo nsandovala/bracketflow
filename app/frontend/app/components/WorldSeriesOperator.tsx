@@ -4,7 +4,14 @@ import { FormEventHandler, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { Match, Player, Team, TeamResultDetail, Tournament } from "../../lib/api";
+import {
+  Match,
+  ParticipantImportResult,
+  Player,
+  Team,
+  TeamResultDetail,
+  Tournament,
+} from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
 import {
@@ -41,6 +48,7 @@ type WorldSeriesOperatorProps = {
   teamFormError: string | null;
   resultDrafts: Record<string, ResultDraft>;
   killRaceMapDrafts: Record<number, KillRaceMapDraft>;
+  onPreviewParticipants?: (rows: string[]) => Promise<ParticipantImportResult | null>;
   onSelectTournament: (tournamentId: number) => void;
   onTeamNameChange: (value: string) => void;
   onTeamRosterChange: (value: string) => void;
@@ -121,6 +129,7 @@ export default function WorldSeriesOperator({
   teamFormError,
   resultDrafts,
   killRaceMapDrafts,
+  onPreviewParticipants,
   onSelectTournament,
   onTeamNameChange,
   onTeamRosterChange,
@@ -286,6 +295,7 @@ export default function WorldSeriesOperator({
             players={players}
             teams={teams}
             submitting={submitting}
+            onPreviewParticipants={onPreviewParticipants}
             onImportParticipants={onImportParticipants}
             onRemoveParticipant={onRemoveParticipant}
             onClearParticipants={onClearParticipants}
@@ -449,11 +459,19 @@ export default function WorldSeriesOperator({
               {selectedTournament.roster_status === "locked" &&
               selectedTournament.bracket_status === "pending" ? (
                 <div className="bf-hub-form-actions">
+                  <button
+                    type="button"
+                    className="opr-save"
+                    disabled={submitting}
+                    onClick={() => void onGenerateBracket()}
+                  >
+                    Generar bracket
+                  </button>
                   {[3, 4, 5].map((minutes) => (
                     <button
                       key={minutes}
                       type="button"
-                      className="bf-button bf-button-primary"
+                      className="bf-button bf-button-ghost"
                       disabled={submitting}
                       onClick={() => void onOpenBracketRespin(minutes)}
                     >
@@ -674,6 +692,7 @@ export default function WorldSeriesOperator({
                 players={players}
                 teams={teams}
                 submitting={submitting}
+                onPreviewParticipants={onPreviewParticipants}
                 onImportParticipants={onImportParticipants}
                 onRemoveParticipant={onRemoveParticipant}
                 onClearParticipants={onClearParticipants}

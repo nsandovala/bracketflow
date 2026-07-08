@@ -11,7 +11,11 @@ import {
 
 import type { Match, Team, Tournament } from "../../lib/api";
 import type { ResolvedTournamentEngine } from "../../lib/tournamentModel";
-import { findChampion, isTournamentCompleted } from "../../lib/tournamentStatus";
+import {
+  findChampion,
+  getTeamShortDisplayName,
+  isTournamentCompleted,
+} from "../../lib/tournamentStatus";
 import {
   type ReactBracketSeed,
   toBracketRounds,
@@ -88,6 +92,47 @@ function renderSeed(props: IRenderSeedProps) {
 
 function renderRoundTitle(title: ReactNode) {
   return <div className="bf-rb-round-title">{title}</div>;
+}
+
+function seedOrder(slotCount: number): number[] {
+  if (slotCount <= 1) {
+    return [1];
+  }
+  const previous = seedOrder(slotCount / 2);
+  return previous.flatMap((seed) => [seed, slotCount + 1 - seed]);
+}
+
+function buildSeedPreview(teams: Team[], teamSize: number) {
+  if (teams.length === 0) {
+    return [];
+  }
+
+  const totalSlots = 1 << Math.ceil(Math.log2(Math.max(teams.length, 2)));
+  const orderedSeeds = seedOrder(totalSlots);
+  const maxNames = teamSize <= 2 ? 2 : 3;
+
+  const rows: Array<{
+    leftLabel: string;
+    leftSeed: number;
+    rightLabel: string;
+    rightSeed: number;
+  }> = [];
+
+  for (let index = 0; index < orderedSeeds.length; index += 2) {
+    const leftSeed = orderedSeeds[index];
+    const rightSeed = orderedSeeds[index + 1];
+    const leftTeam = teams[leftSeed - 1] ?? null;
+    const rightTeam = teams[rightSeed - 1] ?? null;
+
+    rows.push({
+      leftLabel: leftTeam ? getTeamShortDisplayName(leftTeam, maxNames) : "Pasa directo",
+      leftSeed,
+      rightLabel: rightTeam ? getTeamShortDisplayName(rightTeam, maxNames) : "Pasa directo",
+      rightSeed,
+    });
+  }
+
+  return rows;
 }
 
 function ChampionBlock({
@@ -171,14 +216,21 @@ export default function BracketView({
   const hasMatches = matches.length > 0;
   const champion = findChampion(matches, teams);
   const isCompleted = isTournamentCompleted(matches);
+  const seedPreview = buildSeedPreview(teams, engine?.teamSize ?? 2);
 
-  const title = isCompleted ? "Torneo finalizado" : hasMatches ? "Bracket" : "Falta generar bracket";
+  const title = isCompleted
+    ? "Torneo finalizado"
+    : hasMatches
+      ? "Bracket"
+      : hasTeams
+        ? "Seed listo para generar"
+        : "Falta generar bracket";
   const subtitle = isCompleted
     ? `Campeón: ${champion?.displayName ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
     : hasMatches
       ? `${teams.length} equipos sembrados - ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
       : hasTeams
-        ? "Los equipos ya existen. Genera la llave para empezar a operar el BO3."
+        ? "Los equipos ya existen. Este es el seed que se usará al generar la llave."
         : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
 
   function handleFit() {
@@ -220,12 +272,22 @@ export default function BracketView({
 
       {rounds.length === 0 ? (
         <div className="bf-bracket-empty">
-          <strong>Seed pendiente</strong>
+          <strong>{hasTeams ? "Seed listo" : "Seed pendiente"}</strong>
           <p>
             {hasTeams
-              ? "Los equipos estan listos, pero la llave todavia no fue generada."
+              ? "Los equipos están listos. Genera el bracket para persistir esta llave."
               : "Carga participantes y confirma equipos para pintar la llave."}
           </p>
+          {hasTeams && seedPreview.length > 0 ? (
+            <div>
+              {seedPreview.map((row, index) => (
+                <p key={`${row.leftSeed}-${row.rightSeed}`}>
+                  M{index + 1}: Seed #{row.leftSeed} {row.leftLabel} vs Seed #{row.rightSeed}{" "}
+                  {row.rightLabel}
+                </p>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : (
         <>

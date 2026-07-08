@@ -9,6 +9,7 @@ import StreamOverlaySidebar from "./StreamOverlaySidebar";
 import StreamStandingsBoard from "./StreamStandingsBoard";
 import { useStreamLeaderboard } from "../lib/useStreamLeaderboard";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import { getMatchPointStatus, getMatchPointStatusMessage } from "../../lib/tournamentStatus";
 
 type WorldSeriesStreamViewProps = {
   tournamentId: number | null;
@@ -32,6 +33,17 @@ export default function WorldSeriesStreamView({
     engine?.scoringProfile === "kill_race" ||
     engine?.tournamentStructure === "single_elim" ||
     engine?.tournamentStructure === "double_elim";
+  const matchPointStatus =
+    tournament && engine && !isBracket
+      ? getMatchPointStatus({
+          tournament,
+          threshold: engine.matchPointThreshold,
+          standings,
+          teams,
+          matches,
+        })
+      : { state: "idle" as const };
+  const matchPointMessage = isBracket ? null : getMatchPointStatusMessage(matchPointStatus);
 
   useEffect(() => {
     const body = document.body;
@@ -86,7 +98,7 @@ export default function WorldSeriesStreamView({
             <StreamOverlaySidebar
               standings={standings}
               tournamentName={tournament?.name ?? null}
-              tournamentGame={tournament?.game ?? null}
+              tournamentGame={matchPointMessage ?? tournament?.game ?? null}
               afterGameNumber={afterGameNumber}
               connected={connected}
               brand={brand}
@@ -97,7 +109,7 @@ export default function WorldSeriesStreamView({
           <div className="bf-ov-lower-anchor">
             <StreamOverlayLowerThird
               standings={standings}
-              tournamentGame={tournament?.game ?? null}
+              tournamentGame={matchPointMessage ?? tournament?.game ?? null}
               afterGameNumber={afterGameNumber}
               connected={connected}
               brand={brand}
@@ -127,7 +139,9 @@ export default function WorldSeriesStreamView({
             <span className="bf-stream-mark">BF</span>
             <div className="bf-stream-brand-copy">
               <h1 className="bf-stream-title">{tournament?.name ?? "BracketFlow"}</h1>
-              <p className="bf-stream-game">{tournament?.game ?? "World Series"}</p>
+              <p className="bf-stream-game">
+                {matchPointMessage ?? tournament?.game ?? "World Series"}
+              </p>
             </div>
           </div>
 

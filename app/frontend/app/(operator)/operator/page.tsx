@@ -44,6 +44,7 @@ function OperatorPageClient() {
     updateKillRaceMapDraft,
     selectMatch,
     selectTournament,
+    previewParticipantImport,
     importParticipants,
     removeParticipant,
     clearParticipants,
@@ -133,6 +134,7 @@ function OperatorPageClient() {
       onTeamNameChange={setTeamName}
       onTeamRosterChange={setTeamRoster}
       onCreateTeam={handleCreateTeam}
+      onPreviewParticipants={previewParticipantImport}
       onImportParticipants={importParticipants}
       onRemoveParticipant={removeParticipant}
       onClearParticipants={clearParticipants}

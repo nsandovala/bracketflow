@@ -163,6 +163,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const [killRaceMapDrafts, setKillRaceMapDrafts] = useState<Record<number, KillRaceMapDraft>>({});
 
   const selectedMatchIdRef = useRef<number | null>(selectedMatchId);
+  const refreshRequestRef = useRef(0);
 
   useEffect(() => {
     selectedMatchIdRef.current = selectedMatchId;
@@ -170,6 +171,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
   const refreshSelectedTournament = useCallback(
     async (tournamentId: number, options?: { preferLatestMatch?: boolean }) => {
+      const requestId = ++refreshRequestRef.current;
       const tournament = await getTournament(tournamentId);
       if (!isOperatorSupportedTournament(tournament)) {
         throw new Error("Selected tournament is not supported by Operator yet");
@@ -202,6 +204,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
             relevantMatches.some((match) => match.id === selectedMatchIdRef.current)
           ? selectedMatchIdRef.current
           : latestMatchId;
+
+      if (requestId !== refreshRequestRef.current) {
+        return;
+      }
 
       setSelectedTournament(tournament);
       setTeams(nextTeams);

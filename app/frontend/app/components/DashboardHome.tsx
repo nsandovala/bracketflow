@@ -14,6 +14,8 @@ import {
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import {
   findChampion,
+  getMatchPointStatus,
+  getMatchPointStatusMessage,
   getTeamDisplayName,
   isTournamentCompleted,
 } from "../../lib/tournamentStatus";
@@ -83,6 +85,17 @@ export default function DashboardHome() {
   const killRaceCurrentMatch = killRacePlayableMatches[0] ?? null;
   const killRaceChampion = isKillRace ? findChampion(matches, teams) : null;
   const killRaceCompleted = isKillRace ? isTournamentCompleted(matches) : false;
+  const matchPointStatus =
+    engine && !isKillRace
+      ? getMatchPointStatus({
+          tournament: selectedTournament,
+          threshold: engine.matchPointThreshold,
+          standings: sortedStandings,
+          teams,
+          matches,
+        })
+      : { state: "idle" as const };
+  const matchPointMessage = isKillRace ? null : getMatchPointStatusMessage(matchPointStatus);
   const killRaceProgress =
     matches.length > 0 ? `${killRaceCompletedSeries.length}/${matches.length} series cerradas` : "Bracket pendiente";
   const killRaceCurrentLabel =
@@ -141,13 +154,17 @@ export default function DashboardHome() {
                   : totalTeams > 0
                     ? "Falta preparar bracket"
                     : "Falta generar equipos"
-                : gameNumber > 0
+                : matchPointStatus.state === "champion"
+                  ? `Campeón: ${matchPointStatus.championLabel}`
+                  : gameNumber > 0
                   ? `Partida ${gameNumber}`
                   : "Sin partida abierta"}
             </span>
             <span aria-hidden="true">·</span>
             <span>
-              {leader ? (
+              {matchPointStatus.state === "threshold_reached" && matchPointMessage ? (
+                matchPointMessage
+              ) : leader ? (
                 <>
                   Líder: <strong>{leader.team_name}</strong>
                 </>
