@@ -44,6 +44,10 @@ export default function WorldSeriesStreamView({
         })
       : { state: "idle" as const };
   const matchPointMessage = isBracket ? null : getMatchPointStatusMessage(matchPointStatus);
+  const streamStatusLine =
+    matchPointStatus.state === "champion"
+      ? `Campeon por Match Point: ${matchPointStatus.championLabel}`
+      : matchPointMessage ?? tournament?.game ?? "World Series";
 
   useEffect(() => {
     const body = document.body;
@@ -98,7 +102,7 @@ export default function WorldSeriesStreamView({
             <StreamOverlaySidebar
               standings={standings}
               tournamentName={tournament?.name ?? null}
-              tournamentGame={matchPointMessage ?? tournament?.game ?? null}
+              tournamentGame={streamStatusLine}
               afterGameNumber={afterGameNumber}
               connected={connected}
               brand={brand}
@@ -109,7 +113,7 @@ export default function WorldSeriesStreamView({
           <div className="bf-ov-lower-anchor">
             <StreamOverlayLowerThird
               standings={standings}
-              tournamentGame={matchPointMessage ?? tournament?.game ?? null}
+              tournamentGame={streamStatusLine}
               afterGameNumber={afterGameNumber}
               connected={connected}
               brand={brand}
@@ -139,9 +143,7 @@ export default function WorldSeriesStreamView({
             <span className="bf-stream-mark">BF</span>
             <div className="bf-stream-brand-copy">
               <h1 className="bf-stream-title">{tournament?.name ?? "BracketFlow"}</h1>
-              <p className="bf-stream-game">
-                {matchPointMessage ?? tournament?.game ?? "World Series"}
-              </p>
+              <p className="bf-stream-game">{streamStatusLine}</p>
             </div>
           </div>
 

@@ -55,8 +55,8 @@ export default function BracketStreamView({
                 {matches.length > 0
                   ? "Bracket preparado"
                   : teams.length > 0
-                    ? "Seed listo"
-                    : "Seed pendiente"}
+                    ? "Llave lista"
+                    : "Llave pendiente"}
               </span>
               <strong>{matches.length > 0 ? matches.length : teams.length}</strong>
             </div>

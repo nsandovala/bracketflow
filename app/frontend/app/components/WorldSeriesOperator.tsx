@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEventHandler, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEventHandler, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -18,8 +18,11 @@ import {
   getTeamDisplayName,
   isTournamentCompleted,
   findChampion,
+  getMatchPointStatus,
+  getMatchPointStatusMessage,
+  getTeamRosterText,
 } from "../../lib/tournamentStatus";
-import { KillRaceMapDraft, ResultDraft } from "../lib/useWorldSeriesPractice";
+import { KillRaceMapDraft, ResultDraft, WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
@@ -33,6 +36,7 @@ type WorldSeriesOperatorProps = {
   teams: Team[];
   matches: Match[];
   players: Player[];
+  standings: WorldSeriesStanding[];
   activeMatch: Match | null;
   activeMatchResults: TeamResultDetail[];
   pendingTeams: Team[];
@@ -114,6 +118,7 @@ export default function WorldSeriesOperator({
   teams,
   matches,
   players,
+  standings,
   activeMatch,
   activeMatchResults,
   pendingTeams,
@@ -199,6 +204,29 @@ export default function WorldSeriesOperator({
   const effectiveLobbySize = selectedEngine
     ? getEffectiveLobbySize(selectedEngine, totalTeams)
     : totalTeams;
+  const matchPointStatus =
+    selectedTournament && selectedEngine && !isKillRace
+      ? getMatchPointStatus({
+          tournament: selectedTournament,
+          threshold: selectedEngine.matchPointThreshold,
+          standings,
+          teams,
+          matches,
+        })
+      : { state: "idle" as const };
+  const matchPointMessage = isKillRace ? null : getMatchPointStatusMessage(matchPointStatus);
+  const matchPointRoster =
+    matchPointStatus.state === "champion"
+      ? getTeamRosterText(matchPointStatus.champion) || "Roster pendiente"
+      : null;
+  const importFormatExample = useMemo(() => {
+    const expectedTeamSize = Math.max(selectedEngine?.teamSize ?? 3, 1);
+    const playersHint = Array.from(
+      { length: expectedTeamSize },
+      (_, index) => `player${index + 1}`
+    ).join(", ");
+    return `Team Name, ${playersHint}`;
+  }, [selectedEngine?.teamSize]);
 
   const gameStats = useMemo(() => {
     if (activeMatchResults.length === 0) {
@@ -268,9 +296,61 @@ export default function WorldSeriesOperator({
         ? "Listo para generar bracket"
         : "Falta generar bracket";
 
+  async function handleTeamImportChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !onBulkImportTeams) return;
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    const parsed: Array<{ name: string; roster: string }> = [];
+
+    for (const line of lines) {
+      const parts = line.split(/,\s*|,/);
+      if (parts.length < 2) continue;
+      const name = parts[0].trim();
+      const roster = parts
+        .slice(1)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .join(", ");
+      if (name && roster) {
+        parsed.push({ name, roster });
+      }
+    }
+
+    if (parsed.length === 0) {
+      setTeamImportMessage(`No se detectaron equipos validos. Formato esperado: ${importFormatExample}.`);
+      return;
+    }
+
+    await onBulkImportTeams(parsed);
+    setTeamImportMessage(`${parsed.length} equipo(s) importado(s).`);
+    if (teamFileInputRef.current) {
+      teamFileInputRef.current.value = "";
+    }
+  }
+
   return (
     <main className="bf-page bf-page-operator">
       <div className="opr-amb" aria-hidden="true" />
+
+      {!isKillRace && matchPointStatus.state !== "idle" ? (
+        <section className={`bf-status-banner ${matchPointStatus.state === "champion" ? "is-success" : "is-warning"}`}>
+          <span className="bf-status-banner-kicker">
+            {matchPointStatus.state === "champion" ? "Campeon por Match Point" : "Estado Match Point"}
+          </span>
+          <strong className="bf-status-banner-title">
+            {matchPointStatus.state === "champion"
+              ? matchPointStatus.championLabel
+              : "Match Point alcanzado"}
+          </strong>
+          <span className="bf-status-banner-sub">
+            {matchPointStatus.state === "champion"
+              ? `${matchPointRoster}${selectedTournament?.status === "completed" ? " - Torneo finalizado." : ""}`
+              : matchPointMessage}
+          </span>
+        </section>
+      ) : null}
 
       {message ? <p className="bf-message">{message}</p> : null}
 
@@ -317,20 +397,38 @@ export default function WorldSeriesOperator({
           <div className="opr-eyebrow">Setup requerido</div>
           <h2>Agrega equipos antes de operar la partida.</h2>
           <p className="sub">
-            Primero deja listo el roster del torneo. Despues vuelve a Operator para cargar resultados.
+            Primero deja listo el roster del torneo. Puedes importar TXT/CSV desde aqui o cargar un equipo manualmente.
           </p>
+          <input
+            ref={teamFileInputRef}
+            type="file"
+            accept=".txt,.csv,text/plain,text/csv"
+            className="bf-roulette-file-input"
+            onChange={(event) => void handleTeamImportChange(event)}
+            disabled={submitting}
+          />
           <div className="bf-hub-form-actions">
             <button
               type="button"
               className="bf-button bf-button-primary"
               onClick={() => setMode("setup")}
             >
-              Configurar equipos
+              Agregar equipo
+            </button>
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              onClick={() => teamFileInputRef.current?.click()}
+              disabled={submitting || !onBulkImportTeams}
+            >
+              Importar TXT/CSV
             </button>
             <Link href="/torneos" className="bf-button bf-button-ghost">
               Volver a Torneos
             </Link>
           </div>
+          <p className="bf-inline-note">Formato esperado: {importFormatExample}</p>
+          {teamImportMessage ? <p className="bf-inline-note">{teamImportMessage}</p> : null}
 
           {mode === "setup" && !requiresRoulette ? (
             <form className="opr-form" onSubmit={onCreateTeam}>
@@ -397,7 +495,7 @@ export default function WorldSeriesOperator({
               </span>
               <div className="opr-stat-body">
                 <div className="opr-stat-label">Formato</div>
-                <div className="opr-stat-value">Seed listo</div>
+                <div className="opr-stat-value">Llave lista</div>
                 <div className="opr-stat-sub">
                   {selectedEngine?.tournamentStructure === "double_elim"
                     ? "Double elim"
@@ -448,12 +546,12 @@ export default function WorldSeriesOperator({
                   : bracketOpen
                     ? `Ventana abierta. El contador vive en DB y no se reinicia con F5: ${bracketCountdown}.`
                     : selectedTournament.bracket_status === "locked"
-                      ? "Bracket locked. No se aceptan respins posteriores."
+                      ? "Bracket bloqueado. No se aceptan respins posteriores."
                       : selectedTournament.bracket_status === "running"
-                        ? "Bracket running. La llave ya no se puede regenerar."
+                        ? "Bracket en juego. La llave ya no se puede regenerar."
                         : selectedTournament.bracket_status === "completed"
-                          ? "Bracket completed."
-                          : "Abre una ventana de respin para generar o regenerar la llave."}
+                          ? "Bracket finalizado."
+                          : "Abre una ventana de respin de bracket o genera la llave ahora mismo."}
               </p>
 
               {selectedTournament.roster_status === "locked" &&
@@ -475,7 +573,7 @@ export default function WorldSeriesOperator({
                       disabled={submitting}
                       onClick={() => void onOpenBracketRespin(minutes)}
                     >
-                      Abrir respin {minutes} min
+                      Abrir respin de bracket ({minutes} min)
                     </button>
                   ))}
                 </div>
@@ -1029,7 +1127,7 @@ export default function WorldSeriesOperator({
               <div className="opr-eyebrow">Equipos</div>
               <h2>Agregar equipo real</h2>
               <p className="sub">
-                Carga nombre del equipo y roster real en una sola acción. O importa un archivo .txt/.csv con el formato: Equipo,Jugador1,Jugador2,Jugador3,Jugador4
+                Carga nombre del equipo y roster real en una sola accion. O importa un archivo TXT/CSV con el formato: {importFormatExample}
               </p>
 
               <input
@@ -1037,27 +1135,7 @@ export default function WorldSeriesOperator({
                 type="file"
                 accept=".txt,.csv,text/plain,text/csv"
                 className="bf-roulette-file-input"
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file || !onBulkImportTeams) return;
-                  const text = await file.text();
-                  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-                  const parsed: Array<{ name: string; roster: string }> = [];
-                  for (const line of lines) {
-                    const parts = line.split(/,\s*|,/);
-                    if (parts.length < 2) continue;
-                    const name = parts[0].trim();
-                    const roster = parts.slice(1).map((p) => p.trim()).filter(Boolean).join(", ");
-                    if (name && roster) parsed.push({ name, roster });
-                  }
-                  if (parsed.length === 0) {
-                    setTeamImportMessage("No se detectaron equipos válidos. Formato esperado: Equipo,Jugador1,Jugador2...");
-                    return;
-                  }
-                  await onBulkImportTeams(parsed);
-                  setTeamImportMessage(`${parsed.length} equipo(s) importado(s).`);
-                  if (teamFileInputRef.current) teamFileInputRef.current.value = "";
-                }}
+                onChange={(event) => void handleTeamImportChange(event)}
                 disabled={submitting}
               />
               <div className="bf-hub-form-actions" style={{ marginBottom: 14 }}>
@@ -1067,7 +1145,7 @@ export default function WorldSeriesOperator({
                   onClick={() => teamFileInputRef.current?.click()}
                   disabled={submitting || !onBulkImportTeams}
                 >
-                  Importar equipos .txt/.csv
+                  Importar TXT/CSV
                 </button>
                 {teamImportMessage ? (
                   <span className="bf-inline-note">{teamImportMessage}</span>

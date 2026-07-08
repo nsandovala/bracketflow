@@ -28,6 +28,7 @@ function OperatorPageClient() {
     teams,
     matches,
     players,
+    sortedStandings,
     activeMatch,
     activeMatchResults,
     pendingTeams,
@@ -112,6 +113,7 @@ function OperatorPageClient() {
       teams={teams}
       matches={matches}
       players={players}
+      standings={sortedStandings}
       activeMatch={activeMatch}
       activeMatchResults={activeMatchResults}
       pendingTeams={pendingTeams}

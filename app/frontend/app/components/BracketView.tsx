@@ -223,14 +223,14 @@ export default function BracketView({
     : hasMatches
       ? "Bracket"
       : hasTeams
-        ? "Seed listo para generar"
+        ? "Llave lista para generar"
         : "Falta generar bracket";
   const subtitle = isCompleted
     ? `Campeón: ${champion?.displayName ?? "—"} · Serie ${champion?.finalScore ?? "—"}.`
     : hasMatches
       ? `${teams.length} equipos sembrados - ${engine?.tournamentStructure === "double_elim" ? "Double elim" : "Single elim"}.`
       : hasTeams
-        ? "Los equipos ya existen. Este es el seed que se usará al generar la llave."
+        ? "Los equipos ya existen. Esta es la llave previa que se usará al generar el bracket."
         : "Carga participantes, gira la ruleta y confirma equipos para ver la llave.";
 
   function handleFit() {
@@ -272,7 +272,7 @@ export default function BracketView({
 
       {rounds.length === 0 ? (
         <div className="bf-bracket-empty">
-          <strong>{hasTeams ? "Seed listo" : "Seed pendiente"}</strong>
+          <strong>{hasTeams ? "Llave lista" : "Llave pendiente"}</strong>
           <p>
             {hasTeams
               ? "Los equipos están listos. Genera el bracket para persistir esta llave."
@@ -282,7 +282,7 @@ export default function BracketView({
             <div>
               {seedPreview.map((row, index) => (
                 <p key={`${row.leftSeed}-${row.rightSeed}`}>
-                  M{index + 1}: Seed #{row.leftSeed} {row.leftLabel} vs Seed #{row.rightSeed}{" "}
+                  Cruce {index + 1}: #{row.leftSeed} {row.leftLabel} vs #{row.rightSeed}{" "}
                   {row.rightLabel}
                 </p>
               ))}

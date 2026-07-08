@@ -8,6 +8,7 @@ import {
   findChampion,
   getMatchPointStatus,
   getMatchPointStatusMessage,
+  getTeamRosterText,
   isTournamentCompleted,
 } from "../../lib/tournamentStatus";
 import { WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
@@ -55,6 +56,10 @@ export default function WorldSeriesStandings({
         })
       : { state: "idle" as const };
   const matchPointMessage = isBracket ? null : getMatchPointStatusMessage(matchPointStatus);
+  const matchPointRoster =
+    matchPointStatus.state === "champion"
+      ? getTeamRosterText(matchPointStatus.champion) || "Roster pendiente"
+      : null;
 
   return (
     <main className="bf-shell-standings">
@@ -103,6 +108,22 @@ export default function WorldSeriesStandings({
           </select>
         </label>
       </section>
+
+      {!isBracket && matchPointStatus.state !== "idle" ? (
+        <section className={`bf-status-banner ${matchPointStatus.state === "champion" ? "is-success" : "is-warning"}`}>
+          <span className="bf-status-banner-kicker">
+            {matchPointStatus.state === "champion" ? "Campeon por Match Point" : "Estado Match Point"}
+          </span>
+          <strong className="bf-status-banner-title">
+            {matchPointStatus.state === "champion"
+              ? matchPointStatus.championLabel
+              : "Match Point alcanzado"}
+          </strong>
+          <span className="bf-status-banner-sub">
+            {matchPointStatus.state === "champion" ? matchPointRoster : matchPointMessage}
+          </span>
+        </section>
+      ) : null}
 
       <section className="bf-standings-panel">
         {isBracket ? (

@@ -675,6 +675,54 @@ a:focus-visible {
 .bf-message {
   border-style: solid;
   border-color: rgba(97, 242, 163, 0.14);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+
+.bf-status-banner {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+}
+
+.bf-status-banner.is-success {
+  border-color: rgba(255, 211, 110, 0.28);
+  background:
+    linear-gradient(135deg, rgba(255, 211, 110, 0.1), transparent 42%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.bf-status-banner.is-warning {
+  border-color: rgba(255, 152, 102, 0.28);
+  background:
+    linear-gradient(135deg, rgba(255, 152, 102, 0.08), transparent 42%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.bf-status-banner-kicker {
+  color: var(--amon-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bf-status-banner-title {
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.bf-status-banner-sub {
+  color: var(--amon-muted);
+  font-size: 0.94rem;
+  line-height: 1.5;
 }
 
 .bf-home-cta-grid,

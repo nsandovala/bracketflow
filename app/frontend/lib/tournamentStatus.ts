@@ -167,13 +167,7 @@ export function getMatchPointStatusMessage(status: MatchPointStatus) {
   if (status.state !== "threshold_reached") {
     return null;
   }
-  if (status.reason === "tie") {
-    return "Match Point alcanzado; falta desempatar.";
-  }
-  if (status.reason === "incomplete_match") {
-    return "Match Point alcanzado; falta cerrar la partida completa.";
-  }
-  return "Match Point alcanzado; falta reflejar el campeón.";
+  return "Match Point alcanzado: falta cerrar partida completa o resolver desempate.";
 }
 
 export function findChampion(matches: Match[], teams: Team[]): ChampionInfo | null {
