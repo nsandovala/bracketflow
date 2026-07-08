@@ -289,12 +289,82 @@ export default function WorldSeriesOperator({
         )
         .sort((left, right) => left.round - right.round || left.id - right.id)[0] ?? null
     : null;
-  const missingBracketTitle =
-    selectedTournament?.roster_status !== "locked"
-      ? "Falta bloquear equipos"
-      : bracketOpen
-        ? "Listo para generar bracket"
-        : "Falta generar bracket";
+  const bracketViewActions =
+    !selectedTournament || mode !== "bracket"
+      ? null
+      : matches.length > 0
+        ? (
+            <Link
+              href={`/standings?tournamentId=${selectedTournament.id}`}
+              className="bf-button bf-button-ghost"
+            >
+              Ver bracket
+            </Link>
+          )
+        : selectedTournament.roster_status !== "locked"
+          ? (
+              <button
+                type="button"
+                className="opr-save"
+                disabled={submitting}
+                onClick={() => void onLockRosterRespin()}
+              >
+                Cerrar respin y bloquear equipos
+              </button>
+            )
+        : bracketOpen
+          ? (
+              <div className="bf-hub-form-actions">
+                <button
+                  type="button"
+                  className="opr-save"
+                  disabled={submitting}
+                  onClick={() => void onGenerateBracket()}
+                >
+                  Generar bracket
+                </button>
+                <button
+                  type="button"
+                  className="bf-button bf-button-ghost"
+                  disabled={submitting}
+                  onClick={() => void onLockBracketRespin()}
+                >
+                  Bloquear bracket ahora
+                </button>
+              </div>
+            )
+          : selectedTournament.bracket_status === "pending"
+            ? (
+                <div className="bf-hub-form-actions">
+                  <button
+                    type="button"
+                    className="opr-save"
+                    disabled={submitting}
+                    onClick={() => void onOpenBracketRespin(3)}
+                  >
+                    Abrir respin de bracket
+                  </button>
+                  {[4, 5].map((minutes) => (
+                    <button
+                      key={minutes}
+                      type="button"
+                      className="bf-button bf-button-ghost"
+                      disabled={submitting}
+                      onClick={() => void onOpenBracketRespin(minutes)}
+                    >
+                      Abrir respin de bracket ({minutes} min)
+                    </button>
+                  ))}
+                </div>
+              )
+            : (
+                <Link
+                  href={`/standings?tournamentId=${selectedTournament.id}`}
+                  className="bf-button bf-button-ghost"
+                >
+                  Ver bracket
+                </Link>
+              );
 
   async function handleTeamImportChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -531,75 +601,8 @@ export default function WorldSeriesOperator({
               teams={teams}
               matches={matches}
               mode="operator"
+              actions={bracketViewActions}
             />
-          ) : null}
-
-          {(mode === "bracket" || mode === "op") && matches.length === 0 ? (
-            <section className="opr-panel">
-              <div className="opr-eyebrow">
-                {bracketOpen ? "Bracket respin" : "Estado del bracket"}
-              </div>
-              <h2>{missingBracketTitle}</h2>
-              <p className="sub">
-                {selectedTournament.roster_status !== "locked"
-                  ? "Primero bloquea el roster para habilitar el bracket."
-                  : bracketOpen
-                    ? `Ventana abierta. El contador vive en DB y no se reinicia con F5: ${bracketCountdown}.`
-                    : selectedTournament.bracket_status === "locked"
-                      ? "Bracket bloqueado. No se aceptan respins posteriores."
-                      : selectedTournament.bracket_status === "running"
-                        ? "Bracket en juego. La llave ya no se puede regenerar."
-                        : selectedTournament.bracket_status === "completed"
-                          ? "Bracket finalizado."
-                          : "Abre una ventana de respin de bracket o genera la llave ahora mismo."}
-              </p>
-
-              {selectedTournament.roster_status === "locked" &&
-              selectedTournament.bracket_status === "pending" ? (
-                <div className="bf-hub-form-actions">
-                  <button
-                    type="button"
-                    className="opr-save"
-                    disabled={submitting}
-                    onClick={() => void onGenerateBracket()}
-                  >
-                    Generar bracket
-                  </button>
-                  {[3, 4, 5].map((minutes) => (
-                    <button
-                      key={minutes}
-                      type="button"
-                      className="bf-button bf-button-ghost"
-                      disabled={submitting}
-                      onClick={() => void onOpenBracketRespin(minutes)}
-                    >
-                      Abrir respin de bracket ({minutes} min)
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {bracketOpen ? (
-                <div className="bf-hub-form-actions">
-                  <button
-                    type="button"
-                    className="opr-save"
-                    disabled={submitting}
-                    onClick={() => void onGenerateBracket()}
-                  >
-                    Generar bracket
-                  </button>
-                  <button
-                    type="button"
-                    className="bf-button bf-button-ghost"
-                    disabled={submitting}
-                    onClick={() => void onLockBracketRespin()}
-                  >
-                    Bloquear bracket ahora
-                  </button>
-                </div>
-              ) : null}
-            </section>
           ) : null}
 
           {mode !== "setup" ? (

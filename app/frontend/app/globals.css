@@ -4516,6 +4516,19 @@ a:focus-visible {
   color: var(--amon-muted);
 }
 
+.bf-bracket-empty-actions,
+.bf-bracket-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.bf-bracket-inline-actions {
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
 .bf-bracket-toolbar {
   display: flex;
   align-items: center;

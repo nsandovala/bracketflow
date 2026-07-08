@@ -27,6 +27,7 @@ type BracketViewProps = {
   teams: Team[];
   matches: Match[];
   mode: "setup" | "stream" | "operator" | "standings";
+  actions?: ReactNode;
 };
 
 function SeedContent({ seed }: { seed: ReactBracketSeed }) {
@@ -208,6 +209,7 @@ export default function BracketView({
   teams,
   matches,
   mode,
+  actions,
 }: BracketViewProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -288,9 +290,11 @@ export default function BracketView({
               ))}
             </div>
           ) : null}
+          {actions ? <div className="bf-bracket-empty-actions">{actions}</div> : null}
         </div>
       ) : (
         <>
+          {actions ? <div className="bf-bracket-inline-actions">{actions}</div> : null}
           {mode !== "stream" ? <BracketToolbar onFit={handleFit} onReset={handleReset} /> : null}
           <div className="bf-bracket-board" ref={boardRef}>
             <div
