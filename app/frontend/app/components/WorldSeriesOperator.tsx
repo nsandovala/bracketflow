@@ -303,58 +303,74 @@ export default function WorldSeriesOperator({
           )
         : selectedTournament.roster_status !== "locked"
           ? (
-              <button
-                type="button"
-                className="opr-save"
-                disabled={submitting}
-                onClick={() => void onLockRosterRespin()}
-              >
-                Cerrar respin y bloquear equipos
-              </button>
-            )
-        : bracketOpen
-          ? (
-              <div className="bf-hub-form-actions">
+              <div className="bf-bracket-cta-stack">
+                <span className="bf-bracket-cta-note">
+                  Cierra el respin y bloquea equipos para habilitar la llave final.
+                </span>
                 <button
                   type="button"
                   className="opr-save"
                   disabled={submitting}
-                  onClick={() => void onGenerateBracket()}
+                  onClick={() => void onLockRosterRespin()}
                 >
-                  Generar bracket
-                </button>
-                <button
-                  type="button"
-                  className="bf-button bf-button-ghost"
-                  disabled={submitting}
-                  onClick={() => void onLockBracketRespin()}
-                >
-                  Bloquear bracket ahora
+                  Cerrar respin y bloquear equipos
                 </button>
               </div>
             )
-          : selectedTournament.bracket_status === "pending"
-            ? (
+        : bracketOpen
+          ? (
+              <div className="bf-bracket-cta-stack">
+                <div className="bf-bracket-cta-chip">Respin activo · {bracketCountdown}</div>
+                <span className="bf-bracket-cta-note">
+                  Respin de bracket activo. Genera la llave antes de que termine la ventana.
+                </span>
                 <div className="bf-hub-form-actions">
                   <button
                     type="button"
                     className="opr-save"
                     disabled={submitting}
-                    onClick={() => void onOpenBracketRespin(3)}
+                    onClick={() => void onGenerateBracket()}
                   >
-                    Abrir respin de bracket
+                    Generar bracket
                   </button>
-                  {[4, 5].map((minutes) => (
+                  <button
+                    type="button"
+                    className="bf-button bf-button-ghost"
+                    disabled={submitting}
+                    onClick={() => void onLockBracketRespin()}
+                  >
+                    Bloquear bracket ahora
+                  </button>
+                </div>
+              </div>
+            )
+          : selectedTournament.bracket_status === "pending"
+            ? (
+                <div className="bf-bracket-cta-stack">
+                  <span className="bf-bracket-cta-note">
+                    Abre una ventana de respin de bracket para generar la llave.
+                  </span>
+                  <div className="bf-hub-form-actions">
                     <button
-                      key={minutes}
                       type="button"
-                      className="bf-button bf-button-ghost"
+                      className="opr-save"
                       disabled={submitting}
-                      onClick={() => void onOpenBracketRespin(minutes)}
+                      onClick={() => void onOpenBracketRespin(3)}
                     >
-                      Abrir respin de bracket ({minutes} min)
+                      Abrir respin de bracket
                     </button>
-                  ))}
+                    {[4, 5].map((minutes) => (
+                      <button
+                        key={minutes}
+                        type="button"
+                        className="bf-button bf-button-ghost"
+                        disabled={submitting}
+                        onClick={() => void onOpenBracketRespin(minutes)}
+                      >
+                        Abrir respin de bracket ({minutes} min)
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )
             : (
@@ -766,10 +782,18 @@ export default function WorldSeriesOperator({
                 ) : (
                   <>
                     <div className="opr-eyebrow">Serie actual</div>
-                    <h2>{matches.length === 0 ? "Falta generar bracket" : "No hay serie jugable"}</h2>
+                    <h2>
+                      {matches.length === 0
+                        ? bracketOpen
+                          ? "Respin de bracket activo"
+                          : "Falta generar bracket"
+                        : "No hay serie jugable"}
+                    </h2>
                     <p className="sub">
                       {matches.length === 0
-                        ? "Genera la llave para habilitar el BO3."
+                        ? bracketOpen
+                          ? `Ventana abierta. Puedes generar la llave ahora (${bracketCountdown}).`
+                          : "Genera la llave para habilitar el BO3."
                         : "No hay serie jugable. Revisa propagación de BYE en bracket."}
                     </p>
                   </>
@@ -777,7 +801,9 @@ export default function WorldSeriesOperator({
                 {matches.length === 0 && !isTournamentCompleted(matches) ? (
                   <div className="bf-hub-form-actions">
                     <span className="bf-empty">
-                      Abre respin de bracket para generar la llave.
+                      {bracketOpen
+                        ? `Respin de bracket activo. Genera la llave antes de ${bracketCountdown}.`
+                        : "Abre respin de bracket para generar la llave."}
                     </span>
                   </div>
                 ) : null}

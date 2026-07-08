@@ -4529,6 +4529,35 @@ a:focus-visible {
   margin-bottom: 12px;
 }
 
+.bf-bracket-cta-stack {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.bf-bracket-inline-actions .bf-bracket-cta-stack {
+  justify-items: flex-start;
+}
+
+.bf-bracket-cta-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 211, 110, .28);
+  background: rgba(255, 211, 110, .08);
+  color: var(--amon-text);
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+
+.bf-bracket-cta-note {
+  color: var(--amon-muted);
+  font-size: .92rem;
+  line-height: 1.5;
+}
+
 .bf-bracket-toolbar {
   display: flex;
   align-items: center;
