@@ -27,6 +27,14 @@
   --amon-cream-dim: rgba(233, 227, 213, 0.07);
   --amon-cream-line: rgba(233, 227, 213, 0.16);
   --amon-cream-glow: rgba(233, 227, 213, 0.14);
+
+  /* Gedeon Arena (home público) — dorado controlado + verde operativo mate */
+  --amon-gold: #c9a24b;
+  --amon-gold-hi: #e9cd8a;
+  --amon-gold-line: rgba(201, 162, 75, 0.3);
+  --amon-gold-line-soft: rgba(201, 162, 75, 0.16);
+  --amon-green-mate: #5cb596;
+  --amon-green-mate-border: rgba(92, 181, 150, 0.22);
 }
 
 @theme inline {
@@ -1048,10 +1056,7 @@ a:focus-visible {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% -10%, rgba(21, 55, 88, 0.23), transparent 52%),
-    radial-gradient(ellipse at 92% 62%, rgba(14, 48, 57, 0.16), transparent 43%),
-    linear-gradient(150deg, #0a0e16 0%, #0a111b 52%, #080c13 100%);
+  background: #0a0d0c;
 }
 
 .bf-hub-arena-h1,
@@ -1372,6 +1377,14 @@ a:focus-visible {
   gap: var(--amon-space-5);
 }
 
+.bf-home-v2 {
+  gap: 0;
+}
+
+.bf-home-v2 > .bf-app-topbar {
+  margin-bottom: clamp(8px, 2vh, 18px);
+}
+
 .bf-home-hero-v2,
 .bf-home-pitch,
 .bf-tournaments-hero,
@@ -1491,6 +1504,362 @@ a:focus-visible {
   background: rgba(255, 255, 255, 0.022);
   color: var(--amon-text-dim);
   line-height: 1.5;
+}
+
+/* ============================================================
+   Home público · Gedeon Arena (v4.1)
+   Entrada premium centrada en el casco Gedeon. Dorado
+   controlado + verde mate sobre grafito. Solo afecta al Home.
+   ============================================================ */
+.bf-home-arena-hero {
+  position: relative;
+  min-height: calc(100svh - clamp(118px, 18svh, 176px));
+  display: grid;
+  place-items: start center;
+  align-content: start;
+  gap: 0;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding: clamp(18px, 3svh, 30px) clamp(20px, 5vw, 64px) clamp(28px, 5svh, 44px);
+  text-align: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent;
+  isolation: isolate;
+}
+
+.bf-home-arena-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 32%, rgba(201, 162, 75, 0.08), transparent 65%),
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(92, 181, 150, 0.035), transparent 60%);
+}
+
+.bf-home-golden-sand,
+.bf-home-circuit-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bf-home-golden-sand {
+  opacity: 0.9;
+}
+
+.bf-home-circuit-field {
+  opacity: 0.52;
+}
+
+.bf-home-hero-inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: clamp(10px, 1.8svh, 16px);
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.bf-home-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border: 1px solid var(--amon-line-strong);
+  border-radius: 999px;
+  background: rgba(15, 21, 19, 0.6);
+  backdrop-filter: var(--amon-blur-sm);
+  -webkit-backdrop-filter: var(--amon-blur-sm);
+  color: var(--amon-muted);
+  font-family: var(--amon-font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.bf-home-hero-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amon-green-mate);
+  box-shadow: 0 0 8px rgba(92, 181, 150, 0.6);
+}
+
+/* Stage del casco: sin borde ni fondo rectangular. El casco flota y los
+   circuitos/glow se extienden más allá de su ancho hacia los lados. */
+.bf-home-helmet-stage {
+  position: relative;
+  width: min(760px, 92vw);
+  margin: 0 auto -2%;
+}
+
+/* Halo dorado como en el JSX: radial cálido detrás del casco, sin card. */
+.bf-home-helmet-glow {
+  position: absolute;
+  inset: -32% -24%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 50% 55% at 50% 46%, rgba(233, 205, 138, 0.16), transparent 68%),
+    radial-gradient(ellipse 42% 44% at 50% 44%, rgba(201, 162, 75, 0.14), transparent 62%);
+  filter: blur(28px);
+}
+
+/* Asset web optimizado: grande, nítido y apoyado sobre fondo negro continuo. */
+.bf-home-helmet-img {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  margin: 0 auto;
+  filter: drop-shadow(0 22px 52px rgba(201, 162, 75, 0.2));
+}
+
+.bf-home-brandmark {
+  font-family: var(--amon-font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: var(--amon-gold-hi);
+}
+
+.bf-home-submark {
+  font-family: var(--amon-font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.26em;
+  color: var(--amon-faint);
+  text-transform: uppercase;
+}
+
+.bf-home-arena-hero .bf-home-headline {
+  margin: 6px 0 0;
+  font-family: var(--amon-font-display);
+  font-size: clamp(2.1rem, 6vw, 4.4rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+  text-transform: uppercase;
+  color: var(--amon-text);
+}
+
+.bf-home-arena-hero .bf-home-value {
+  max-width: 560px;
+  margin: 0 auto;
+  color: var(--amon-text-dim);
+}
+
+.bf-home-arena-hero .bf-home-primary-actions {
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.bf-home-arena-hero .bf-button-hero {
+  border: 1px solid var(--amon-gold-line);
+}
+
+/* Circuitos: parpadeo sutil escalonado */
+@keyframes bf-trace-blink {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes bf-node-blink {
+  0%,
+  88%,
+  100% {
+    opacity: 0.3;
+  }
+  92% {
+    opacity: 0.9;
+  }
+}
+
+.bf-home-trace {
+  stroke: rgba(201, 162, 75, 0.5);
+  stroke-width: 0.8;
+  animation: bf-trace-blink 5s ease-in-out infinite;
+}
+
+.bf-home-node {
+  fill: #0a0d0c;
+  stroke: rgba(201, 162, 75, 0.55);
+  stroke-width: 0.8;
+  animation: bf-node-blink 7s ease-in-out infinite;
+}
+
+.bf-home-pad {
+  fill: rgba(201, 162, 75, 0.4);
+  animation: bf-trace-blink 5s ease-in-out infinite;
+}
+
+/* Sección de capacidades (4 cards) */
+.bf-home-cards-section {
+  display: grid;
+  gap: var(--amon-space-5);
+  padding: clamp(18px, 4svh, 34px) 0 0;
+}
+
+.bf-home-cards-section .bf-home-section-head {
+  justify-items: center;
+  text-align: center;
+}
+
+.bf-home-cards-grid {
+  gap: var(--amon-space-4);
+}
+
+.bf-home-cap-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-height: 262px;
+  padding: 30px 24px;
+  text-align: center;
+  border: 1px solid var(--amon-gold-line-soft);
+  border-radius: var(--amon-radius-lg);
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012) 48%),
+    rgba(7, 12, 20, 0.5);
+  backdrop-filter: var(--amon-blur-md);
+  -webkit-backdrop-filter: var(--amon-blur-md);
+  box-shadow: var(--amon-glass-v2-shadow);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.bf-home-cap-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(233, 205, 138, 0.28), transparent);
+}
+
+.bf-home-cap-card.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--cap-i) * 80ms);
+}
+
+.bf-home-cap-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--amon-gold-line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.bf-home-cap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--amon-radius-md);
+  color: var(--amon-green-mate);
+  background: linear-gradient(180deg, rgba(92, 181, 150, 0.12), rgba(92, 181, 150, 0.04));
+  border: 1px solid var(--amon-green-mate-border);
+}
+
+.bf-home-cap-title {
+  margin: 0;
+  font-family: var(--amon-font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--amon-text);
+}
+
+.bf-home-cap-copy {
+  max-width: 260px;
+  margin: 0;
+  color: var(--amon-text-dim);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.bf-home-cap-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-gold-line-soft);
+  background: rgba(92, 181, 150, 0.08);
+  color: var(--amon-green-mate);
+  font-family: var(--amon-font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.bf-home-cap-cta:hover {
+  border-color: var(--amon-gold-line);
+  background: rgba(92, 181, 150, 0.14);
+  color: var(--amon-gold-hi);
+}
+
+.bf-home-cap-live {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-gold-line-soft);
+  background: rgba(92, 181, 150, 0.1);
+  color: var(--amon-green-mate);
+  font-family: var(--amon-font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.bf-home-cap-live i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amon-green-mate);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-home-trace,
+  .bf-home-node {
+    animation: none;
+    opacity: 0.32;
+  }
+
+  .bf-home-cap-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .bf-tournaments-hero {
@@ -1694,6 +2063,11 @@ a:focus-visible {
   .bf-home-hero-v2 {
     min-height: 440px;
     padding: var(--amon-space-5);
+  }
+
+  .bf-home-arena-hero {
+    min-height: calc(100svh - 124px);
+    padding: 20px var(--amon-space-5) 28px;
   }
 
   .bf-home-pitch-grid,
