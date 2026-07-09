@@ -1379,10 +1379,14 @@ a:focus-visible {
 
 .bf-home-v2 {
   gap: 0;
+  padding-top: 0;
 }
 
 .bf-home-v2 > .bf-app-topbar {
-  margin-bottom: clamp(8px, 2vh, 18px);
+  position: relative;
+  z-index: 4;
+  margin-bottom: clamp(-82px, -9svh, -52px);
+  padding-top: clamp(16px, 2.8svh, 26px);
 }
 
 .bf-home-hero-v2,
@@ -1513,14 +1517,13 @@ a:focus-visible {
    ============================================================ */
 .bf-home-arena-hero {
   position: relative;
-  min-height: calc(100svh - clamp(118px, 18svh, 176px));
+  min-height: 88svh;
   display: grid;
-  place-items: start center;
-  align-content: start;
+  place-items: center;
   gap: 0;
   width: 100vw;
   margin-inline: calc(50% - 50vw);
-  padding: clamp(18px, 3svh, 30px) clamp(20px, 5vw, 64px) clamp(28px, 5svh, 44px);
+  padding: clamp(84px, 11svh, 128px) clamp(20px, 5vw, 64px) clamp(34px, 5.4svh, 56px);
   text-align: center;
   overflow: hidden;
   border: 0;
@@ -1536,42 +1539,49 @@ a:focus-visible {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 45% at 50% 32%, rgba(201, 162, 75, 0.08), transparent 65%),
-    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(92, 181, 150, 0.035), transparent 60%);
+    linear-gradient(180deg, rgba(4, 6, 8, 0.12), rgba(4, 6, 8, 0.02) 32%, rgba(4, 6, 8, 0.12));
 }
 
-.bf-home-golden-sand,
-.bf-home-circuit-field {
+.bf-home-arena-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 88% 62% at 50% 48%, transparent 56%, rgba(5, 8, 11, 0.18) 100%),
+    radial-gradient(circle at 50% 30%, rgba(232, 181, 77, 0.04), transparent 24%);
+}
+
+.bf-home-hero-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-}
-
-.bf-home-golden-sand {
-  opacity: 0.9;
-}
-
-.bf-home-circuit-field {
-  opacity: 0.52;
+  background-color: #06090c;
+  background-image: url("/gedeon/hero-bg-master-4k.png");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 34%;
+  opacity: 1;
 }
 
 .bf-home-hero-inner {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: clamp(10px, 1.8svh, 16px);
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   width: 100%;
-  max-width: 760px;
-  margin: 0 auto;
 }
 
 .bf-home-hero-badge {
+  position: absolute;
+  top: clamp(76px, 11svh, 118px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1587,6 +1597,7 @@ a:focus-visible {
   font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .bf-home-hero-badge i {
@@ -1597,44 +1608,27 @@ a:focus-visible {
   box-shadow: 0 0 8px rgba(92, 181, 150, 0.6);
 }
 
-/* Stage del casco: sin borde ni fondo rectangular. El casco flota y los
-   circuitos/glow se extienden más allá de su ancho hacia los lados. */
-.bf-home-helmet-stage {
-  position: relative;
-  width: min(760px, 92vw);
-  margin: 0 auto -2%;
-}
-
-/* Halo dorado como en el JSX: radial cálido detrás del casco, sin card. */
-.bf-home-helmet-glow {
+.bf-home-hero-copy {
   position: absolute;
-  inset: -32% -24%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 50% 55% at 50% 46%, rgba(233, 205, 138, 0.16), transparent 68%),
-    radial-gradient(ellipse 42% 44% at 50% 44%, rgba(201, 162, 75, 0.14), transparent 62%);
-  filter: blur(28px);
-}
-
-/* Asset web optimizado: grande, nítido y apoyado sobre fondo negro continuo. */
-.bf-home-helmet-img {
-  position: relative;
-  z-index: 2;
-  display: block;
-  width: 100%;
-  max-width: 760px;
-  height: auto;
-  margin: 0 auto;
-  filter: drop-shadow(0 22px 52px rgba(201, 162, 75, 0.2));
+  top: calc(54% + 112px);
+  left: 50%;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding-top: 0;
+  width: min(1460px, calc(100% - 32px));
+  transform: translateX(-50%);
 }
 
 .bf-home-brandmark {
   font-family: var(--amon-font-display);
-  font-size: 1.05rem;
+  margin-top: 0;
+  font-size: clamp(1.38rem, 1.9vw, 1.72rem);
   font-weight: 800;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   color: var(--amon-gold-hi);
+  transform: translateY(16px);
 }
 
 .bf-home-submark {
@@ -1643,72 +1637,38 @@ a:focus-visible {
   letter-spacing: 0.26em;
   color: var(--amon-faint);
   text-transform: uppercase;
+  transform: translateY(16px);
 }
 
 .bf-home-arena-hero .bf-home-headline {
   margin: 6px 0 0;
   font-family: var(--amon-font-display);
-  font-size: clamp(2.1rem, 6vw, 4.4rem);
+  font-size: clamp(3.2rem, 5.25vw, 5rem);
   font-weight: 800;
-  letter-spacing: 0.01em;
-  line-height: 0.95;
+  letter-spacing: -0.01em;
+  line-height: 0.94;
   text-transform: uppercase;
   color: var(--amon-text);
+  text-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
 }
 
 .bf-home-arena-hero .bf-home-value {
-  max-width: 560px;
+  max-width: 700px;
   margin: 0 auto;
-  color: var(--amon-text-dim);
+  color: rgba(242, 239, 231, 0.86);
+  font-size: clamp(1.16rem, 1.72vw, 1.46rem);
+  line-height: 1.38;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
 .bf-home-arena-hero .bf-home-primary-actions {
   justify-content: center;
-  margin-top: 6px;
+  gap: 14px;
+  margin-top: 10px;
 }
 
 .bf-home-arena-hero .bf-button-hero {
   border: 1px solid var(--amon-gold-line);
-}
-
-/* Circuitos: parpadeo sutil escalonado */
-@keyframes bf-trace-blink {
-  0%,
-  100% {
-    opacity: 0.22;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes bf-node-blink {
-  0%,
-  88%,
-  100% {
-    opacity: 0.3;
-  }
-  92% {
-    opacity: 0.9;
-  }
-}
-
-.bf-home-trace {
-  stroke: rgba(201, 162, 75, 0.5);
-  stroke-width: 0.8;
-  animation: bf-trace-blink 5s ease-in-out infinite;
-}
-
-.bf-home-node {
-  fill: #0a0d0c;
-  stroke: rgba(201, 162, 75, 0.55);
-  stroke-width: 0.8;
-  animation: bf-node-blink 7s ease-in-out infinite;
-}
-
-.bf-home-pad {
-  fill: rgba(201, 162, 75, 0.4);
-  animation: bf-trace-blink 5s ease-in-out infinite;
 }
 
 /* Sección de capacidades (4 cards) */
@@ -1849,12 +1809,6 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bf-home-trace,
-  .bf-home-node {
-    animation: none;
-    opacity: 0.32;
-  }
-
   .bf-home-cap-card {
     opacity: 1;
     transform: none;
@@ -2066,8 +2020,50 @@ a:focus-visible {
   }
 
   .bf-home-arena-hero {
-    min-height: calc(100svh - 124px);
-    padding: 20px var(--amon-space-5) 28px;
+    min-height: 86svh;
+    padding: 92px var(--amon-space-5) 30px;
+  }
+
+  .bf-home-hero-bg {
+    background-position: center 36%;
+  }
+
+  .bf-home-hero-inner {
+    inset: 0;
+  }
+
+  .bf-home-hero-badge {
+    top: clamp(74px, 10svh, 102px);
+    padding-inline: 12px;
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+  }
+
+  .bf-home-hero-copy {
+    top: calc(57% + 44px);
+    padding-top: 0;
+    width: min(720px, calc(100% - 36px));
+    gap: 3px;
+  }
+
+  .bf-home-brandmark {
+    margin-top: 0;
+    font-size: 1.14rem;
+    transform: translateY(18px);
+  }
+
+  .bf-home-submark {
+    transform: translateY(18px);
+  }
+
+  .bf-home-arena-hero .bf-home-headline {
+    margin-top: 6px;
+    font-size: clamp(3.15rem, 11vw, 4.7rem);
+  }
+
+  .bf-home-arena-hero .bf-home-value {
+    max-width: 560px;
+    font-size: 1.04rem;
   }
 
   .bf-home-pitch-grid,
