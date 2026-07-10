@@ -1380,6 +1380,7 @@ a:focus-visible {
 .bf-home-v2 {
   gap: 0;
   padding-top: 0;
+  position: relative;
 }
 
 .bf-home-v2 > .bf-app-topbar {
@@ -1569,10 +1570,37 @@ a:focus-visible {
   opacity: 1;
 }
 
+.bf-home-hero-dust {
+  position: absolute;
+  inset: -2%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.14;
+  background:
+    radial-gradient(circle at 16% 34%, rgba(159, 236, 219, 0.18) 0 1px, transparent 2px),
+    radial-gradient(circle at 23% 28%, rgba(233, 205, 138, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 31% 62%, rgba(159, 236, 219, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 47% 39%, rgba(233, 205, 138, 0.12) 0 1px, transparent 2px),
+    radial-gradient(circle at 61% 30%, rgba(159, 236, 219, 0.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 58%, rgba(233, 205, 138, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 81% 35%, rgba(159, 236, 219, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 87% 68%, rgba(233, 205, 138, 0.12) 0 1px, transparent 2px);
+}
+
+.bf-home-hero-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .bf-home-hero-inner {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 4;
   width: 100%;
 }
 
@@ -1673,9 +1701,28 @@ a:focus-visible {
 
 /* Sección de capacidades (4 cards) */
 .bf-home-cards-section {
+  position: relative;
+  isolation: isolate;
   display: grid;
   gap: var(--amon-space-5);
   padding: clamp(18px, 4svh, 34px) 0 0;
+  overflow: hidden;
+}
+
+.bf-home-cards-fx {
+  position: absolute;
+  inset: 6% -2% -8%;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
+  width: 104%;
+  height: 102%;
+  opacity: 0.78;
+}
+
+.bf-home-cards-section > *:not(.bf-home-cards-fx) {
+  position: relative;
+  z-index: 1;
 }
 
 .bf-home-cards-section .bf-home-section-head {
@@ -1809,6 +1856,10 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bf-home-hero-fx {
+    opacity: 0.52;
+  }
+
   .bf-home-cap-card {
     opacity: 1;
     transform: none;

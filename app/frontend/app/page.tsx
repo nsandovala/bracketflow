@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 
 import AppTopbar from "./components/AppTopbar";
+import GedeonHeroFX from "./components/GedeonHeroFX";
 import { useWorldSeriesPractice } from "./lib/useWorldSeriesPractice";
 
 type CapabilityId = "dashboard" | "standings" | "casters" | "experience";
@@ -132,7 +133,6 @@ export default function Home() {
         <div className="bf-hub-arena-h2" />
         <div className="bf-hub-arena-h3" />
       </div>
-
       <AppTopbar
         title="BracketFlow"
         subtitle="Tournament Operating System"
@@ -142,6 +142,8 @@ export default function Home() {
 
       <section className="bf-home-hero-v2 bf-home-arena-hero">
         <div className="bf-home-hero-bg" aria-hidden="true" />
+        <div className="bf-home-hero-dust" aria-hidden="true" />
+        <GedeonHeroFX />
 
         <div className="bf-home-hero-inner">
           <span className="bf-home-hero-badge">
@@ -173,6 +175,7 @@ export default function Home() {
       </section>
 
       <section id="bf-home-cards" className="bf-home-cards-section" ref={cardsRef}>
+        <GedeonHeroFX className="bf-home-cards-fx" traceCount={0} emberDensity={28} emberTealChance={0.08} />
         <div className="bf-home-section-head">
           <span className="bf-hub-section-kicker">Capacidades</span>
           <h3>Todo el torneo, en una sola arena</h3>
