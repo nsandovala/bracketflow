@@ -1,5 +1,40 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - H1 Home Gedeon Arena hardening
+
+**Fecha:** 2026-07-14
+**Rama:** `feat/ui-home-gedeon-arena` (sin commit)
+
+**Objetivo del sprint:** endurecer el Home aprobado de Gedeon Arena para merge seguro a `master`, manteniendo prioridad desktop/tablet first y mobile safe, sin rediseñar la composición ni tocar dashboard/operator/bracket/stream/backend.
+
+**Qué se hizo:**
+- Se corrigió `.gitattributes`: se quitó `app/frontend/.gitattributes` mal ubicado y se creó `.gitattributes` en la raíz con `* text=auto eol=lf`, sin ejecutar `git add --renormalize`.
+- El hero dejó de servir `app/frontend/public/gedeon/hero-bg-master-4k.png` (~6.07 MB) y ahora usa `app/frontend/public/gedeon-arena-bg.webp` (~442 KB) en desktop/tablet, conservando el mismo encuadre aprobado.
+- Mobile usa `app/frontend/public/gedeon-arena-bg-mobile.webp` (~177 KB) en `max-width: 720px` para evitar descargar el asset desktop pesado.
+- `GedeonHeroFX` quedó endurecido sin librerías: pausa con `IntersectionObserver`, pausa con `document.visibilitychange`, reanudación sin salto de partículas/pulsos y debounce de `180ms` para `ResizeObserver` + `resize`.
+- Se movieron fuera de `public` los assets de mockup/documentación: `HOMECATUAL.jpg`, `mockup_aprobado.png`, `gedeon/boceto1.png`.
+- El master 4K del hero quedó resguardado fuera de `public` en `app/docs/images/` como fuente de respaldo para futuras exportaciones high-quality.
+
+**Qué NO se hizo:**
+- No se rediseñó el Home ni se cambió headline/copy principal.
+- No se agregaron librerías ni se tocó `package.json` / `package-lock.json`.
+- No se reescribió `GedeonHeroFX` desde cero.
+- No se agregó preload del hero: quedó pendiente hasta validar en Network que no duplique descargas reales.
+- No hubo commit ni push.
+
+**Pendiente real:**
+- Validación visual manual de Nelson en desktop `1920x1080`, `2560x1440`, laptop `1366x768`, tablet `1024px`, mobile `390x844` y `430x932`.
+- Validar `StreamView/OBS 1920x1080` como superficie especial sin declarar aprobación visual hasta que Nelson lo revise.
+- Si Nelson quiere todavía más margen premium en desktop, se puede exportar un nuevo WebP/AVIF high-quality desde el master 4K ya resguardado en docs.
+
+**Futuro explícito:**
+- OGL/WebGL para una versión futura del FX si el producto decide subir complejidad visual.
+- Dashboard operativo como siguiente superficie premium del producto.
+- Push Mode.
+- `Saber Más` extendido.
+- OCR.
+- agentes/copilot.
+
 ## ULTIMO SPRINT EJECUTADO - F0 residual four-engines backend/state
 
 **Fecha:** 2026-07-07

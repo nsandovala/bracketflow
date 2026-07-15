@@ -4,6 +4,17 @@
 > Este documento preserva ideas de producto, monetizacion y automatizacion.
 > No define el foco del sprint actual.
 
+## Home Gedeon Arena - siguiente capa futura
+
+- El Home ya quedó implementado y endurecido en `feat/ui-home-gedeon-arena` con canvas custom sin librerías, circuitos saliendo desde el contorno exterior del casco y brasas en hero/cards.
+- La prioridad vigente se mantiene: desktop/laptop primero, tablet segundo, mobile safe sin mandar sobre desktop.
+- El siguiente salto visual futuro, si se aprueba, es migrar el FX a OGL/WebGL para ganar profundidad manteniendo control de performance.
+- `Saber Más` puede crecer como superficie editorial/explicativa sin tocar el hero aprobado.
+- `Push Mode` sigue como backlog de producto y no debe mezclarse con este hardening.
+- OCR sigue diferido para flujos operativos/resultados.
+- agentes/copilot siguen diferidos hasta que la base manual esté más consolidada.
+- Dashboard operativo premium sigue siendo la siguiente superficie importante después del Home.
+
 ## Norte MVP vigente
 
 - WS Practice fluido y unificado dentro del shell de operator.

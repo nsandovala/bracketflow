@@ -27,6 +27,14 @@
   --amon-cream-dim: rgba(233, 227, 213, 0.07);
   --amon-cream-line: rgba(233, 227, 213, 0.16);
   --amon-cream-glow: rgba(233, 227, 213, 0.14);
+
+  /* Gedeon Arena (home público) — dorado controlado + verde operativo mate */
+  --amon-gold: #c9a24b;
+  --amon-gold-hi: #e9cd8a;
+  --amon-gold-line: rgba(201, 162, 75, 0.3);
+  --amon-gold-line-soft: rgba(201, 162, 75, 0.16);
+  --amon-green-mate: #5cb596;
+  --amon-green-mate-border: rgba(92, 181, 150, 0.22);
 }
 
 @theme inline {
@@ -1048,10 +1056,7 @@ a:focus-visible {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% -10%, rgba(21, 55, 88, 0.23), transparent 52%),
-    radial-gradient(ellipse at 92% 62%, rgba(14, 48, 57, 0.16), transparent 43%),
-    linear-gradient(150deg, #0a0e16 0%, #0a111b 52%, #080c13 100%);
+  background: #0a0d0c;
 }
 
 .bf-hub-arena-h1,
@@ -1372,6 +1377,19 @@ a:focus-visible {
   gap: var(--amon-space-5);
 }
 
+.bf-home-v2 {
+  gap: 0;
+  padding-top: 0;
+  position: relative;
+}
+
+.bf-home-v2 > .bf-app-topbar {
+  position: relative;
+  z-index: 4;
+  margin-bottom: clamp(-82px, -9svh, -52px);
+  padding-top: clamp(16px, 2.8svh, 26px);
+}
+
 .bf-home-hero-v2,
 .bf-home-pitch,
 .bf-tournaments-hero,
@@ -1491,6 +1509,362 @@ a:focus-visible {
   background: rgba(255, 255, 255, 0.022);
   color: var(--amon-text-dim);
   line-height: 1.5;
+}
+
+/* ============================================================
+   Home público · Gedeon Arena (v4.1)
+   Entrada premium centrada en el casco Gedeon. Dorado
+   controlado + verde mate sobre grafito. Solo afecta al Home.
+   ============================================================ */
+.bf-home-arena-hero {
+  position: relative;
+  min-height: 88svh;
+  display: grid;
+  place-items: center;
+  gap: 0;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  padding: clamp(84px, 11svh, 128px) clamp(20px, 5vw, 64px) clamp(34px, 5.4svh, 56px);
+  text-align: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent;
+  isolation: isolate;
+}
+
+.bf-home-arena-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(4, 6, 8, 0.12), rgba(4, 6, 8, 0.02) 32%, rgba(4, 6, 8, 0.12));
+}
+
+.bf-home-arena-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 88% 62% at 50% 48%, transparent 56%, rgba(5, 8, 11, 0.18) 100%),
+    radial-gradient(circle at 50% 30%, rgba(232, 181, 77, 0.04), transparent 24%);
+}
+
+.bf-home-hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #06090c;
+  background-image: url("/gedeon-arena-bg.webp");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 34%;
+  opacity: 1;
+}
+
+.bf-home-hero-dust {
+  position: absolute;
+  inset: -2%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.14;
+  background:
+    radial-gradient(circle at 16% 34%, rgba(159, 236, 219, 0.18) 0 1px, transparent 2px),
+    radial-gradient(circle at 23% 28%, rgba(233, 205, 138, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 31% 62%, rgba(159, 236, 219, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 47% 39%, rgba(233, 205, 138, 0.12) 0 1px, transparent 2px),
+    radial-gradient(circle at 61% 30%, rgba(159, 236, 219, 0.16) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 58%, rgba(233, 205, 138, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 81% 35%, rgba(159, 236, 219, 0.14) 0 1px, transparent 2px),
+    radial-gradient(circle at 87% 68%, rgba(233, 205, 138, 0.12) 0 1px, transparent 2px);
+}
+
+.bf-home-hero-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.bf-home-hero-inner {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+}
+
+.bf-home-hero-badge {
+  position: absolute;
+  top: clamp(76px, 11svh, 118px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border: 1px solid var(--amon-line-strong);
+  border-radius: 999px;
+  background: rgba(15, 21, 19, 0.6);
+  backdrop-filter: var(--amon-blur-sm);
+  -webkit-backdrop-filter: var(--amon-blur-sm);
+  color: var(--amon-muted);
+  font-family: var(--amon-font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bf-home-hero-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amon-green-mate);
+  box-shadow: 0 0 8px rgba(92, 181, 150, 0.6);
+}
+
+.bf-home-hero-copy {
+  position: absolute;
+  top: calc(54% + 112px);
+  left: 50%;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding-top: 0;
+  width: min(1460px, calc(100% - 32px));
+  transform: translateX(-50%);
+}
+
+.bf-home-brandmark {
+  font-family: var(--amon-font-display);
+  margin-top: 0;
+  font-size: clamp(1.38rem, 1.9vw, 1.72rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--amon-gold-hi);
+  transform: translateY(16px);
+}
+
+.bf-home-submark {
+  font-family: var(--amon-font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.26em;
+  color: var(--amon-faint);
+  text-transform: uppercase;
+  transform: translateY(16px);
+}
+
+.bf-home-arena-hero .bf-home-headline {
+  margin: 6px 0 0;
+  font-family: var(--amon-font-display);
+  font-size: clamp(3.2rem, 5.25vw, 5rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 0.94;
+  text-transform: uppercase;
+  color: var(--amon-text);
+  text-shadow: 0 14px 36px rgba(0, 0, 0, 0.42);
+}
+
+.bf-home-arena-hero .bf-home-value {
+  max-width: 700px;
+  margin: 0 auto;
+  color: rgba(242, 239, 231, 0.86);
+  font-size: clamp(1.16rem, 1.72vw, 1.46rem);
+  line-height: 1.38;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.bf-home-arena-hero .bf-home-primary-actions {
+  justify-content: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.bf-home-arena-hero .bf-button-hero {
+  border: 1px solid var(--amon-gold-line);
+}
+
+/* Sección de capacidades (4 cards) */
+.bf-home-cards-section {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: var(--amon-space-5);
+  padding: clamp(18px, 4svh, 34px) 0 0;
+  overflow: hidden;
+}
+
+.bf-home-cards-fx {
+  position: absolute;
+  inset: 6% -2% -8%;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
+  width: 104%;
+  height: 102%;
+  opacity: 0.78;
+}
+
+.bf-home-cards-section > *:not(.bf-home-cards-fx) {
+  position: relative;
+  z-index: 1;
+}
+
+.bf-home-cards-section .bf-home-section-head {
+  justify-items: center;
+  text-align: center;
+}
+
+.bf-home-cards-grid {
+  gap: var(--amon-space-4);
+}
+
+.bf-home-cap-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-height: 262px;
+  padding: 30px 24px;
+  text-align: center;
+  border: 1px solid var(--amon-gold-line-soft);
+  border-radius: var(--amon-radius-lg);
+  background:
+    linear-gradient(155deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012) 48%),
+    rgba(7, 12, 20, 0.5);
+  backdrop-filter: var(--amon-blur-md);
+  -webkit-backdrop-filter: var(--amon-blur-md);
+  box-shadow: var(--amon-glass-v2-shadow);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.bf-home-cap-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(233, 205, 138, 0.28), transparent);
+}
+
+.bf-home-cap-card.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--cap-i) * 80ms);
+}
+
+.bf-home-cap-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--amon-gold-line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.bf-home-cap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--amon-radius-md);
+  color: var(--amon-green-mate);
+  background: linear-gradient(180deg, rgba(92, 181, 150, 0.12), rgba(92, 181, 150, 0.04));
+  border: 1px solid var(--amon-green-mate-border);
+}
+
+.bf-home-cap-title {
+  margin: 0;
+  font-family: var(--amon-font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--amon-text);
+}
+
+.bf-home-cap-copy {
+  max-width: 260px;
+  margin: 0;
+  color: var(--amon-text-dim);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.bf-home-cap-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-gold-line-soft);
+  background: rgba(92, 181, 150, 0.08);
+  color: var(--amon-green-mate);
+  font-family: var(--amon-font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.bf-home-cap-cta:hover {
+  border-color: var(--amon-gold-line);
+  background: rgba(92, 181, 150, 0.14);
+  color: var(--amon-gold-hi);
+}
+
+.bf-home-cap-live {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-gold-line-soft);
+  background: rgba(92, 181, 150, 0.1);
+  color: var(--amon-green-mate);
+  font-family: var(--amon-font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.bf-home-cap-live i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--amon-green-mate);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-home-hero-fx {
+    opacity: 0.52;
+  }
+
+  .bf-home-cap-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .bf-tournaments-hero {
@@ -1694,6 +2068,54 @@ a:focus-visible {
   .bf-home-hero-v2 {
     min-height: 440px;
     padding: var(--amon-space-5);
+  }
+
+  .bf-home-arena-hero {
+    min-height: 86svh;
+    padding: 92px var(--amon-space-5) 30px;
+  }
+
+  .bf-home-hero-bg {
+    background-image: url("/gedeon-arena-bg-mobile.webp");
+    background-position: center 36%;
+  }
+
+  .bf-home-hero-inner {
+    inset: 0;
+  }
+
+  .bf-home-hero-badge {
+    top: clamp(74px, 10svh, 102px);
+    padding-inline: 12px;
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+  }
+
+  .bf-home-hero-copy {
+    top: calc(57% + 44px);
+    padding-top: 0;
+    width: min(720px, calc(100% - 36px));
+    gap: 3px;
+  }
+
+  .bf-home-brandmark {
+    margin-top: 0;
+    font-size: 1.14rem;
+    transform: translateY(18px);
+  }
+
+  .bf-home-submark {
+    transform: translateY(18px);
+  }
+
+  .bf-home-arena-hero .bf-home-headline {
+    margin-top: 6px;
+    font-size: clamp(3.15rem, 11vw, 4.7rem);
+  }
+
+  .bf-home-arena-hero .bf-home-value {
+    max-width: 560px;
+    font-size: 1.04rem;
   }
 
   .bf-home-pitch-grid,
