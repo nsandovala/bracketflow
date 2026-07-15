@@ -42,7 +42,7 @@ export default function TournamentSelector({
             >
               {tournaments.map((tournament) => (
                 <option key={tournament.id} value={tournament.id}>
-                  {tournament.name} Â· {getFormatLabel(tournament.format)}
+                  {tournament.name} - {getFormatLabel(tournament.format)}
                 </option>
               ))}
             </select>

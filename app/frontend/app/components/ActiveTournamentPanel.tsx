@@ -16,7 +16,7 @@ export default function ActiveTournamentPanel({
         <div>
           <h2>{tournament.name}</h2>
           <p>
-            {tournament.game} Â· {formatLabel}
+            {tournament.game} - {formatLabel}
           </p>
         </div>
         <span className="bf-pill">{tournament.status}</span>
