@@ -4860,15 +4860,282 @@ a:focus-visible {
   color: var(--amon-accent);
 }
 
+.bf-dash-shell {
+  display: grid;
+  gap: var(--amon-space-4);
+}
+
+.bf-dash-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.78fr);
+  gap: var(--amon-space-4);
+  align-items: start;
+}
+
+.bf-dash-main,
+.bf-dash-rail {
+  display: grid;
+  gap: var(--amon-space-4);
+  min-width: 0;
+}
+
+.bf-dash-header {
+  align-items: flex-start;
+}
+
+.bf-dash-header-main,
+.bf-dash-next-copy {
+  display: grid;
+  gap: 12px;
+}
+
+.bf-dash-header-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bf-dash-header-side {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  min-width: min(100%, 280px);
+}
+
+.bf-dash-surface-note {
+  margin: 0;
+}
+
+.bf-dash-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bf-dash-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--amon-text-dim);
+  font-size: 0.73rem;
+  letter-spacing: 0.03em;
+}
+
+.bf-dash-next {
+  align-items: center;
+}
+
+.bf-dash-next.is-warning {
+  border-color: rgba(201, 162, 75, 0.28);
+  background:
+    linear-gradient(120deg, rgba(201, 162, 75, 0.085), transparent 44%),
+    var(--amon-glass-v2-bg);
+}
+
+.bf-dash-next.is-success {
+  border-color: rgba(95, 227, 154, 0.26);
+  background:
+    linear-gradient(120deg, rgba(95, 227, 154, 0.08), transparent 44%),
+    var(--amon-glass-v2-bg);
+}
+
+.bf-dash-next-title {
+  margin: 0;
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: clamp(1.4rem, 2vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.bf-dash-next-detail,
+.bf-dash-next-meta {
+  margin: 0;
+  color: var(--amon-text-dim);
+  line-height: 1.6;
+}
+
+.bf-dash-next-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 0.78rem;
+}
+
+.bf-dash-state-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bf-dash-summary-stack,
+.bf-dash-summary-list,
+.bf-dash-context-list,
+.bf-dash-roadmap-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bf-dash-summary-hero,
+.bf-dash-summary-row,
+.bf-dash-roadmap-item {
+  border: 1px solid var(--amon-line);
+  border-radius: var(--amon-radius-md);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.bf-dash-summary-hero {
+  display: grid;
+  gap: 5px;
+  padding: 16px 17px;
+}
+
+.bf-dash-summary-hero.is-success {
+  border-color: rgba(95, 227, 154, 0.22);
+  background: linear-gradient(110deg, rgba(95, 227, 154, 0.065), rgba(255, 255, 255, 0.022));
+}
+
+.bf-dash-summary-kicker {
+  color: var(--amon-faint);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bf-dash-summary-hero strong {
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.bf-dash-summary-hero span:last-child {
+  color: var(--amon-text-dim);
+  line-height: 1.55;
+}
+
+.bf-dash-summary-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+}
+
+.bf-dash-summary-row-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--amon-text-dim);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.bf-dash-summary-row-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bf-dash-summary-row-copy strong {
+  overflow: hidden;
+  color: var(--amon-text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bf-dash-summary-row-copy span {
+  color: var(--amon-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.bf-dash-context-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bf-dash-context-row:last-child {
+  min-height: 36px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.bf-dash-context-label {
+  color: var(--amon-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.bf-dash-context-value {
+  max-width: 62%;
+  overflow: hidden;
+  color: var(--amon-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bf-dash-context-value.is-success {
+  color: var(--amon-accent);
+}
+
+.bf-dash-context-value.is-warning {
+  color: var(--amon-gold-hi);
+}
+
+.bf-dash-roadmap-item {
+  display: grid;
+  gap: 4px;
+  padding: 14px 15px;
+}
+
+.bf-dash-roadmap-item strong {
+  color: var(--amon-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bf-dash-roadmap-item span {
+  color: var(--amon-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
 /* ---- Responsive (desktop primero) ---- */
 @media (max-width: 1180px) {
   .bf-dash-grid {
     grid-template-columns: 1fr;
   }
 
+  .bf-dash-layout,
   .bf-dash-v2 .bf-dash-stats,
   .bf-dash-motors-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bf-dash-layout {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -4882,6 +5149,10 @@ a:focus-visible {
 
   .bf-dash-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .bf-dash-state-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -4903,7 +5174,13 @@ a:focus-visible {
     width: 100%;
   }
 
+  .bf-dash-header-side {
+    justify-items: stretch;
+    min-width: 0;
+  }
+
   .bf-dash-v2 .bf-dash-stats,
+  .bf-dash-state-grid,
   .bf-dash-motors-grid {
     grid-template-columns: 1fr;
   }
@@ -4914,6 +5191,23 @@ a:focus-visible {
 
   .bf-dash-podium-kills {
     display: none;
+  }
+
+  .bf-dash-header-topline,
+  .bf-dash-context-row,
+  .bf-dash-summary-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .bf-dash-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bf-dash-summary-row-copy strong,
+  .bf-dash-context-value {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .bf-standings-toolbar {
