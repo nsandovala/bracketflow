@@ -95,6 +95,60 @@ Frontend:
 
 - UI: `http://localhost:3000`
 
+## QA local del repo
+
+Desde la raiz del repo:
+
+```powershell
+.\scripts\qa.ps1
+```
+
+Flags disponibles:
+
+- `.\scripts\qa.ps1 -FrontendOnly`
+- `.\scripts\qa.ps1 -BackendOnly`
+- `.\scripts\qa.ps1 -SkipBuild`
+
+El script ejecuta:
+
+1. `git status --short`
+2. `npm run lint` en `app/frontend`
+3. `npm run build` en `app/frontend` salvo `-SkipBuild`
+4. `pytest` en `app/backend` si hay Python disponible
+
+## CI
+
+El workflow del repo vive en `.github/workflows/ci.yml`.
+
+Corre en:
+
+- `pull_request` hacia `master`
+- `push` hacia `master`
+
+Checks actuales:
+
+- frontend: `npm ci`, `npm run lint`, `npm run build`
+- backend: `pip install -r requirements.txt`, `python -m pytest tests`
+
+## Pull Requests
+
+Usar `.github/pull_request_template.md`.
+
+Antes de abrir PR:
+
+1. correr `.\scripts\qa.ps1`
+2. revisar `git diff --stat`
+3. confirmar que el cambio no mezcla dominios
+4. documentar riesgos y rollback
+
+## Agentes
+
+Spec del agente de revision/CI:
+
+- `app/docs/agents/ci-pr-qa-agent.md`
+
+Ese agente existe para revisar ramas, ejecutar QA local, detectar scope creep y bloquear merge cuando falten validaciones.
+
 ## Flujo rapido de prueba
 
 ### Bracket clasico

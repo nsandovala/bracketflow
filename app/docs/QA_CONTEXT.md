@@ -4,6 +4,7 @@
 > Fecha: 2026-06-30
 > Estado: rescate P0 de Kill Race BO3 validado.
 
+<<<<<<< HEAD
 ## Sprint H2 - Home Product Story / Saber Mas
 
 **Fecha:** 2026-07-14
@@ -40,6 +41,46 @@
 - OGL/WebGL
 - OCR
 - agentes/copilot
+=======
+## Sprint A1 - Repo CI / CLI / PR / QA Agent
+
+**Fecha:** 2026-07-14
+**Rama:** `feat/repo-ci-qa-agent` (sin commit)
+
+### Objetivo QA
+
+- dejar comandos de validacion claros;
+- dejar CI de GitHub real;
+- dejar checklist de PR;
+- dejar un agente de revision CI/PR/QA documentado.
+
+### Entregables
+
+| Entregable | Estado | Nota |
+|---|---|---|
+| `scripts/qa.ps1` | listo | corre git status + frontend + backend |
+| `.github/workflows/ci.yml` | listo | PR/push a `master` |
+| `.github/pull_request_template.md` | listo | checklist base del repo |
+| `app/docs/agents/ci-pr-qa-agent.md` | listo | spec operativa del agente |
+| `app/README.md` | actualizado | documenta QA local, CI y PR |
+
+### Comandos canonicos del repo
+
+- `.\scripts\qa.ps1`
+- `cd app/frontend && npm run lint`
+- `cd app/frontend && npm run build`
+- `cd app/backend && .\.venv\Scripts\python.exe -m pytest tests`
+- `git status --short`
+- `git diff --stat`
+- `git diff --name-status`
+
+### Gap real documentado
+
+- No hay tests de frontend declarados en `package.json`.
+- No hay Vitest configurado.
+- No hay Playwright configurado como comando usable del repo.
+- La CI se limita a checks reales: lint/build frontend y pytest backend.
+>>>>>>> master
 
 ## Sprint H1 - Home Gedeon Arena hardening
 

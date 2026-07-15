@@ -1,5 +1,6 @@
 # NEXT STEPS
 
+<<<<<<< HEAD
 ## ULTIMO SPRINT EJECUTADO - H2 Home Product Story / Saber Mas
 
 **Fecha:** 2026-07-14
@@ -30,6 +31,51 @@
 **Pendiente real:**
 - Validacion visual manual de Nelson en desktop `1920x1080`, laptop `1366x768`, tablet `1024px` y mobile `390x844`.
 - Confirmar si el storytelling del Home necesita una segunda pasada de copy o si queda congelado hasta el siguiente sprint visual.
+=======
+## ULTIMO SPRINT EJECUTADO - A1 Repo CI / CLI / PR / QA Agent
+
+**Fecha:** 2026-07-14
+**Rama:** `feat/repo-ci-qa-agent` (sin commit)
+
+**Objetivo del sprint:** crear una base de calidad del repo para QA local, CI de GitHub, template de PR y un agente documentado de revision/merge.
+
+**Que se hizo:**
+- Se relevo la verdad del repo real desde la raiz:
+  - frontend en `app/frontend`
+  - backend en `app/backend`
+  - docs en `app/docs`
+  - tests backend en `app/backend/tests`
+- Se creo `scripts/qa.ps1` en la raiz del repo.
+- Se creo `.github/workflows/ci.yml` con jobs reales de frontend y backend.
+- Se creo `.github/pull_request_template.md`.
+- Se creo `app/docs/agents/ci-pr-qa-agent.md`.
+- Se actualizo `app/README.md` con QA local, CI, PR y referencia al agente.
+
+**Comandos reales confirmados:**
+- Frontend:
+  - `cd app/frontend && npm install`
+  - `cd app/frontend && npm run lint`
+  - `cd app/frontend && npm run build`
+- Backend:
+  - `cd app/backend && pip install -r requirements.txt`
+  - `cd app/backend && python -m pytest tests`
+  - `cd app/backend && uvicorn app.main:app --reload`
+- Repo:
+  - `git status -sb`
+  - `git status --short`
+  - `git diff --stat`
+  - `git diff --name-status`
+
+**Que NO se hizo:**
+- No se toco logica de negocio.
+- No se tocaron APIs, scoring ni UI de producto.
+- No se instalaron dependencias nuevas.
+- No se agregaron tests falsos ni jobs decorativos.
+- No hubo commit ni push.
+
+**Pendiente real:**
+- Si en el futuro se agregan tests de frontend o e2e, la CI debe crecer solo cuando existan comandos reales en el repo.
+>>>>>>> master
 
 ## ULTIMO SPRINT EJECUTADO - H1 Home Gedeon Arena hardening
 

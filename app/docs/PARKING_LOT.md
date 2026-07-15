@@ -4,11 +4,20 @@
 > Este documento preserva ideas de producto, monetizacion y automatizacion.
 > No define el foco del sprint actual.
 
+<<<<<<< HEAD
 ## H2 Home Product Story
 
 - `feat/home-product-story` agrega `bf-home-story` como bloque editorial de producto debajo de las cards del Home aprobado.
 - El hero Gedeon Arena y su canvas no se tocan en esta fase.
 - Lo que sigue fuera de este sprint se mantiene igual: Dashboard operativo premium, Push Mode, OGL/WebGL, OCR y agentes/copilot.
+=======
+## QA / CI del repo - futuro cercano
+
+- Si el repo suma tests de frontend reales, agregarlos al workflow solo cuando exista comando estable en `package.json`.
+- Si aparece Playwright o Vitest como parte oficial del repo, integrarlos a `scripts/qa.ps1` y a `.github/workflows/ci.yml`.
+- Mantener la regla de "verde real antes que cobertura falsa": no crear jobs placeholder que fallen por diseno.
+- Mantener la regla de un dominio por commit tambien para ramas de QA/CI.
+>>>>>>> master
 
 ## Home Gedeon Arena - siguiente capa futura
 
