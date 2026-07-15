@@ -4,6 +4,13 @@
 > Este documento preserva ideas de producto, monetizacion y automatizacion.
 > No define el foco del sprint actual.
 
+## QA / CI del repo - futuro cercano
+
+- Si el repo suma tests de frontend reales, agregarlos al workflow solo cuando exista comando estable en `package.json`.
+- Si aparece Playwright o Vitest como parte oficial del repo, integrarlos a `scripts/qa.ps1` y a `.github/workflows/ci.yml`.
+- Mantener la regla de "verde real antes que cobertura falsa": no crear jobs placeholder que fallen por diseno.
+- Mantener la regla de un dominio por commit tambien para ramas de QA/CI.
+
 ## Home Gedeon Arena - siguiente capa futura
 
 - El Home ya quedó implementado y endurecido en `feat/ui-home-gedeon-arena` con canvas custom sin librerías, circuitos saliendo desde el contorno exterior del casco y brasas en hero/cards.
