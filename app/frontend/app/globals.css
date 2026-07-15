@@ -1563,7 +1563,7 @@ a:focus-visible {
   z-index: 0;
   pointer-events: none;
   background-color: #06090c;
-  background-image: url("/gedeon/hero-bg-master-4k.png");
+  background-image: url("/gedeon-arena-bg.webp");
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center 34%;
@@ -2076,6 +2076,7 @@ a:focus-visible {
   }
 
   .bf-home-hero-bg {
+    background-image: url("/gedeon-arena-bg-mobile.webp");
     background-position: center 36%;
   }
 

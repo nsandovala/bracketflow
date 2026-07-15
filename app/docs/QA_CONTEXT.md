@@ -4,6 +4,55 @@
 > Fecha: 2026-06-30
 > Estado: rescate P0 de Kill Race BO3 validado.
 
+## Sprint H1 - Home Gedeon Arena hardening
+
+**Fecha:** 2026-07-14
+**Rama:** `feat/ui-home-gedeon-arena` (sin commit)
+
+### Objetivo QA
+
+- Mantener el Home Gedeon Arena aprobado en desktop/tablet.
+- Evitar descarga absurda en mobile.
+- Frenar ambos canvas cuando salen del viewport o la pestaña queda oculta.
+- Evitar rebuilds agresivos durante resize.
+- Limpiar `public/` de mockups y dejar documentación actualizada.
+
+### Decisiones técnicas ejecutadas
+
+| Tema | Decisión |
+|---|---|
+| Hero desktop/tablet | `globals.css` ahora usa `/gedeon-arena-bg.webp` (~442 KB) en vez de `/gedeon/hero-bg-master-4k.png` (~6.07 MB) |
+| Hero mobile | `max-width: 720px` usa `/gedeon-arena-bg-mobile.webp` (~177 KB) |
+| Calidad visual | El WebP desktop se revisó visualmente contra el master 4K y se consideró aceptable para preservar el look aprobado sin rediseño |
+| Canvas viewport pause | `IntersectionObserver` sobre el canvas |
+| Canvas tab pause | `document.visibilitychange` |
+| Reanudación | reloj acumulado propio + reset de frame timestamp para evitar teleport/jumps |
+| Resize hardening | debounce `180ms` compartido entre `ResizeObserver` y `window.resize` |
+| Preload | NO agregado en este sprint; falta validar Network para descartar doble descarga real |
+
+### Assets movidos fuera de public
+
+- `app/frontend/public/HOMECATUAL.jpg` -> `app/docs/images/HOMECATUAL.jpg`
+- `app/frontend/public/mockup_aprobado.png` -> `app/docs/images/mockup_aprobado.png`
+- `app/frontend/public/gedeon/boceto1.png` -> `app/docs/images/boceto1-home-gedeon.png`
+- `app/frontend/public/gedeon/hero-bg-master-4k.png` -> `app/docs/images/hero-bg-master-4k.png`
+
+### QA manual pendiente de Nelson
+
+- Desktop `1920x1080`
+- Desktop `2560x1440`
+- Laptop `1366x768`
+- Tablet `1024px`
+- Mobile `390x844`
+- Mobile `430x932`
+- `StreamView/OBS 1920x1080` como superficie especial posterior
+
+### Criterio honesto de cierre visual
+
+- No declarar aprobación visual automática.
+- Desktop manda sobre mobile.
+- Mobile debe ser seguro y liviano, no redefinir el encuadre aprobado.
+
 ## Sprint F0 residual - four-engines backend/state
 
 **Fecha:** 2026-07-07

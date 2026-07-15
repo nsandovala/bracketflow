@@ -253,6 +253,12 @@ export default function GedeonHeroFX({
     let mobile = false;
     let traces: Trace[] = [];
     let embers: Ember[] = [];
+    let resizeDebounce = 0;
+    let inViewport = true;
+    let documentVisible = !document.hidden;
+    let isRunning = false;
+    let animationTimeMs = 0;
+    let lastFrameTime = 0;
 
     const drawTraceBase = (trace: Trace) => {
       ctx.strokeStyle = hexToRgba(trace.color, trace.alpha);
@@ -326,6 +332,16 @@ export default function GedeonHeroFX({
       ctx.fill();
     };
 
+    const stopAnimation = () => {
+      isRunning = false;
+      lastFrameTime = 0;
+
+      if (raf) {
+        window.cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+
     const rebuildScene = () => {
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -386,45 +402,100 @@ export default function GedeonHeroFX({
     };
 
     const tick = (timeMs: number) => {
-      render(timeMs, true);
+      if (!isRunning) {
+        return;
+      }
+
+      if (lastFrameTime === 0) {
+        lastFrameTime = timeMs;
+      }
+
+      const deltaMs = Math.min(timeMs - lastFrameTime, 48);
+      lastFrameTime = timeMs;
+      animationTimeMs += Math.max(deltaMs, 0);
+
+      render(animationTimeMs, true);
+      raf = window.requestAnimationFrame(tick);
+    };
+
+    const syncPlayback = () => {
+      const shouldAnimate = !reducedMotion && inViewport && documentVisible;
+
+      if (!shouldAnimate) {
+        stopAnimation();
+        render(animationTimeMs, false);
+        return;
+      }
+
+      if (isRunning) {
+        return;
+      }
+
+      isRunning = true;
+      lastFrameTime = 0;
       raf = window.requestAnimationFrame(tick);
     };
 
     const syncMotionPreference = () => {
       reducedMotion = media.matches;
-      window.cancelAnimationFrame(raf);
-      render(0, false);
+      syncPlayback();
+    };
 
-      if (!reducedMotion) {
-        raf = window.requestAnimationFrame(tick);
-      }
+    const queueRebuild = () => {
+      window.clearTimeout(resizeDebounce);
+      resizeDebounce = window.setTimeout(() => {
+        rebuildScene();
+        render(animationTimeMs, false);
+        syncPlayback();
+      }, 180);
     };
 
     rebuildScene();
-    syncMotionPreference();
+    render(animationTimeMs, false);
+    syncPlayback();
 
-    const observer =
+    const resizeObserver =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(() => {
-            rebuildScene();
-            render(0, false);
+            queueRebuild();
           })
         : null;
 
-    observer?.observe(canvas);
+    resizeObserver?.observe(canvas);
+
+    const intersectionObserver =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            ([entry]) => {
+              inViewport = entry?.isIntersecting ?? true;
+              syncPlayback();
+            },
+            { threshold: 0.01 },
+          )
+        : null;
+
+    intersectionObserver?.observe(canvas);
 
     const handleResize = () => {
-      rebuildScene();
-      render(0, false);
+      queueRebuild();
+    };
+
+    const handleVisibilityChange = () => {
+      documentVisible = !document.hidden;
+      syncPlayback();
     };
 
     window.addEventListener("resize", handleResize);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     media.addEventListener("change", syncMotionPreference);
 
     return () => {
-      window.cancelAnimationFrame(raf);
-      observer?.disconnect();
+      stopAnimation();
+      window.clearTimeout(resizeDebounce);
+      resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
       window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       media.removeEventListener("change", syncMotionPreference);
     };
   }, [emberDensity, emberTealChance, originX, originY, traceCount]);
