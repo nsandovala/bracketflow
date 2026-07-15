@@ -5110,6 +5110,63 @@ a:focus-visible {
   padding: 14px 15px;
 }
 
+.bf-dash-roadmap-available {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid rgba(95, 227, 154, 0.22);
+  border-radius: var(--amon-radius-md);
+  background: linear-gradient(110deg, rgba(95, 227, 154, 0.07), rgba(255, 255, 255, 0.022));
+}
+
+.bf-dash-roadmap-available > strong {
+  color: var(--amon-text);
+  font-size: 0.96rem;
+}
+
+.bf-dash-roadmap-available > span:not(.bf-dash-roadmap-status) {
+  color: var(--amon-text-dim);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.bf-dash-roadmap-status,
+.bf-dash-roadmap-group-label {
+  color: var(--amon-accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.bf-dash-roadmap-group-label {
+  display: block;
+  margin: 0 0 8px 2px;
+  color: var(--amon-faint);
+}
+
+.bf-dash-roadmap-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  margin-top: 4px;
+  color: var(--amon-accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.bf-dash-roadmap-cta:hover {
+  color: var(--amon-text);
+}
+
+.bf-dash-roadmap-cta svg {
+  width: 14px;
+  height: 14px;
+}
+
 .bf-dash-roadmap-item strong {
   color: var(--amon-text);
   font-size: 0.9rem;
@@ -5311,6 +5368,36 @@ a:focus-visible {
 .bf-page-operator > *:not(.opr-amb) { position: relative; z-index: 1; }
 
 /* ---- Command bar sticky ---- */
+.opr-push {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 14px;
+  padding: 17px 18px;
+  border: 1px solid var(--amon-line);
+  border-left: 3px solid var(--amon-accent);
+  border-radius: var(--amon-radius-lg);
+  background: linear-gradient(100deg, rgba(97, 242, 163, .075), transparent 45%), rgba(8, 14, 25, .82);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .2);
+}
+.opr-push.is-blocked { border-left-color: var(--amon-cream); background: linear-gradient(100deg, var(--amon-cream-dim), transparent 45%), rgba(8, 14, 25, .82); }
+.opr-push.is-info { border-left-color: #79a8e8; background: linear-gradient(100deg, rgba(121, 168, 232, .08), transparent 45%), rgba(8, 14, 25, .82); }
+.opr-push-state { display: grid; justify-items: center; gap: 5px; min-width: 62px; color: var(--amon-muted); font-size: .65rem; letter-spacing: .12em; text-transform: uppercase; }
+.opr-push-state span { width: 10px; height: 10px; border-radius: 50%; background: var(--amon-accent); box-shadow: 0 0 16px rgba(97, 242, 163, .6); }
+.opr-push.is-blocked .opr-push-state span { background: var(--amon-cream); box-shadow: 0 0 16px var(--amon-cream-glow); }
+.opr-push.is-info .opr-push-state span { background: #79a8e8; box-shadow: 0 0 16px rgba(121, 168, 232, .5); }
+.opr-push-copy { min-width: 0; }
+.opr-push-copy h2 { margin: 3px 0; color: var(--amon-text); font-family: var(--amon-font-display); font-size: 1.25rem; letter-spacing: .025em; }
+.opr-push-copy p { margin: 0; color: var(--amon-text-dim); font-size: .88rem; }
+.opr-push-copy small { display: block; margin-top: 6px; color: var(--amon-muted); font-size: .75rem; }
+.opr-push-copy small strong { color: var(--amon-text-dim); }
+.opr-push-cta, .opr-push-lock { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 17px; border-radius: 11px; white-space: nowrap; font-size: .8rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+.opr-push-cta { border: 1px solid rgba(97, 242, 163, .3); background: var(--amon-accent-dim); color: var(--amon-text); cursor: pointer; text-decoration: none; transition: .16s; }
+.opr-push-cta:hover { transform: translateY(-1px); border-color: rgba(97, 242, 163, .55); }
+.opr-push-cta:disabled { opacity: .5; cursor: wait; transform: none; }
+.opr-push-lock { border: 1px solid var(--amon-line); color: var(--amon-muted); background: rgba(255, 255, 255, .025); }
+
 .opr-command {
   position: sticky;
   top: 12px;
@@ -6191,6 +6278,8 @@ a:focus-visible {
 
 /* ---- Responsive ---- */
 @media (max-width: 1080px) {
+  .opr-push { grid-template-columns: auto minmax(0, 1fr); }
+  .opr-push-cta, .opr-push-lock { grid-column: 2; justify-self: start; }
   .opr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bf-standings-seed-preview {
     grid-template-columns: 1fr;
@@ -6207,6 +6296,9 @@ a:focus-visible {
   .opr-stats { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
+  .opr-push { grid-template-columns: 1fr; }
+  .opr-push-state { display: flex; justify-content: flex-start; min-width: 0; }
+  .opr-push-cta, .opr-push-lock { grid-column: 1; width: 100%; }
   .opr-grid { grid-template-columns: 1fr; }
   .opr-form { grid-template-columns: 1fr; }
   .opr-topbar { flex-wrap: wrap; height: auto; gap: 12px; }

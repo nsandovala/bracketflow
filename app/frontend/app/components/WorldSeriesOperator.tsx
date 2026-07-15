@@ -14,6 +14,7 @@ import {
 } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
+import { getOperatorNextAction } from "../../lib/operatorNextAction";
 import {
   getTeamDisplayName,
   isTournamentCompleted,
@@ -296,6 +297,66 @@ export default function WorldSeriesOperator({
         )
         .sort((left, right) => left.round - right.round || left.id - right.id)[0] ?? null
     : null;
+  const hasKillRaceTie =
+    isKillRace &&
+    selectedEngine?.primaryView === "standings" &&
+    totalTeams > 1 &&
+    reportsLoaded === totalTeams &&
+    activeMatchResults.filter(
+      (result) => result.kills === Math.max(...activeMatchResults.map((entry) => entry.kills))
+    ).length > 1;
+  const nextAction = getOperatorNextAction({
+    hasTournament: Boolean(selectedTournament),
+    isFinalized,
+    primaryView: selectedEngine?.primaryView ?? null,
+    requiresRoulette,
+    playerCount: players.length,
+    teamCount: totalTeams,
+    rosterStatus: selectedTournament?.roster_status,
+    bracketStatus: selectedTournament?.bracket_status,
+    matchCount: matches.length,
+    hasActiveMatch: Boolean(activeMatch) && !activeKillRaceSeriesClosed,
+    pendingReportCount: pendingCount,
+    hasKillRaceTie,
+    nextGameNumber,
+  });
+
+  async function handleNextAction() {
+    if (nextAction.id === "create_game") {
+      onCreateNextGame();
+      return;
+    }
+    if (nextAction.id === "generate_roulette") {
+      await onGenerateRoulette();
+      setMode("setup");
+      return;
+    }
+    if (nextAction.id === "lock_roster") {
+      const result = await onLockRosterRespin();
+      if (result) setMode("bracket");
+      return;
+    }
+    if (nextAction.id === "open_bracket_respin") {
+      await onOpenBracketRespin(3);
+      setMode("bracket");
+      return;
+    }
+    if (nextAction.id === "generate_bracket") {
+      await onGenerateBracket();
+      setMode("bracket");
+      return;
+    }
+    if (nextAction.targetTab) {
+      setMode(nextAction.targetTab);
+      if (nextAction.id === "load_reports") {
+        setFilter("pending");
+        const firstPendingTeam = pendingTeams[0];
+        if (firstPendingTeam) {
+          window.setTimeout(() => jumpToTeam(firstPendingTeam.id), 0);
+        }
+      }
+    }
+  }
   const bracketViewActions =
     !selectedTournament || mode !== "bracket"
       ? null
@@ -873,6 +934,40 @@ export default function WorldSeriesOperator({
               </p>
             </section>
           ) : null}
+
+          <section className={`opr-push is-${nextAction.status}`} aria-live="polite">
+            <div className="opr-push-state" aria-hidden="true">
+              <span />
+              {nextAction.status === "ready" ? "Lista" : nextAction.status === "blocked" ? "Bloqueada" : "Info"}
+            </div>
+            <div className="opr-push-copy">
+              <div className="opr-eyebrow">Push Mode · Próxima acción</div>
+              <h2>{nextAction.title}</h2>
+              <p>{nextAction.description}</p>
+              <small><strong>Por qué:</strong> {nextAction.reason}</small>
+            </div>
+            {nextAction.ctaLabel ? (
+              nextAction.id === "review_completed" && selectedTournament ? (
+                <Link
+                  href={`/standings?tournamentId=${selectedTournament.id}`}
+                  className="opr-push-cta"
+                >
+                  {nextAction.ctaLabel}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="opr-push-cta"
+                  disabled={submitting}
+                  onClick={() => void handleNextAction()}
+                >
+                  {nextAction.ctaLabel}
+                </button>
+              )
+            ) : (
+              <span className="opr-push-lock">Acción no disponible</span>
+            )}
+          </section>
 
           <section className="opr-command">
             <div className="opr-game">

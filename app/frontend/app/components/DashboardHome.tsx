@@ -840,16 +840,25 @@ export default function DashboardHome() {
           <section className="bf-dash-podium-panel">
             <div className="bf-dash-panel-heading">
               <div>
-                <span className="bf-dash-section-label">Proximamente</span>
+                <span className="bf-dash-section-label">Estado del producto</span>
                 <h3>Roadmap controlado</h3>
               </div>
             </div>
 
+            <article className="bf-dash-roadmap-available">
+              <span className="bf-dash-roadmap-status">Disponible ahora</span>
+              <strong>Push Mode básico</strong>
+              <span>Próxima acción sugerida en Operator. Manual-first: tú confirmas cada paso.</span>
+              <Link
+                href={selectedTournament ? `/operator?tournamentId=${selectedTournament.id}` : "/operator"}
+                className="bf-dash-roadmap-cta"
+              >
+                Abrir Push Mode en Operator <IconArrowRight />
+              </Link>
+            </article>
+
+            <span className="bf-dash-roadmap-group-label">Próximamente</span>
             <div className="bf-dash-roadmap-list">
-              <article className="bf-dash-roadmap-item">
-                <strong>Push Mode</strong>
-                <span>Automatizacion operativa posterior al core manual.</span>
-              </article>
               <article className="bf-dash-roadmap-item">
                 <strong>OCR MVP</strong>
                 <span>Carga asistida de resultados cuando el flujo base ya este estable.</span>
