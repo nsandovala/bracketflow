@@ -4,6 +4,43 @@
 > Fecha: 2026-06-30
 > Estado: rescate P0 de Kill Race BO3 validado.
 
+## Sprint H2 - Home Product Story / Saber Mas
+
+**Fecha:** 2026-07-14
+**Rama:** `feat/home-product-story` (sin commit)
+
+### Objetivo QA
+
+- Mantener intacto el hero Gedeon Arena aprobado.
+- Hacer que `Saber Mas` lleve a una seccion real de explicacion del producto.
+- Explicar BracketFlow sin inventar features ya cerradas.
+- Sostener calidad premium en desktop/tablet y mobile safe sin overflow horizontal.
+
+### Cambios ejecutados
+
+| Tema | Decision |
+|---|---|
+| CTA hero | `Saber Mas` ahora apunta a `#bf-home-story` |
+| Card experiencia | Tambien apunta a `#bf-home-story` para mantener coherencia del recorrido |
+| Nueva seccion | `bf-home-story` debajo de cards |
+| Contenido | overview del producto + 4 bloques editoriales + flujo operativo + motores soportados + roadmap visible |
+| Tecnica | solo `page.tsx` + `globals.css`, sin canvas nuevo ni librerias |
+
+### QA manual pendiente de Nelson
+
+- Desktop `1920x1080`
+- Laptop `1366x768`
+- Tablet `1024px`
+- Mobile `390x844`
+
+### Fuera de scope explicitado
+
+- Dashboard operativo
+- Push Mode
+- OGL/WebGL
+- OCR
+- agentes/copilot
+
 ## Sprint H1 - Home Gedeon Arena hardening
 
 **Fecha:** 2026-07-14

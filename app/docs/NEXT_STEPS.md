@@ -1,5 +1,36 @@
 # NEXT STEPS
 
+## ULTIMO SPRINT EJECUTADO - H2 Home Product Story / Saber Mas
+
+**Fecha:** 2026-07-14
+**Rama:** `feat/home-product-story` (sin commit)
+
+**Objetivo del sprint:** extender el Home Gedeon Arena aprobado con una seccion editorial `bf-home-story` debajo de las cards para explicar mejor el producto sin tocar hero, canvas, backend ni superficies operativas.
+
+**Que se hizo:**
+- El CTA `Saber Mas` del hero ahora navega a `#bf-home-story`.
+- La card `Experiencia Optimizada` tambien apunta a `#bf-home-story` para alinear el recorrido con la narrativa del producto en vez de mandar fuera del Home.
+- Se agrego la seccion `bf-home-story` debajo de las cards con:
+  - que es BracketFlow;
+  - para quien es;
+  - que problema resuelve;
+  - flujo de operacion de arena;
+  - motores soportados hoy;
+  - que viene despues.
+- La implementacion se resolvio solo en `app/frontend/app/page.tsx` y `app/frontend/app/globals.css`, sin librerias nuevas y sin canvas adicional.
+- Desktop/tablet siguen siendo la prioridad visual; mobile queda como superficie segura de lectura, no como motor del layout.
+
+**Que NO se hizo:**
+- No se rediseño el hero.
+- No se toco `GedeonHeroFX`.
+- No se toco backend, APIs, scoring, Operator, DashboardHome, BracketView ni Stream.
+- No se implemento Push Mode, OGL, OCR ni agentes/copilot.
+- No hubo commit ni push.
+
+**Pendiente real:**
+- Validacion visual manual de Nelson en desktop `1920x1080`, laptop `1366x768`, tablet `1024px` y mobile `390x844`.
+- Confirmar si el storytelling del Home necesita una segunda pasada de copy o si queda congelado hasta el siguiente sprint visual.
+
 ## ULTIMO SPRINT EJECUTADO - H1 Home Gedeon Arena hardening
 
 **Fecha:** 2026-07-14

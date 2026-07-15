@@ -4,6 +4,12 @@
 > Este documento preserva ideas de producto, monetizacion y automatizacion.
 > No define el foco del sprint actual.
 
+## H2 Home Product Story
+
+- `feat/home-product-story` agrega `bf-home-story` como bloque editorial de producto debajo de las cards del Home aprobado.
+- El hero Gedeon Arena y su canvas no se tocan en esta fase.
+- Lo que sigue fuera de este sprint se mantiene igual: Dashboard operativo premium, Push Mode, OGL/WebGL, OCR y agentes/copilot.
+
 ## Home Gedeon Arena - siguiente capa futura
 
 - El Home ya quedó implementado y endurecido en `feat/ui-home-gedeon-arena` con canvas custom sin librerías, circuitos saliendo desde el contorno exterior del casco y brasas en hero/cards.
