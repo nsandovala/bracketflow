@@ -1168,7 +1168,16 @@ export default function WorldSeriesOperator({
           {/* ---- OPERACIÓN: grilla de reportes ---- */}
           {mode === "op" ? (
             activeMatch ? (
-              <div className="opr-grid">
+              <div className="opr-results-matrix" role="table" aria-label={`Reportes de la partida ${activeMatch.round}`}>
+                <div className="opr-results-head" role="row">
+                  <span>Estado</span>
+                  <span>Equipo / roster</span>
+                  <span>Kills</span>
+                  {usesPlacement ? <span>Placement</span> : null}
+                  <span>{usesPlacement ? "Total" : "Kills"}</span>
+                  <span>Validación</span>
+                  <span>Acción</span>
+                </div>
                 {visibleTeams.map((team) => {
                   const savedResult = activeMatchResults.find(
                     (result) => result.team_id === team.id
@@ -1190,73 +1199,81 @@ export default function WorldSeriesOperator({
                         )
                       : draft.kills);
                   const isSaved = Boolean(savedResult);
+                  const hasDraftChanges = Boolean(resultDrafts[key]);
                   const hasVal = estimatedTotal != null && estimatedTotal !== "";
+                  const hasRequiredDraft =
+                    draft.kills.trim().length > 0 &&
+                    (!usesPlacement || draft.placement.trim().length > 0);
+                  const rowState = isFinalized ? "Finalizado" : isSaved ? "Guardado" : "Pendiente";
 
                   return (
-                    <article
+                    <div
                       key={team.id}
                       id={`opr-card-${team.id}`}
-                      className={`opr-card ${isSaved ? "is-saved" : "is-pending"}`}
+                      className={`opr-results-row ${isSaved ? "is-saved" : "is-pending"}${isFinalized ? " is-finalized" : ""}`}
+                      role="row"
                     >
-                      <div className="opr-card-head">
-                        <div>
-                          <div className="opr-team-name">{team.name}</div>
-                          <p className="opr-team-roster">{rosterText(team)}</p>
-                        </div>
-                        <span className={`opr-tag ${isSaved ? "t-saved" : "t-pending"}`}>
-                          <i />
-                          {isSaved ? "Guardado" : "Pendiente"}
-                        </span>
+                      <div className={`opr-matrix-status is-${isFinalized ? "finalized" : isSaved ? "saved" : "pending"}`} role="cell">
+                        <i />
+                        <span>{rowState}</span>
                       </div>
-
-                      <div className="opr-inputs">
-                        <div className="opr-field">
-                          <label>Kills</label>
+                      <div className="opr-matrix-team" role="cell">
+                        <strong>{team.name}</strong>
+                        <span>{rosterText(team)}</span>
+                      </div>
+                      <label className="opr-matrix-field" role="cell">
+                        <span>Kills de {team.name}</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={draft.kills}
+                          placeholder="0"
+                          disabled={isFinalized}
+                          aria-label={`Kills de ${team.name}`}
+                          onChange={(event) =>
+                            onUpdateDraft(activeMatch.id, team.id, { kills: event.target.value })
+                          }
+                        />
+                      </label>
+                      {usesPlacement ? (
+                        <label className="opr-matrix-field" role="cell">
+                          <span>Placement de {team.name}</span>
                           <input
                             type="number"
                             inputMode="numeric"
-                            value={draft.kills}
-                            placeholder="0"
+                            value={draft.placement}
+                            placeholder={`1-${effectiveLobbySize}`}
                             disabled={isFinalized}
+                            aria-label={`Placement de ${team.name}`}
                             onChange={(event) =>
-                              onUpdateDraft(activeMatch.id, team.id, { kills: event.target.value })
+                              onUpdateDraft(activeMatch.id, team.id, { placement: event.target.value })
                             }
                           />
-                        </div>
-                        {usesPlacement ? (
-                          <div className="opr-field">
-                            <label>Placement</label>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              value={draft.placement}
-                              placeholder={`1-${effectiveLobbySize}`}
-                              disabled={isFinalized}
-                              onChange={(event) =>
-                                onUpdateDraft(activeMatch.id, team.id, {
-                                  placement: event.target.value,
-                                })
-                              }
-                            />
-                          </div>
-                        ) : null}
-                        <div className="opr-total">
-                          <label>{usesPlacement ? "Total" : "Kills"}</label>
-                          <b className={hasVal ? "has-val" : ""}>{hasVal ? estimatedTotal : "—"}</b>
-                        </div>
+                        </label>
+                      ) : null}
+                      <div className={`opr-matrix-total${hasVal ? " has-val" : ""}`} role="cell">
+                        {hasVal ? estimatedTotal : "—"}
                       </div>
-
-                      <div className="opr-card-foot">
-                        <button
-                          type="button"
-                          className="opr-save"
-                          disabled={submitting || isFinalized}
-                          onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
-                        >
-                          {isFinalized ? "Torneo finalizado" : isSaved ? "Editar" : "Guardar reporte"}
-                        </button>
+                      <div className="opr-matrix-validation" role="cell">
+                        {isFinalized
+                          ? "Solo lectura"
+                          : isSaved && hasDraftChanges
+                            ? "Cambios sin guardar"
+                            : isSaved
+                              ? "Datos guardados"
+                            : hasRequiredDraft
+                              ? "Listo para guardar"
+                              : "Faltan datos"}
                       </div>
-                    </article>
+                      <button
+                        type="button"
+                        className="opr-matrix-save"
+                        disabled={submitting || isFinalized}
+                        onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
+                      >
+                        {isFinalized ? "Finalizado" : isSaved ? "Actualizar" : "Guardar"}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
