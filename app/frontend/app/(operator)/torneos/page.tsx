@@ -7,6 +7,7 @@ import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 import { IconDashboard, IconStandings, IconTeams, IconTrophy } from "../../components/icons";
 import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
 import type { Tournament } from "../../../lib/api";
+import { getOperatorNextAction } from "../../../lib/operatorNextAction";
 import {
   ENGINE_PRESETS,
   resolveTournamentEngine,
@@ -14,7 +15,7 @@ import {
   type TournamentStructure,
   type TeamSize,
 } from "../../../lib/tournamentModel";
-import { getTournamentStatusLabel } from "../../../lib/tournamentStatus";
+import { getMatchPointStatus, getTournamentStatusLabel } from "../../../lib/tournamentStatus";
 
 const TOURNAMENT_MOTORS = [
   {
@@ -63,12 +64,21 @@ const MOTOR_ICONS = [IconTrophy, IconTeams, IconDashboard, IconStandings];
 export default function TorneosPage() {
   const router = useRouter();
   const {
+    backendOnline,
     loading,
     submitting,
     message,
     tournaments,
     selectedTournamentId,
     selectedTournament,
+    teams,
+    players,
+    matches,
+    activeMatch,
+    reportsLoaded,
+    totalTeams,
+    sortedStandings,
+    canCreateNextGame,
     createEngineTournament,
     updateEngineTournament,
     archiveSelectedTournament,
@@ -438,26 +448,30 @@ export default function TorneosPage() {
           tournaments.map((tournament) => {
             const isSelected = tournament.id === selectedTournamentId;
             const engine = resolveTournamentEngine(tournament);
-            const needsRoulette =
-              engine.rosterPolicy === "roulette" &&
-              tournament.config?.rouletteStatus !== "confirmed";
-            const isKillRaceTournament = engine.engineKey === "kill_race_bracket";
-            const primaryHref = needsRoulette
-              ? `/operator?tournamentId=${tournament.id}&roulette=1`
-              : isKillRaceTournament
-                ? `/standings?tournamentId=${tournament.id}`
-                : `/operator?tournamentId=${tournament.id}`;
-            const primaryLabel = needsRoulette
-              ? "Ruleta"
-              : isKillRaceTournament
-                ? "Ver bracket"
-                : "Operar";
+            const selectedMatchPointStatus = isSelected && engine.primaryView !== "bracket"
+              ? getMatchPointStatus({
+                  tournament,
+                  threshold: engine.matchPointThreshold,
+                  standings: sortedStandings,
+                  teams,
+                  matches,
+                })
+              : undefined;
+            const pushModeAction = getOperatorNextAction({
+              tournament,
+              engine,
+              backendOnline,
+              teamsCount: isSelected ? totalTeams : undefined,
+              participantsCount: isSelected ? players.length : undefined,
+              matches: isSelected ? matches : undefined,
+              activeMatch: isSelected ? activeMatch : undefined,
+              reportsLoaded: isSelected ? reportsLoaded : undefined,
+              totalTeams: isSelected ? totalTeams : undefined,
+              matchPointStatus: selectedMatchPointStatus,
+              canCreateNextMatch: isSelected ? canCreateNextGame : undefined,
+            });
             const isChecked = selectedIds.has(tournament.id);
-            const statusLabel = needsRoulette
-              ? "Setup requerido"
-              : isSelected
-                ? "Activo"
-                : getTournamentStatusLabel(tournament.status);
+            const statusLabel = isSelected ? "Activo" : getTournamentStatusLabel(tournament.status);
             return (
               <article
                 key={tournament.id}
@@ -474,11 +488,15 @@ export default function TorneosPage() {
                   <span className="bf-hub-tournament-meta">
                     <span className="bf-hub-tournament-game">{tournament.game}</span>
                     <span className="bf-hub-tournament-status">{statusLabel}</span>
+                    <span className={`bf-push-chip is-${pushModeAction.tone}`}>
+                      <span>Push</span>
+                      {pushModeAction.label}
+                    </span>
                   </span>
                 </div>
                 <div className="bf-hub-tournament-actions">
-                  <Link href={primaryHref} className="bf-button bf-button-primary">
-                    {primaryLabel}
+                  <Link href={pushModeAction.href} className="bf-button bf-button-primary">
+                    {pushModeAction.ctaLabel}
                   </Link>
                   <Link href={`/dashboard?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
                     Dashboard

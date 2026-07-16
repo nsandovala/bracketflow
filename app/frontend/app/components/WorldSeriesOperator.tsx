@@ -14,6 +14,7 @@ import {
 } from "../../lib/api";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
+import { getOperatorNextAction } from "../../lib/operatorNextAction";
 import {
   getTeamDisplayName,
   isTournamentCompleted,
@@ -226,6 +227,19 @@ export default function WorldSeriesOperator({
     (typeof selectedTournament?.config?.championTeamId === "number" &&
       selectedTournament.config.championTeamId > 0) ||
     matchPointStatus.state === "champion";
+  const pushModeAction = getOperatorNextAction({
+    tournament: selectedTournament,
+    engine: selectedEngine,
+    backendOnline,
+    teamsCount: totalTeams,
+    participantsCount: players.length,
+    matches,
+    activeMatch,
+    reportsLoaded,
+    totalTeams,
+    matchPointStatus,
+    canCreateNextMatch: canCreateNextGame,
+  });
   const importFormatExample = useMemo(() => {
     const expectedTeamSize = Math.max(selectedEngine?.teamSize ?? 3, 1);
     const playersHint = Array.from(
@@ -1028,7 +1042,7 @@ export default function WorldSeriesOperator({
                 className={mode === "op" ? "is-on" : ""}
                 onClick={() => setMode("op")}
               >
-                Push Mode
+                Push Mode · {pushModeAction.label}
               </button>
               <button
                 type="button"
