@@ -865,7 +865,7 @@ export default function WorldSeriesOperator({
 
           {/* ---- Command bar ---- */}
           {requiresRoulette ? (
-            <section className="opr-panel">
+            <section className="opr-panel opr-setup-ready">
               <div className="opr-eyebrow">Equipos generados por ruleta</div>
               <h2>Listo para operar</h2>
               <p className="sub">
@@ -874,7 +874,7 @@ export default function WorldSeriesOperator({
             </section>
           ) : null}
 
-          <section className="opr-command">
+          <section className={`opr-command${isFinalized ? " is-finalized" : ""}`}>
             <div className="opr-game">
               <div>
                 <div className="eye">Operando</div>
@@ -907,7 +907,7 @@ export default function WorldSeriesOperator({
                 </b>
               </div>
               <div className="opr-bar">
-                <i style={{ width: `${progressPct}%` }} />
+                <i style={{ width: `${progressPct}%` }} aria-hidden="true" />
               </div>
             </div>
 
@@ -938,14 +938,21 @@ export default function WorldSeriesOperator({
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                className={`opr-next${canCreateNextGame ? " is-ready" : ""}`}
-                disabled={!canCreateNextGame || submitting}
-                onClick={onCreateNextGame}
-              >
-                Crear Partida {nextGameNumber} <span className="arrow">→</span>
-              </button>
+              <div className="opr-command-actions">
+                <nav className="opr-command-links" aria-label="Vistas del torneo">
+                  <Link href={`/standings?tournamentId=${selectedTournament.id}`}>Standings</Link>
+                  <Link href={`/stream?tournamentId=${selectedTournament.id}`}>Stream</Link>
+                  <Link href="/dashboard">Dashboard</Link>
+                </nav>
+                <button
+                  type="button"
+                  className={`opr-next${canCreateNextGame ? " is-ready" : ""}`}
+                  disabled={!canCreateNextGame || submitting}
+                  onClick={onCreateNextGame}
+                >
+                  Crear Partida {nextGameNumber} <span className="arrow">→</span>
+                </button>
+              </div>
             )}
           </section>
 
@@ -1021,7 +1028,7 @@ export default function WorldSeriesOperator({
                 className={mode === "op" ? "is-on" : ""}
                 onClick={() => setMode("op")}
               >
-                Operación
+                Push Mode
               </button>
               <button
                 type="button"
@@ -1051,6 +1058,17 @@ export default function WorldSeriesOperator({
               </div>
             ) : null}
           </div>
+
+          {mode === "op" ? (
+            <aside className="opr-ocr-slot" aria-label="OCR Draft Intake pendiente">
+              <span className="opr-ocr-mark" aria-hidden="true">OCR</span>
+              <span className="opr-ocr-copy">
+                <strong>OCR Draft Intake</strong>
+                <small>Próxima capa: leer captura, crear borrador y confirmar manualmente.</small>
+              </span>
+              <span className="opr-tag t-pending"><i />Pendiente</span>
+            </aside>
+          ) : null}
 
           {/* ---- Chips de pendientes (saltar a) ---- */}
           {mode === "op" && pendingCount > 0 ? (
@@ -1101,7 +1119,7 @@ export default function WorldSeriesOperator({
                     <article
                       key={team.id}
                       id={`opr-card-${team.id}`}
-                      className={`opr-card ${isSaved ? "is-saved" : "is-pending"}`}
+                      className={`opr-card ${isSaved ? "is-saved" : "is-pending"}${isFinalized ? " is-finalized" : ""}`}
                     >
                       <div className="opr-card-head">
                         <div>
@@ -1110,7 +1128,7 @@ export default function WorldSeriesOperator({
                         </div>
                         <span className={`opr-tag ${isSaved ? "t-saved" : "t-pending"}`}>
                           <i />
-                          {isSaved ? "Guardado" : "Pendiente"}
+                          {isFinalized ? "Finalizado" : isSaved ? "Guardado" : "Pendiente"}
                         </span>
                       </div>
 
