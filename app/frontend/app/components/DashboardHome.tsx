@@ -440,18 +440,29 @@ export default function DashboardHome() {
 
   function handleSelectTournament(tournamentId: number) {
     selectTournament(tournamentId);
-    router.replace(`/dashboard?tournamentId=${tournamentId}`);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("tournamentId", String(tournamentId));
+    router.replace(`/dashboard?${nextParams.toString()}`);
   }
 
   return (
     <div className="bf-dash bf-dash-v2 bf-dash-shell">
+      <header className="bf-dash-welcome">
+        <div>
+          <span className="bf-dash-section-label">Dashboard operativo</span>
+          <h1>Bienvenido de vuelta, Operator</h1>
+          <p>Controla el torneo activo, su señal competitiva y el siguiente paso operativo.</p>
+        </div>
+        <span className={`bf-dash-badge${backendOnline ? " is-live" : " is-offline"}`}>
+          <i className="bf-op-dot" />
+          {backendOnline ? "Backend online" : "Backend offline"}
+        </span>
+      </header>
+
       <section className="bf-dash-active bf-dash-header">
         <div className="bf-dash-active-main bf-dash-header-main">
           <div className="bf-dash-header-topline">
-            <span className="bf-dash-section-label">Cockpit operativo</span>
-            <span className={`bf-dash-badge${backendOnline ? " is-live" : ""}`}>
-              {backendOnline ? "Backend online" : "Backend offline"}
-            </span>
+            <span className="bf-dash-section-label">Torneo activo</span>
           </div>
 
           <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
@@ -844,6 +855,45 @@ export default function DashboardHome() {
           </section>
         </aside>
       </div>
+
+      <section className="bf-dash-motors">
+        <div className="bf-dash-panel-heading">
+          <div>
+            <span className="bf-dash-section-label">Motores de torneo</span>
+            <h3>Seleccionar o crear formato</h3>
+          </div>
+          <Link href="/torneos" className="bf-dash-inline-link">
+            Ver torneos <IconArrowRight size={15} />
+          </Link>
+        </div>
+        <div className="bf-dash-motors-grid">
+          {[
+            ["World Series BR", "Acumulativo · standings"],
+            ["Resurgence / Rebirth WS", "Acumulativo · ritmo corto"],
+            ["Gedeon Roulette WS", "Ruleta · acumulativo"],
+            ["Kill Race Bracket", "Bracket · series BO"],
+          ].map(([label, detail]) => (
+            <Link key={label} href="/torneos" className="bf-dash-motor">
+              <span className="bf-dash-motor-icon"><IconTrophy size={18} /></span>
+              <span className="bf-dash-motor-copy"><strong>{label}</strong><small>{detail}</small></span>
+              <span className="bf-dash-motor-status">Gestionar en Torneos</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="bf-dash-secondary" aria-label="Módulos secundarios">
+        <article className="bf-dash-module">
+          <span className="bf-dash-module-icon"><IconDashboard size={20} /></span>
+          <div><span className="bf-dash-section-label">Comunidad</span><h3>Discord Bot</h3><p>Base pendiente para notificaciones y comunidad.</p></div>
+          <span className="bf-dash-module-state">Configurar luego</span>
+        </article>
+        <article className="bf-dash-module">
+          <span className="bf-dash-module-icon"><IconStream size={20} /></span>
+          <div><span className="bf-dash-section-label">Broadcast</span><h3>Stream / Overlays</h3><p>Overlay base disponible. Caster Console pendiente.</p></div>
+          <Link href={streamHref} className="bf-dash-inline-link">Abrir Stream <IconArrowRight size={15} /></Link>
+        </article>
+      </section>
     </div>
   );
 }
