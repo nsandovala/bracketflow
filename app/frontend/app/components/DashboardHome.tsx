@@ -128,8 +128,8 @@ export default function DashboardHome() {
   const stat = (value: number | string) => (loading ? DASH : String(value));
   const tournamentsCount = tournaments.length;
   const playersCount = players.length;
-  const top3 = sortedStandings.slice(0, 3);
-  const leader = top3[0] ?? null;
+  const top5 = sortedStandings.slice(0, 5);
+  const leader = top5[0] ?? null;
   const leaderTeam = leader ? teamsById.get(leader.team_id) : null;
   const leaderLabel = leaderTeam ? getTeamDisplayName(leaderTeam) : leader?.team_name ?? null;
   const reportedBattleRoyaleMatches = matches.filter(
@@ -181,8 +181,17 @@ export default function DashboardHome() {
         })
       : { state: "idle" as const };
 
+  const tournamentFinalized =
+    selectedTournament?.status === "completed" ||
+    matchPointStatus.state === "champion" ||
+    killRaceCompleted;
+
   const pendingTeamNames = pendingTeams.map((team) => getTeamDisplayName(team));
   const pendingReportsCount = activeMatch ? Math.max(totalTeams - activeMatchResults.length, 0) : 0;
+  const hasPendingOperation =
+    !tournamentFinalized &&
+    (isKillRace ? Boolean(killRaceCurrentMatch) : Boolean(activeMatch && pendingReportsCount > 0));
+  const totalConfirmedKills = sortedStandings.reduce((sum, entry) => sum + entry.kills, 0);
   const matchPointHeadline =
     matchPointStatus.state === "champion"
       ? `Campeon por Match Point: ${matchPointStatus.championLabel}.`
@@ -626,7 +635,7 @@ export default function DashboardHome() {
             <div className="bf-dash-panel-heading">
               <div>
                 <span className="bf-dash-section-label">Resumen competitivo</span>
-                <h3>{isKillRace ? "Bracket y series" : "Top 3 y lectura del torneo"}</h3>
+                <h3>{isKillRace ? "Bracket y series" : "Top 5 competitivo"}</h3>
               </div>
               <span className="bf-dash-badge">
                 {isKillRace
@@ -692,9 +701,12 @@ export default function DashboardHome() {
                   </div>
                 </div>
               )
-            ) : top3.length > 0 ? (
+            ) : top5.length > 0 ? (
               <div className="bf-dash-podium-list">
-                {top3.map((entry, index) => (
+                <div className="bf-dash-podium-columns" aria-hidden="true">
+                  <span>#</span><span>Equipo / roster</span><span>Pts</span><span>Kills</span><span>Best</span><span>Partidas</span>
+                </div>
+                {top5.map((entry, index) => (
                   <article key={entry.team_id} className={`bf-dash-podium-row${index === 0 ? " is-leader" : ""}`}>
                     <span className="bf-dash-rank">{index + 1}</span>
                     <div className="bf-dash-team">
@@ -707,8 +719,10 @@ export default function DashboardHome() {
                         {entry.players.length > 0 ? entry.players.join(" / ") : "Roster pendiente"}
                       </span>
                     </div>
-                    <span className="bf-dash-podium-kills">{entry.kills} K</span>
                     <span className="bf-dash-podio-pts">{formatPoints(entry.total_points)}</span>
+                    <span className="bf-dash-podium-kills">{entry.kills}</span>
+                    <span className="bf-dash-podium-best">{entry.best_placement ?? DASH}</span>
+                    <span className="bf-dash-podium-matches">{entry.matches_played}</span>
                   </article>
                 ))}
               </div>
@@ -737,23 +751,23 @@ export default function DashboardHome() {
             </div>
 
             <div className="bf-dash-quick">
-              <Link href={operatorHref} className="bf-dash-quick-link">
-                <span className="bf-dash-quick-icon">
-                  <IconOperator size={19} />
-                </span>
-                <span className="bf-dash-quick-copy">
-                  <strong>Ir a Operator</strong>
-                  <span>Operacion manual y carga real.</span>
-                </span>
-              </Link>
+              {hasPendingOperation ? (
+                <Link href={operatorHref} className="bf-dash-quick-link is-primary">
+                  <span className="bf-dash-quick-icon"><IconOperator size={19} /></span>
+                  <span className="bf-dash-quick-copy">
+                    <strong>Ir a Operator</strong>
+                    <span>{isKillRace ? "Serie lista para operar." : `${pendingReportsCount} reportes pendientes.`}</span>
+                  </span>
+                </Link>
+              ) : null}
 
-              <Link href={standingsHref} className="bf-dash-quick-link">
+              <Link href={standingsHref} className={`bf-dash-quick-link${!hasPendingOperation ? " is-primary" : ""}`}>
                 <span className="bf-dash-quick-icon">
                   <IconStandings size={19} />
                 </span>
                 <span className="bf-dash-quick-copy">
-                  <strong>Ver Standings</strong>
-                  <span>Lectura competitiva y clasificacion.</span>
+                  <strong>{tournamentFinalized ? "Ver resultado final" : "Ver Standings"}</strong>
+                  <span>{tournamentFinalized ? "Campeón y clasificación confirmada." : "Lectura competitiva y clasificación."}</span>
                 </span>
               </Link>
 
@@ -763,7 +777,7 @@ export default function DashboardHome() {
                 </span>
                 <span className="bf-dash-quick-copy">
                   <strong>Abrir Stream</strong>
-                  <span>Superficie para casting y OBS.</span>
+                  <span>Vista read-only para broadcast y OBS.</span>
                 </span>
               </Link>
 
@@ -782,82 +796,50 @@ export default function DashboardHome() {
           <section className="bf-dash-podium-panel">
             <div className="bf-dash-panel-heading">
               <div>
-                <span className="bf-dash-section-label">Contexto real</span>
-                <h3>Lectura operativa</h3>
+                <span className="bf-dash-section-label">Señal compartible</span>
+                <h3>Snapshot competitivo</h3>
               </div>
             </div>
 
-            <div className="bf-dash-context-list">
-              <div className="bf-dash-context-row">
-                <span className="bf-dash-context-label">Backend</span>
-                <strong className={`bf-dash-context-value${backendOnline ? " is-success" : " is-warning"}`}>
-                  {backendOnline ? "Online" : "Offline"}
-                </strong>
+            <div className="bf-dash-snapshot">
+              <div className="bf-dash-snapshot-lead">
+                <span>{tournamentFinalized ? "Campeón confirmado" : "Líder actual"}</span>
+                <strong>{leaderCardValue}</strong>
+                <small>{leaderCardSub}</small>
               </div>
-
-              <div className="bf-dash-context-row">
-                <span className="bf-dash-context-label">Roster</span>
-                <strong className="bf-dash-context-value">{rosterStatusLabel}</strong>
+              <div className="bf-dash-snapshot-stats">
+                {isKillRace ? (
+                  <>
+                    <span><strong>{killRaceCompletedSeries.length}</strong> series cerradas</span>
+                    <span><strong>{matches.length}</strong> series totales</span>
+                    <span><strong>BO{engine?.bestOf ?? 3}</strong> formato</span>
+                  </>
+                ) : (
+                  <>
+                    <span><strong>{top5.length}</strong> top visibles</span>
+                    <span><strong>{totalConfirmedKills}</strong> kills acumuladas</span>
+                    <span><strong>{gameNumber || DASH}</strong> {tournamentFinalized ? "partida final" : "partida actual"}</span>
+                  </>
+                )}
               </div>
-
-              <div className="bf-dash-context-row">
-                <span className="bf-dash-context-label">{isKillRace ? "Bracket" : "Partida activa"}</span>
-                <strong className="bf-dash-context-value">
-                  {isKillRace
-                    ? bracketStatusLabel
-                    : activeMatch
-                      ? `Partida ${activeMatch.round}`
-                      : "Sin partida abierta"}
-                </strong>
-              </div>
-
-              <div className="bf-dash-context-row">
-                <span className="bf-dash-context-label">{isKillRace ? "Serie actual" : "Reportes pendientes"}</span>
-                <strong className="bf-dash-context-value">
-                  {isKillRace
-                    ? resolvedKillRaceCurrentLabel ?? "Sin serie jugable"
-                    : activeMatch
-                      ? `${pendingReportsCount}`
-                      : "No aplica"}
-                </strong>
-              </div>
-
-              <div className="bf-dash-context-row">
-                <span className="bf-dash-context-label">{isKillRace ? "BO actual" : "Match Point"}</span>
-                <strong className="bf-dash-context-value">
-                  {isKillRace
-                    ? `BO${engine?.bestOf ?? 3}`
-                    : engine?.supportsMatchPoint
-                      ? matchPointStatus.state === "champion"
-                        ? "Coronado"
-                        : `${engine.matchPointThreshold ?? DASH} pts`
-                      : "No aplica"}
-                </strong>
-              </div>
+              <p>Datos reales listos para captura manual. Exportación todavía no disponible.</p>
             </div>
           </section>
 
           <section className="bf-dash-podium-panel">
             <div className="bf-dash-panel-heading">
               <div>
-                <span className="bf-dash-section-label">Proximamente</span>
-                <h3>Roadmap controlado</h3>
+                <span className="bf-dash-section-label">Señal de evento</span>
+                <h3>Broadcast readiness</h3>
               </div>
             </div>
 
-            <div className="bf-dash-roadmap-list">
-              <article className="bf-dash-roadmap-item">
-                <strong>Push Mode</strong>
-                <span>Automatizacion operativa posterior al core manual.</span>
-              </article>
-              <article className="bf-dash-roadmap-item">
-                <strong>OCR MVP</strong>
-                <span>Carga asistida de resultados cuando el flujo base ya este estable.</span>
-              </article>
-              <article className="bf-dash-roadmap-item">
-                <strong>Caster Suite</strong>
-                <span>Capas premium para stream sin venderlas como feature terminada hoy.</span>
-              </article>
+            <div className="bf-dash-readiness">
+              <div><span>Standings</span><strong className={selectedTournament ? "is-ready" : "is-waiting"}>{selectedTournament ? "Listo" : "En espera"}</strong></div>
+              <div><span>Stream overlay</span><strong className={streamReady ? "is-ready" : "is-waiting"}>{streamReady ? "Listo" : "En espera"}</strong></div>
+              <div><span>Push Mode</span><strong className="is-ready">Operator</strong></div>
+              <div><span>Caster Console</span><strong className="is-pending">Pendiente</strong></div>
+              <div><span>OCR MVP</span><strong className="is-pending">Pendiente</strong></div>
             </div>
           </section>
         </aside>
