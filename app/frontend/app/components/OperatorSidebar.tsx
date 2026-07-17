@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 import {
@@ -40,7 +41,16 @@ export default function OperatorSidebar() {
   return (
     <aside className="bf-op-sidebar">
       <Link href="/" className="bf-op-brand">
-        <span className="bf-op-brand-mark">BF</span>
+        <span className="bf-op-brand-mark">
+          <Image
+            src="/gedeon/helmet-hero.webp"
+            alt=""
+            width={44}
+            height={44}
+            priority
+            className="bf-op-brand-image"
+          />
+        </span>
         <span className="bf-op-brand-copy">
           <span className="bf-op-brand-name">BracketFlow</span>
           <span className="bf-op-brand-tag">Operator Suite</span>

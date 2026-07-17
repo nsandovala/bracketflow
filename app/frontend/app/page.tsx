@@ -18,24 +18,13 @@ type Capability = {
   live?: boolean;
 };
 
-type StoryOverview = {
+type ArenaMovement = {
   eyebrow: string;
   title: string;
   copy: string;
   points: string[];
-};
-
-type StoryBlock = {
-  eyebrow: string;
-  title: string;
-  copy: string;
-  points: string[];
-};
-
-type StoryStep = {
-  step: string;
-  title: string;
-  copy: string;
+  cta: string;
+  href: string;
 };
 
 const CAPABILITIES: Capability[] = [
@@ -56,9 +45,9 @@ const CAPABILITIES: Capability[] = [
   },
   {
     id: "casters",
-    title: "Herramientas para Casters",
-    copy: "Overlays, paneles y soporte visual para transmisión.",
-    cta: "Ver Herramientas",
+    title: "Stream para Broadcast",
+    copy: "Una vista clara del torneo para transmisión, staff y comunidad.",
+    cta: "Ver Stream",
     href: "/stream",
   },
   {
@@ -70,87 +59,35 @@ const CAPABILITIES: Capability[] = [
   },
 ];
 
-const STORY_OVERVIEW: StoryOverview[] = [
-  {
-    eyebrow: "Que es",
-    title: "BracketFlow",
-    copy:
-      "Una arena operativa para organizar torneos, operar en vivo y mostrar la historia competitiva sin saltar entre herramientas desconectadas.",
-    points: ["torneos competitivos", "operacion manual-first", "standings y stream", "misma lectura visual"],
-  },
-  {
-    eyebrow: "Para quien es",
-    title: "Operadores, staff y casters",
-    copy:
-      "Pensado para quien necesita ver contexto claro, confirmar el siguiente paso y sostener una experiencia consistente para comunidad y transmision.",
-    points: ["desktop/laptop cockpit", "tablet para staff", "streamview/OBS", "mobile safe para viewer"],
-  },
-  {
-    eyebrow: "Que problema resuelve",
-    title: "Menos caos, mas control",
-    copy:
-      "Reduce la friccion entre planillas, mensajes, capturas y overlays improvisados para que la operacion del torneo no dependa de memoria ni parches.",
-    points: ["menos planillas sueltas", "menos copy manual", "menos contexto perdido", "mas legibilidad"],
-  },
-];
-
-const STORY_BLOCKS: StoryBlock[] = [
+const ARENA_MOVEMENTS: ArenaMovement[] = [
   {
     eyebrow: "01",
-    title: "Crea la arena",
-    copy:
-      "Configura el formato, registra equipos y prepara el torneo sin perderte entre planillas, mensajes y capturas sueltas.",
-    points: ["WSOW Battle Royale", "Rebirth WS", "Gedeon Roulette", "Kill Race BO3"],
+    title: "CREA LA ARENA",
+    copy: "Configura motor, equipos y reglas en una sola superficie antes de abrir la competencia.",
+    points: ["World Series BR", "Rebirth WS", "Gedeon Roulette", "Kill Race"],
+    cta: "Configurar torneo",
+    href: "/torneos",
   },
   {
     eyebrow: "02",
-    title: "Opera en vivo",
-    copy:
-      "El operador ve que falta, que partida esta activa, que equipos reportaron y cual es la proxima accion.",
-    points: ["resultados manual-first", "validacion clara", "avance de bracket", "estados persistentes"],
+    title: "OPERA EN VIVO",
+    copy: "Carga resultados, valida el estado y sigue la próxima acción sin perder el control del torneo.",
+    points: ["Reportes manual-first", "Push Mode", "Estado compartido", "OCR como próxima capa"],
+    cta: "Abrir cockpit",
+    href: "/operator",
   },
   {
     eyebrow: "03",
-    title: "Muestra el torneo",
-    copy:
-      "Standings, stream view y herramientas para caster permiten contar la historia competitiva sin improvisar overlays.",
-    points: ["standings en vivo", "vista stream", "soporte para casters", "foco en legibilidad"],
-  },
-  {
-    eyebrow: "04",
-    title: "Roadmap",
-    copy:
-      "El core manual queda primero. Luego vienen automatizaciones controladas para reducir carga operativa sin inventar resultados.",
-    points: ["Push Mode", "OCR MVP", "OGL/WebGL premium", "Copilot/agentes"],
+    title: "MUESTRA EL TORNEO",
+    copy: "Standings y stream mantienen a staff, caster y comunidad mirando el mismo estado competitivo.",
+    points: ["Standings", "Stream overlay", "Lectura para caster", "Señal para comunidad"],
+    cta: "Ver Stream",
+    href: "/stream",
   },
 ];
 
-const STORY_FLOW: StoryStep[] = [
-  {
-    step: "Paso 1",
-    title: "Configura formato y roster",
-    copy: "El torneo arranca con reglas claras, equipos cargados y una superficie comun para toda la operacion.",
-  },
-  {
-    step: "Paso 2",
-    title: "Confirma estado y avance",
-    copy: "Cada cambio deja una lectura visible: que esta listo, que falta validar y cual es la siguiente accion.",
-  },
-  {
-    step: "Paso 3",
-    title: "Opera partida a partida",
-    copy: "El operador mantiene control del flujo sin depender de memoria, chats dispersos ni overlays armados a ultimo minuto.",
-  },
-  {
-    step: "Paso 4",
-    title: "Cuenta la historia competitiva",
-    copy: "Standings, bracket y stream view permiten mostrar avance real con mejor contexto para staff, comunidad y caster.",
-  },
-];
-
-const STORY_ENGINES = ["WSOW Battle Royale", "Rebirth WS", "Gedeon Roulette", "Kill Race BO3"];
-
-const STORY_NEXT = ["Dashboard operativo premium", "Push Mode", "OGL/WebGL", "OCR", "Discord bot", "Copilot/agentes"];
+const AVAILABLE_TODAY = ["Motores base", "Dashboard operativo", "Operator manual-first", "Push Mode", "Standings", "Stream View"];
+const NEXT_LAYER = ["OCR Draft Intake", "Discord Bot", "Caster Console", "HEO Copilot / agentes", "OGL/WebGL premium"];
 
 function CapabilityIcon({ id }: { id: CapabilityId }) {
   return (
@@ -309,102 +246,60 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="bf-home-story" className="bf-home-story-section" aria-labelledby="bf-home-story-title">
-        <div className="bf-home-story-shell">
-          <div className="bf-home-story-head">
-            <span className="bf-hub-section-kicker">Saber mas</span>
-            <h3 id="bf-home-story-title">Una arena operativa para torneos competitivos</h3>
-            <p>
-              BracketFlow une creacion de torneos, operacion en vivo, standings y herramientas para
-              transmision en una experiencia clara, visual y lista para comunidad.
-            </p>
-          </div>
+      <section id="bf-home-story" className="bf-home-arena-story" aria-labelledby="bf-home-story-title">
+        <GedeonHeroFX
+          className="bf-home-arena-story-embers"
+          traceCount={0}
+          emberDensity={56}
+          emberTealChance={0.22}
+        />
+        <div className="bf-home-arena-story-shell">
+          <header className="bf-home-arena-story-head">
+            <span className="bf-hub-section-kicker">Control de arena</span>
+            <h3 id="bf-home-story-title">Tres movimientos para controlar la arena</h3>
+            <p>Menos caos operativo. Una sola lectura del torneo, desde la configuración hasta la transmisión.</p>
+          </header>
 
-          <div className="bf-home-story-overview">
-            {STORY_OVERVIEW.map((item) => (
-              <article key={item.title} className="bf-home-story-overview-card">
-                <span className="bf-home-story-overview-kicker">{item.eyebrow}</span>
-                <h4>{item.title}</h4>
-                <p>{item.copy}</p>
-                <ul className="bf-home-story-list">
-                  {item.points.map((point) => (
-                    <li key={point}>{point}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-
-          <div className="bf-home-story-grid">
-            {STORY_BLOCKS.map((block) => (
-              <article key={block.title} className="bf-home-story-card">
-                <span className="bf-home-story-card-index">{block.eyebrow}</span>
-                <h4>{block.title}</h4>
-                <p>{block.copy}</p>
-                <ul className="bf-home-story-list">
-                  {block.points.map((point) => (
-                    <li key={point}>{point}</li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-
-          <div className="bf-home-story-lower">
-            <article className="bf-home-story-flow">
-              <div className="bf-home-story-flow-head">
-                <span className="bf-home-story-panel-kicker">Como fluye la arena</span>
-                <h4>Un flujo visible para operar sin improvisar</h4>
-                <p>
-                  La operacion no depende de una sola pantalla. BracketFlow ordena el trabajo para que
-                  staff, caster y comunidad lean el mismo torneo desde superficies distintas.
-                </p>
-              </div>
-
-              <div className="bf-home-story-flow-grid">
-                {STORY_FLOW.map((item) => (
-                  <div key={item.title} className="bf-home-story-flow-step">
-                    <span>{item.step}</span>
-                    <strong>{item.title}</strong>
-                    <p>{item.copy}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <aside className="bf-home-story-side">
-              <article className="bf-home-story-side-card">
-                <span className="bf-home-story-panel-kicker">Motores soportados hoy</span>
-                <h4>Listo para formatos competitivos reales</h4>
-                <div className="bf-home-story-chip-cloud" aria-label="Motores soportados">
-                  {STORY_ENGINES.map((engine) => (
-                    <span key={engine} className="bf-home-story-chip">
-                      {engine}
-                    </span>
-                  ))}
+          <div className="bf-home-arena-movements">
+            {ARENA_MOVEMENTS.map((movement) => (
+              <article key={movement.eyebrow} className="bf-home-arena-movement">
+                <span className="bf-home-arena-index">{movement.eyebrow}</span>
+                <div className="bf-home-arena-movement-copy">
+                  <h4>{movement.title}</h4>
+                  <p>{movement.copy}</p>
                 </div>
-              </article>
-
-              <article className="bf-home-story-side-card">
-                <span className="bf-home-story-panel-kicker">Que viene despues</span>
-                <h4>Primero core manual, luego automatizacion controlada</h4>
-                <ul className="bf-home-story-list">
-                  {STORY_NEXT.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </article>
-
-              <div className="bf-home-story-actions">
-                <Link href={hasActiveTournament ? dashboardHref : "/dashboard"} className="bf-button bf-button-primary">
-                  Ver Dashboard
+                <div className="bf-home-arena-signals">
+                  {movement.points.map((point) => <span key={point}>{point}</span>)}
+                </div>
+                <Link href={movement.href} className="bf-home-arena-link">
+                  {movement.cta}<span aria-hidden="true">→</span>
                 </Link>
-                <Link href="/torneos" className="bf-button bf-button-ghost">
-                  Ver Torneos
-                </Link>
-              </div>
-            </aside>
+              </article>
+            ))}
           </div>
+
+          <section className="bf-home-arena-status" aria-label="Estado del producto">
+            <div className="bf-home-arena-status-band is-live">
+              <span className="bf-home-arena-status-label"><i />Disponible hoy</span>
+              <div>{AVAILABLE_TODAY.map((item) => <span key={item}>{item}</span>)}</div>
+            </div>
+            <div className="bf-home-arena-status-band is-next">
+              <span className="bf-home-arena-status-label">Próxima capa</span>
+              <div>{NEXT_LAYER.map((item) => <span key={item}>{item}</span>)}</div>
+            </div>
+          </section>
+
+          <footer className="bf-home-arena-final">
+            <div>
+              <span className="bf-hub-section-kicker">Manual-first hoy · asistido mañana</span>
+              <h3>Primero control. Luego espectáculo.</h3>
+              <p>BracketFlow parte con operación manual confiable y crece hacia OCR, bot de comunidad, herramientas para caster y automatización asistida.</p>
+            </div>
+            <div className="bf-home-arena-final-actions">
+              <Link href={hasActiveTournament ? dashboardHref : "/dashboard"} className="bf-button bf-button-primary">Ver Dashboard</Link>
+              <Link href="/torneos" className="bf-button bf-button-ghost">Crear torneo</Link>
+            </div>
+          </footer>
         </div>
       </section>
     </main>
