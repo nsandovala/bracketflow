@@ -2139,6 +2139,215 @@ a:focus-visible {
   gap: 12px;
 }
 
+/* Home H3 · lower arena story */
+.bf-home-arena-story {
+  position: relative;
+  padding: 28px 0 52px;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.bf-home-arena-story::before {
+  content: "";
+  position: absolute;
+  top: -80px;
+  bottom: 0;
+  left: 50vw;
+  width: 100vw;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, transparent, rgba(3, 8, 14, .78) 16%, rgba(3, 8, 14, .94)),
+    url("/gedeon/gedeon-arena-bg.png") center 15% / cover no-repeat;
+  z-index: -2;
+  opacity: .42;
+  filter: saturate(.72) contrast(1.06);
+  mask-image: linear-gradient(to bottom, transparent, black 8%, black 94%, transparent);
+}
+
+.bf-home-arena-story::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 42% at 50% 12%, rgba(45, 212, 191, .05), transparent 72%),
+    radial-gradient(ellipse 54% 34% at 12% 30%, rgba(45, 212, 191, .045), transparent 74%),
+    radial-gradient(ellipse 50% 32% at 88% 66%, rgba(232, 181, 77, .04), transparent 74%);
+}
+
+.bf-home-arena-story-embers {
+  position: absolute;
+  top: -10%;
+  bottom: -2%;
+  left: 50vw;
+  width: 100vw;
+  transform: translateX(-50%);
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+  opacity: 0.94;
+  mix-blend-mode: screen;
+  filter: saturate(1.08) brightness(1.05);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.16) 8%, rgba(0,0,0,0.42) 32%, rgba(0,0,0,0.72) 62%, black 96%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.16) 8%, rgba(0,0,0,0.42) 32%, rgba(0,0,0,0.72) 62%, black 96%);
+}
+
+/* Extra expansion for very wide desktop monitors */
+@media (min-width: 1800px) {
+  .bf-home-arena-story-embers {
+    top: -12%;
+    bottom: -2%;
+    left: 50%;
+    width: 100vw;
+    height: auto;
+    transform: translateX(-50%);
+    opacity: 0.92;
+  }
+}
+
+.bf-home-arena-story-shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 24px;
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.bf-home-arena-story-head {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.bf-home-arena-story-head h3,
+.bf-home-arena-final h3 {
+  margin: 0;
+  color: var(--amon-text);
+  font-family: var(--amon-font-display);
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+
+.bf-home-arena-story-head h3 { font-size: clamp(1.75rem, 3vw, 2.8rem); }
+.bf-home-arena-story-head p,
+.bf-home-arena-final p { margin: 0; color: var(--amon-muted); line-height: 1.65; }
+
+.bf-home-arena-movements {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bf-home-arena-movement {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 16px;
+  min-height: 330px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(95, 227, 154, .14);
+  border-radius: var(--amon-radius-lg);
+  background:
+    linear-gradient(145deg, rgba(95, 227, 154, .07), transparent 42%),
+    rgba(8, 15, 24, .76);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .035), 0 22px 60px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(14px);
+}
+
+.bf-home-arena-movement::after {
+  content: "";
+  position: absolute;
+  right: -54px;
+  top: -60px;
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(95, 227, 154, .09);
+  border-radius: 50%;
+  box-shadow: 0 0 55px rgba(95, 227, 154, .06);
+}
+
+.bf-home-arena-index {
+  color: var(--amon-gold-hi);
+  font-family: var(--amon-font-display);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .2em;
+}
+
+.bf-home-arena-movement-copy { display: grid; gap: 8px; }
+.bf-home-arena-movement h4 { margin: 0; color: var(--amon-text); font-family: var(--amon-font-display); font-size: 1.24rem; letter-spacing: .06em; }
+.bf-home-arena-movement p { margin: 0; color: var(--amon-muted); font-size: .86rem; line-height: 1.6; }
+
+.bf-home-arena-signals { display: flex; align-content: flex-start; flex-wrap: wrap; gap: 7px; }
+.bf-home-arena-signals span,
+.bf-home-arena-status-band > div span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--amon-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .025);
+  color: var(--amon-text-dim);
+  font-size: .7rem;
+}
+
+.bf-home-arena-link { display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding-top: 12px; border-top: 1px solid var(--amon-line); color: var(--amon-accent); font-size: .78rem; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.bf-home-arena-link:hover { color: var(--amon-text); }
+
+.bf-home-arena-status {
+  display: grid;
+  grid-template-columns: 1.15fr .85fr;
+  overflow: hidden;
+  border: 1px solid var(--amon-glass-v2-border);
+  border-radius: var(--amon-radius-lg);
+  background: rgba(6, 12, 20, .72);
+}
+
+.bf-home-arena-status-band { display: grid; gap: 12px; padding: 18px 20px; }
+.bf-home-arena-status-band + .bf-home-arena-status-band { border-left: 1px solid var(--amon-line); }
+.bf-home-arena-status-band > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.bf-home-arena-status-band.is-next > div span { color: var(--amon-faint); }
+.bf-home-arena-status-label { display: inline-flex; align-items: center; gap: 7px; color: var(--amon-text); font-family: var(--amon-font-display); font-size: .72rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.bf-home-arena-status-label i { width: 6px; height: 6px; border-radius: 50%; background: var(--amon-accent); box-shadow: 0 0 10px rgba(95, 227, 154, .55); }
+
+.bf-home-arena-final {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 26px 28px;
+  border: 1px solid rgba(201, 162, 75, .17);
+  border-radius: var(--amon-radius-lg);
+  background: linear-gradient(105deg, rgba(201, 162, 75, .075), transparent 35%), rgba(8, 14, 22, .82);
+}
+.bf-home-arena-final > div:first-child { display: grid; gap: 7px; max-width: 720px; }
+.bf-home-arena-final h3 { font-size: clamp(1.45rem, 2.4vw, 2.15rem); }
+.bf-home-arena-final-actions { display: flex; gap: 9px; flex-shrink: 0; }
+
+@media (max-width: 1024px) {
+  .bf-home-arena-movements { grid-template-columns: 1fr; }
+  .bf-home-arena-movement { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; min-height: 0; align-items: start; }
+  .bf-home-arena-signals { grid-column: 2; }
+  .bf-home-arena-link { grid-column: 3; grid-row: 1 / span 2; align-self: stretch; border-top: 0; border-left: 1px solid var(--amon-line); padding: 0 0 0 18px; }
+  .bf-home-arena-status { grid-template-columns: 1fr; }
+  .bf-home-arena-status-band + .bf-home-arena-status-band { border-top: 1px solid var(--amon-line); border-left: 0; }
+}
+
+@media (max-width: 680px) {
+  .bf-home-arena-story-shell { width: min(100% - 24px, 1180px); }
+  .bf-home-arena-movement { grid-template-columns: 1fr; grid-template-rows: auto; padding: 20px; }
+  .bf-home-arena-signals,
+  .bf-home-arena-link { grid-column: 1; grid-row: auto; }
+  .bf-home-arena-link { border-top: 1px solid var(--amon-line); border-left: 0; padding: 12px 0 0; }
+  .bf-home-arena-final { align-items: stretch; flex-direction: column; padding: 22px 20px; }
+  .bf-home-arena-final-actions { flex-direction: column; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bf-home-hero-fx {
     opacity: 0.52;
