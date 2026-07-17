@@ -1,0 +1,10 @@
+- No rediseñar si el contrato visual no está cerrado
+- Usar screenshots/mockups como fuente de verdad
+- No cambiar copy/layout si el encargo es atmósfera visual
+- Preservar intención visual aprobada
+- Desktop/laptop first para cockpit
+- Mobile safe, no mobile-first
+- Si no entiende diseño, detenerse y pedir contrato
+- Diferenciar componente funcional vs decoración
+- No meter cards decorativas dentro de superficies operativas
+- Validación por viewport: 1920, 1366, tablet, mobile
