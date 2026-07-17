@@ -67,9 +67,11 @@ function OperatorPageClient() {
 
   useEffect(() => {
     if (selectedTournamentId !== null && selectedTournamentId !== preferredTournamentId) {
-      router.replace(`/operator?tournamentId=${selectedTournamentId}`);
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("tournamentId", String(selectedTournamentId));
+      router.replace(`/operator?${nextParams.toString()}`);
     }
-  }, [preferredTournamentId, router, selectedTournamentId]);
+  }, [preferredTournamentId, router, searchParams, selectedTournamentId]);
 
   async function handleCreateTeam(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
