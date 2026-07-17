@@ -5922,7 +5922,7 @@ a:focus-visible {
   display: grid; gap: 9px; padding: 12px; border: 1px solid var(--amon-line);
   border-radius: var(--amon-radius-md); background: rgba(255, 255, 255, .025);
 }
-.opr-ocr-draft.is-review { border-color: var(--amon-cream-line); }
+.opr-ocr-draft.is-pending { border-color: var(--amon-cream-line); }
 .opr-ocr-draft.is-confirmed { border-color: rgba(97, 242, 163, .2); background: rgba(97, 242, 163, .025); }
 .opr-ocr-draft.is-disputed { border-color: rgba(255, 211, 110, .26); background: rgba(255, 211, 110, .025); }
 .opr-ocr-draft-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

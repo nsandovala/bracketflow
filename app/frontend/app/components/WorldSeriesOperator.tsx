@@ -24,6 +24,13 @@ import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
 import { getOperatorNextAction } from "../../lib/operatorNextAction";
 import {
+  getOcrDraftStorageKey,
+  OcrDraftReport,
+  OcrDraftSource,
+  OcrDraftStatus,
+  parseOcrDraftReports,
+} from "../../lib/ocrDraftIntake";
+import {
   getTeamDisplayName,
   isTournamentCompleted,
   findChampion,
@@ -86,67 +93,112 @@ type WorldSeriesOperatorProps = {
 
 type OperatorMode = "op" | "setup" | "bracket" | "ocr";
 type ResultFilter = "all" | "pending";
-type OcrDraftSource = "MANUAL" | "PRINT" | "OCR_DRAFT";
-type OcrDraftStatus = "empty" | "pending" | "review" | "confirmed" | "disputed";
+type OcrDraftViewStatus = "empty" | "evidence" | "review" | "confirmed" | "disputed";
+type OcrDraftPersistenceState = "loading" | "local" | "memory";
 
-type OcrDraftReport = {
-  id: string;
-  teamName: string;
-  kills: number | "";
-  placement: number | "";
-  source: OcrDraftSource;
-  status: OcrDraftStatus;
-  note?: string;
-};
-
-const OCR_DRAFT_STATES: Array<{ status: OcrDraftStatus; label: string }> = [
+const OCR_DRAFT_STATES: Array<{ status: OcrDraftViewStatus; label: string }> = [
   { status: "empty", label: "Sin evidencia" },
-  { status: "pending", label: "Evidencia cargada / pegada" },
+  { status: "evidence", label: "Evidencia cargada / pegada" },
   { status: "review", label: "Draft pendiente de revisión" },
   { status: "confirmed", label: "Confirmado manualmente" },
   { status: "disputed", label: "Disputado / requiere revisión" },
 ];
 
 const OCR_DRAFT_STATUS_LABELS: Record<OcrDraftStatus, string> = Object.fromEntries(
-  OCR_DRAFT_STATES.map((item) => [item.status, item.label])
+  [
+    ["pending", "Draft pendiente de revisión"],
+    ["confirmed", "Confirmado manualmente"],
+    ["disputed", "Disputado / requiere revisión"],
+  ]
 ) as Record<OcrDraftStatus, string>;
 
 function OcrDraftIntake({
+  tournamentId,
+  matchNumber,
+  activeMatchKey,
   teams,
   usesPlacement,
   effectiveLobbySize,
 }: {
+  tournamentId: number;
+  matchNumber: number;
+  activeMatchKey: string | null;
   teams: Team[];
   usesPlacement: boolean;
   effectiveLobbySize: number;
 }) {
+  const storageKey = getOcrDraftStorageKey(tournamentId, matchNumber);
   const [drafts, setDrafts] = useState<OcrDraftReport[]>([]);
-  const [teamName, setTeamName] = useState("");
+  const [persistenceState, setPersistenceState] =
+    useState<OcrDraftPersistenceState>("loading");
+  const [teamId, setTeamId] = useState("");
   const [kills, setKills] = useState("");
   const [placement, setPlacement] = useState("");
   const [source, setSource] = useState<OcrDraftSource>("MANUAL");
   const [note, setNote] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (cancelled) {
+        return;
+      }
+
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        setDrafts(raw ? parseOcrDraftReports(raw, tournamentId, matchNumber) : []);
+        setPersistenceState("local");
+      } catch {
+        setDrafts([]);
+        setPersistenceState("memory");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [matchNumber, storageKey, tournamentId]);
+
   const formIsDirty =
-    teamName !== "" ||
+    teamId !== "" ||
     kills !== "" ||
     placement !== "" ||
     source !== "MANUAL" ||
     note.trim() !== "";
   const hasTextEvidence = note.trim() !== "";
-  const intakeStatus: OcrDraftStatus = drafts.some((draft) => draft.status === "disputed")
+  const intakeStatus: OcrDraftViewStatus = drafts.some(
+    (draft) => draft.status === "disputed"
+  )
     ? "disputed"
-    : drafts.some((draft) => draft.status === "review")
+    : drafts.some((draft) => draft.status === "pending")
       ? "review"
       : hasTextEvidence
-        ? "pending"
+        ? "evidence"
         : drafts.length > 0 && drafts.every((draft) => draft.status === "confirmed")
           ? "confirmed"
           : "empty";
 
+  function persistDrafts(nextDrafts: OcrDraftReport[]) {
+    setDrafts(nextDrafts);
+    if (persistenceState !== "local") {
+      return;
+    }
+
+    try {
+      if (nextDrafts.length === 0) {
+        window.localStorage.removeItem(storageKey);
+      } else {
+        window.localStorage.setItem(storageKey, JSON.stringify(nextDrafts));
+      }
+    } catch {
+      setPersistenceState("memory");
+    }
+  }
+
   function clearForm() {
-    setTeamName("");
+    setTeamId("");
     setKills("");
     setPlacement("");
     setSource("MANUAL");
@@ -159,7 +211,8 @@ function OcrDraftIntake({
 
     const parsedKills = Number(kills);
     const parsedPlacement = Number(placement);
-    if (!teamName) {
+    const selectedTeam = teams.find((team) => team.id === Number(teamId));
+    if (!selectedTeam) {
       setFormError("Selecciona un equipo real del torneo.");
       return;
     }
@@ -178,27 +231,35 @@ function OcrDraftIntake({
       return;
     }
 
+    const timestamp = new Date().toISOString();
     const draft: OcrDraftReport = {
       id: window.crypto.randomUUID(),
-      teamName,
+      tournamentId,
+      matchNumber,
+      activeMatchKey,
+      teamId: selectedTeam.id,
+      teamName: selectedTeam.name,
       kills: parsedKills,
       placement: usesPlacement ? parsedPlacement : "",
       source,
-      status: "review",
-      note: note.trim() || undefined,
+      status: "pending",
+      note: note.trim(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
     };
-    setDrafts((current) => [draft, ...current]);
+    persistDrafts([draft, ...drafts]);
     clearForm();
   }
 
   function updateDraftStatus(id: string, status: OcrDraftStatus) {
-    setDrafts((current) =>
-      current.map((draft) => (draft.id === id ? { ...draft, status } : draft))
+    const updatedAt = new Date().toISOString();
+    persistDrafts(
+      drafts.map((draft) => (draft.id === id ? { ...draft, status, updatedAt } : draft))
     );
   }
 
   function discardDraft(id: string) {
-    setDrafts((current) => current.filter((draft) => draft.id !== id));
+    persistDrafts(drafts.filter((draft) => draft.id !== id));
   }
 
   return (
@@ -211,7 +272,11 @@ function OcrDraftIntake({
             Próxima capa: leer captura, crear borrador y confirmar manualmente.
           </p>
         </div>
-        <span className="opr-ocr-safety">Local · sin backend</span>
+        <span className="opr-ocr-safety">
+          {persistenceState === "memory"
+            ? "Local · solo memoria"
+            : "Local · este navegador"}
+        </span>
       </div>
 
       <div className="opr-ocr-rule">
@@ -219,9 +284,16 @@ function OcrDraftIntake({
         <span>
           Esta vista no procesa imágenes ni ejecuta OCR. Confirmar aquí solo cambia el estado
           local del draft; no suma reportes, no modifica standings y no activa campeón. Los
-          borradores se descartan al recargar.
+          borradores se guardan en este navegador para el torneo y la partida actuales.
         </span>
       </div>
+
+      {persistenceState === "memory" ? (
+        <p className="bf-inline-note" role="status">
+          El almacenamiento local no está disponible. Los drafts seguirán funcionando en
+          memoria, pero se perderán al recargar.
+        </p>
+      ) : null}
 
       <ol className="opr-ocr-states" aria-label="Estados de OCR Draft Intake">
         {OCR_DRAFT_STATES.map((item) => (
@@ -241,12 +313,13 @@ function OcrDraftIntake({
           <label htmlFor="opr-ocr-team">Equipo</label>
           <select
             id="opr-ocr-team"
-            value={teamName}
-            onChange={(event) => setTeamName(event.target.value)}
+            value={teamId}
+            onChange={(event) => setTeamId(event.target.value)}
+            disabled={persistenceState === "loading"}
           >
             <option value="">Seleccionar equipo</option>
             {teams.map((team) => (
-              <option key={team.id} value={team.name}>
+              <option key={team.id} value={team.id}>
                 {team.name}
               </option>
             ))}
@@ -302,7 +375,11 @@ function OcrDraftIntake({
           />
         </div>
         <div className="opr-ocr-form-actions">
-          <button type="submit" className="opr-save">
+          <button
+            type="submit"
+            className="opr-save"
+            disabled={persistenceState === "loading"}
+          >
             Crear draft para revisión
           </button>
           {formIsDirty ? (
@@ -325,7 +402,7 @@ function OcrDraftIntake({
             <span>Borradores locales</span>
             <strong>{drafts.length}</strong>
           </div>
-          <small>No cuentan como reportes cargados.</small>
+          <small>Guardados localmente. No cuentan como reportes cargados.</small>
         </div>
 
         {drafts.length === 0 ? (
@@ -351,7 +428,7 @@ function OcrDraftIntake({
                 </div>
                 {draft.note ? <p>{draft.note}</p> : null}
                 <div className="opr-ocr-draft-actions">
-                  {draft.status === "review" ? (
+                  {draft.status === "pending" ? (
                     <>
                       <button
                         type="button"
@@ -372,7 +449,7 @@ function OcrDraftIntake({
                     <button
                       type="button"
                       className="bf-button bf-button-ghost"
-                      onClick={() => updateDraftStatus(draft.id, "review")}
+                      onClick={() => updateDraftStatus(draft.id, "pending")}
                     >
                       Volver a revisión
                     </button>
@@ -1527,7 +1604,10 @@ export default function WorldSeriesOperator({
 
           {mode === "ocr" ? (
             <OcrDraftIntake
-              key={selectedTournament.id}
+              key={`${selectedTournament.id}:${currentGame}`}
+              tournamentId={selectedTournament.id}
+              matchNumber={currentGame}
+              activeMatchKey={activeMatch ? `match:${activeMatch.id}` : null}
               teams={teams}
               usesPlacement={usesPlacement}
               effectiveLobbySize={effectiveLobbySize}
