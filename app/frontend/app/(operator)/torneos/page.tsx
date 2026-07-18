@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { IconDashboard, IconStandings, IconTeams, IconTrophy } from "../../components/icons";
 import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
@@ -15,7 +15,7 @@ import {
   type TournamentStructure,
   type TeamSize,
 } from "../../../lib/tournamentModel";
-import { getMatchPointStatus, getTournamentStatusLabel } from "../../../lib/tournamentStatus";
+import { findChampion, getMatchPointStatus, getTournamentStatusLabel } from "../../../lib/tournamentStatus";
 
 const TOURNAMENT_MOTORS = [
   {
@@ -61,6 +61,16 @@ const TOURNAMENT_MOTORS = [
 
 const MOTOR_ICONS = [IconTrophy, IconTeams, IconDashboard, IconStandings];
 
+type ArenaFilterId = "all" | "active" | "draft" | "bracket_ready" | "teams_ready";
+
+const ARENA_FILTERS: ReadonlyArray<{ id: ArenaFilterId; label: string }> = [
+  { id: "all", label: "Todos" },
+  { id: "active", label: "Activos" },
+  { id: "draft", label: "Borrador" },
+  { id: "bracket_ready", label: "Bracket listo" },
+  { id: "teams_ready", label: "Equipos listos" },
+];
+
 export default function TorneosPage() {
   const router = useRouter();
   const {
@@ -102,6 +112,8 @@ export default function TorneosPage() {
   const [motorsVisible, setMotorsVisible] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [arenaFilter, setArenaFilter] = useState<ArenaFilterId>("all");
+  const [arenaSearch, setArenaSearch] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const motorsRef = useRef<HTMLElement>(null);
   const selectedPreset = ENGINE_PRESETS[selectedEngineKey];
@@ -136,6 +148,30 @@ export default function TorneosPage() {
     observer.observe(section);
     return () => observer.disconnect();
   }, []);
+
+  const visibleTournaments = useMemo(() => {
+    const searchTerm = arenaSearch.trim().toLocaleLowerCase();
+    return tournaments.filter((tournament) => {
+      const status = tournament.status.toLocaleLowerCase();
+      const matchesFilter =
+        arenaFilter === "all"
+          ? true
+          : arenaFilter === "active"
+            ? status === "active" || status === "running" || status === "in_progress"
+            : arenaFilter === "draft"
+              ? status === "draft"
+              : arenaFilter === "bracket_ready"
+                ? status === "bracket_generated" || status === "bracket_ready"
+                : status === "teams_generated";
+      if (!matchesFilter) {
+        return false;
+      }
+      if (!searchTerm) {
+        return true;
+      }
+      return tournament.name.toLocaleLowerCase().includes(searchTerm);
+    });
+  }, [arenaFilter, arenaSearch, tournaments]);
 
   function selectEngine(engineKey: TournamentEngineKey) {
     const preset = ENGINE_PRESETS[engineKey];
@@ -247,7 +283,7 @@ export default function TorneosPage() {
   }
 
   function toggleSelectAllVisible() {
-    const visibleIds = tournaments.map((t) => t.id);
+    const visibleIds = visibleTournaments.map((t) => t.id);
     const allSelected = visibleIds.every((id) => selectedIds.has(id));
     if (allSelected) {
       setSelectedIds((prev) => {
@@ -369,9 +405,37 @@ export default function TorneosPage() {
       </section>
 
       <section className="bf-tournaments-list">
-        <div className="bf-home-section-head">
-          <span className="bf-hub-section-kicker">Arena</span>
-          <h3>Torneos activos</h3>
+        <div className="bf-arena-board-head">
+          <div className="bf-home-section-head">
+            <span className="bf-hub-section-kicker">Arena</span>
+            <h3>Arena Board</h3>
+          </div>
+          <span className="bf-arena-board-count">
+            {visibleTournaments.length} de {tournaments.length} torneos
+          </span>
+        </div>
+        <div className="bf-arena-board-controls">
+          <div className="bf-arena-filters" role="tablist" aria-label="Filtro de torneos">
+            {ARENA_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                className={`bf-arena-filter${arenaFilter === filter.id ? " is-active" : ""}`}
+                onClick={() => setArenaFilter(filter.id)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <label className="bf-arena-search">
+            <span>Buscar torneo</span>
+            <input
+              type="search"
+              value={arenaSearch}
+              onChange={(event) => setArenaSearch(event.target.value)}
+              placeholder="WS Practice..."
+            />
+          </label>
         </div>
 
         {selectedIds.size > 0 && (
@@ -379,7 +443,10 @@ export default function TorneosPage() {
             <div className="bf-bulk-info">
               <input
                 type="checkbox"
-                checked={tournaments.length > 0 && tournaments.every((t) => selectedIds.has(t.id))}
+                checked={
+                  visibleTournaments.length > 0 &&
+                  visibleTournaments.every((tournament) => selectedIds.has(tournament.id))
+                }
                 onChange={toggleSelectAllVisible}
                 aria-label="Seleccionar todos los visibles"
               />
@@ -444,8 +511,9 @@ export default function TorneosPage() {
 
         {loading ? (
           <p className="bf-empty">Cargando torneos...</p>
-        ) : tournaments.length > 0 ? (
-          tournaments.map((tournament) => {
+        ) : visibleTournaments.length > 0 ? (
+          <div className="bf-arena-board-grid">
+            {visibleTournaments.map((tournament) => {
             const isSelected = tournament.id === selectedTournamentId;
             const engine = resolveTournamentEngine(tournament);
             const selectedMatchPointStatus = isSelected && engine.primaryView !== "bracket"
@@ -472,72 +540,137 @@ export default function TorneosPage() {
             });
             const isChecked = selectedIds.has(tournament.id);
             const statusLabel = isSelected ? "Activo" : getTournamentStatusLabel(tournament.status);
+            const engineSummary = `${engine.label} · ${engine.primaryView === "bracket" ? "Bracket" : "Standings"}`;
+            const bracketMatches = isSelected
+              ? matches.filter((match) => match.team_a_id !== null && match.team_b_id !== null)
+              : [];
+            const completedBracketMatches = isSelected
+              ? bracketMatches.filter(
+                  (match) => match.status === "completed" || match.winner_id !== null
+                ).length
+              : 0;
+            const pendingReports = isSelected ? Math.max(totalTeams - reportsLoaded, 0) : 0;
+            const progressLabel = !isSelected
+              ? "Selecciona para ver progreso"
+              : engine.primaryView === "bracket"
+                ? bracketMatches.length > 0
+                  ? `Series ${completedBracketMatches}/${bracketMatches.length}`
+                  : "Sin series cargadas"
+                : activeMatch
+                  ? `P${activeMatch.round} · ${reportsLoaded}/${totalTeams} cargados`
+                  : totalTeams > 0
+                    ? `Sin partida activa · ${totalTeams} equipos`
+                    : "Sin reportes";
+            const progressMeta = !isSelected
+              ? "Detalle operativo no cargado"
+              : engine.primaryView === "standings" && activeMatch
+                ? pendingReports > 0
+                  ? `${pendingReports} pendiente(s)`
+                  : "Partida lista para cierre"
+                : "Operación estable";
+            const champion = isSelected && engine.primaryView === "bracket"
+              ? findChampion(matches, teams)
+              : null;
+            const leaderLabel = champion?.displayName
+              ?? (isSelected && sortedStandings.length > 0
+                ? sortedStandings[0].team_name
+                : "Sin líder");
+            const leaderMeta = champion
+              ? `Final ${champion.finalScore}`
+              : isSelected && sortedStandings.length > 0
+                ? `${sortedStandings[0].total_points} pts`
+                : "Sin data confirmada";
             return (
               <article
                 key={tournament.id}
-                className={`bf-hub-tournament-card${isSelected ? " is-active" : ""}${isChecked ? " is-checked" : ""}`}
+                className={`bf-hub-tournament-card bf-arena-row${isSelected ? " is-active" : ""}${isChecked ? " is-checked" : ""}`}
               >
-                <div className="bf-hub-tournament-info">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => toggleSelection(tournament.id)}
-                    aria-label={`Seleccionar ${tournament.name}`}
-                  />
-                  <strong className="bf-hub-tournament-name">{tournament.name}</strong>
-                  <span className="bf-hub-tournament-meta">
-                    <span className="bf-hub-tournament-game">{tournament.game}</span>
-                    <span className="bf-hub-tournament-status">{statusLabel}</span>
+                <div className="bf-arena-row-grid">
+                  <div className="bf-arena-cell bf-arena-cell-selector">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSelection(tournament.id)}
+                      aria-label={`Seleccionar ${tournament.name}`}
+                    />
+                  </div>
+                  <div className="bf-arena-cell bf-arena-cell-tournament">
+                    <strong className="bf-hub-tournament-name">{tournament.name}</strong>
+                    <span className="bf-arena-cell-meta">{engineSummary}</span>
+                  </div>
+                  <div className="bf-arena-cell">
+                    <span className="bf-arena-cell-label">Estado</span>
+                    <span className="bf-arena-status-chip">{statusLabel}</span>
+                  </div>
+                  <div className="bf-arena-cell">
+                    <span className="bf-arena-cell-label">Push Mode</span>
                     <span className={`bf-push-chip is-${pushModeAction.tone}`}>
                       <span>Push</span>
                       {pushModeAction.label}
                     </span>
-                  </span>
-                </div>
-                <div className="bf-hub-tournament-actions">
-                  <Link href={pushModeAction.href} className="bf-button bf-button-primary">
-                    {pushModeAction.ctaLabel}
-                  </Link>
-                  <Link href={`/dashboard?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                    Dashboard
-                  </Link>
-                  <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                    Standings
-                  </Link>
-                  <Link href={`/stream?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost">
-                    Stream
-                  </Link>
-                  <button
-                    type="button"
-                    className="bf-button bf-button-ghost"
-                    onClick={() => revealEditForm(tournament)}
-                    disabled={submitting}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    className="bf-button bf-button-ghost"
-                    onClick={() => handleArchiveTournament(tournament.id)}
-                    disabled={submitting}
-                  >
-                    Archivar
-                  </button>
-                  <button
-                    type="button"
-                    className="bf-button bf-button-danger"
-                    onClick={() => handleDeleteTournament(tournament.id)}
-                    disabled={submitting}
-                  >
-                    Eliminar
-                  </button>
+                  </div>
+                  <div className="bf-arena-cell">
+                    <span className="bf-arena-cell-label">Progreso</span>
+                    <strong className="bf-arena-cell-value">{progressLabel}</strong>
+                    <span className="bf-arena-cell-meta">{progressMeta}</span>
+                  </div>
+                  <div className="bf-arena-cell">
+                    <span className="bf-arena-cell-label">Líder</span>
+                    <strong className="bf-arena-cell-value">{leaderLabel}</strong>
+                    <span className="bf-arena-cell-meta">{leaderMeta}</span>
+                  </div>
+                  <div className="bf-arena-cell bf-arena-cell-actions">
+                    <Link href={pushModeAction.href} className="bf-button bf-button-primary bf-arena-cta">
+                      {pushModeAction.ctaLabel}
+                    </Link>
+                    <div className="bf-arena-quick-actions">
+                      <Link href={`/dashboard?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost bf-arena-quick">
+                        Dashboard
+                      </Link>
+                      <Link href={`/standings?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost bf-arena-quick">
+                        Standings
+                      </Link>
+                      <Link href={`/stream?tournamentId=${tournament.id}`} className="bf-button bf-button-ghost bf-arena-quick">
+                        Stream
+                      </Link>
+                    </div>
+                    <div className="bf-arena-secondary-actions">
+                      <button
+                        type="button"
+                        className="bf-button bf-button-ghost bf-arena-secondary"
+                        onClick={() => revealEditForm(tournament)}
+                        disabled={submitting}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="bf-button bf-button-ghost bf-arena-secondary"
+                        onClick={() => handleArchiveTournament(tournament.id)}
+                        disabled={submitting}
+                      >
+                        Archivar
+                      </button>
+                      <button
+                        type="button"
+                        className="bf-button bf-button-danger bf-arena-secondary bf-arena-danger"
+                        onClick={() => handleDeleteTournament(tournament.id)}
+                        disabled={submitting}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </article>
             );
-          })
+          })}
+          </div>
         ) : (
           <p className="bf-empty">
-            No hay torneos creados. Abre Nuevo torneo para elegir formato competitivo.
+            {tournaments.length === 0
+              ? "No hay torneos creados. Abre Nuevo torneo para elegir formato competitivo."
+              : "No hay torneos para ese filtro o búsqueda."}
           </p>
         )}
       </section>

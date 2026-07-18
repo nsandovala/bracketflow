@@ -2373,6 +2373,201 @@ a:focus-visible {
   gap: var(--amon-space-3);
 }
 
+.bf-arena-board-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.bf-arena-board-count {
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amon-faint);
+}
+
+.bf-arena-board-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bf-arena-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bf-arena-filter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--amon-text-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  transition: border-color .18s ease, color .18s ease, background .18s ease;
+}
+
+.bf-arena-filter:hover {
+  border-color: var(--amon-line-strong);
+  color: var(--amon-text);
+}
+
+.bf-arena-filter.is-active {
+  border-color: rgba(97, 242, 163, .3);
+  color: var(--amon-accent);
+  background: rgba(97, 242, 163, .075);
+}
+
+.bf-arena-search {
+  display: grid;
+  gap: 5px;
+  min-width: 220px;
+}
+
+.bf-arena-search > span {
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-arena-search input {
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(7, 13, 21, 0.86);
+  color: var(--amon-text);
+  padding: 0 13px;
+}
+
+.bf-arena-search input:focus {
+  outline: none;
+  border-color: rgba(97, 242, 163, .32);
+}
+
+.bf-arena-board-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.bf-arena-row {
+  padding: 10px 14px;
+}
+
+.bf-arena-row-grid {
+  display: grid;
+  grid-template-columns: 34px minmax(180px, 1.5fr) minmax(100px, .7fr) minmax(160px, 1fr) minmax(140px, .9fr) minmax(120px, .8fr) minmax(290px, 1.3fr);
+  align-items: center;
+  column-gap: 10px;
+}
+
+.bf-arena-cell {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.bf-arena-cell-selector {
+  justify-items: center;
+}
+
+.bf-arena-cell-selector input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--amon-accent);
+}
+
+.bf-arena-cell-tournament .bf-hub-tournament-name {
+  font-size: 0.93rem;
+  letter-spacing: 0.02em;
+}
+
+.bf-arena-cell-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amon-muted);
+}
+
+.bf-arena-cell-value {
+  margin: 0;
+  color: var(--amon-text);
+  font-size: 0.82rem;
+  font-weight: 640;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-arena-cell-meta {
+  color: var(--amon-text-dim);
+  font-size: 0.67rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bf-arena-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  width: fit-content;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--amon-text-dim);
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bf-arena-cell-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.bf-arena-cta,
+.bf-arena-quick,
+.bf-arena-secondary {
+  min-height: 34px;
+  padding-inline: 12px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+.bf-arena-cta {
+  font-size: 0.72rem;
+}
+
+.bf-arena-quick-actions,
+.bf-arena-secondary-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.bf-arena-secondary-actions {
+  opacity: 0.84;
+}
+
+.bf-arena-danger {
+  opacity: 0.95;
+}
+
 .bf-hub-tournament-card.is-active {
   border-color: rgba(95, 227, 154, 0.26);
   background:
@@ -2429,6 +2624,74 @@ a:focus-visible {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 1500px) {
+  .bf-arena-row-grid {
+    grid-template-columns: 34px minmax(200px, 1.4fr) minmax(120px, .9fr) minmax(180px, 1.1fr) minmax(160px, 1fr) minmax(140px, 1fr);
+    row-gap: 10px;
+  }
+
+  .bf-arena-cell-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+    border-top: 1px solid var(--amon-line);
+    padding-top: 9px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .bf-arena-board-head,
+  .bf-arena-board-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .bf-arena-search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .bf-arena-row-grid {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+
+  .bf-arena-cell {
+    grid-column: 2;
+  }
+
+  .bf-arena-cell-selector {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    align-self: start;
+    padding-top: 4px;
+  }
+
+  .bf-arena-cell-actions {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--amon-line);
+    padding-top: 10px;
+  }
+
+  .bf-arena-cell-tournament .bf-hub-tournament-name,
+  .bf-arena-cell-value,
+  .bf-arena-cell-meta {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 640px) {
+  .bf-arena-row {
+    padding: 12px;
+  }
+
+  .bf-arena-cta,
+  .bf-arena-quick,
+  .bf-arena-secondary {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
 
 /* ---- Bulk delete confirmation ---- */
