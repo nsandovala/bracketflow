@@ -5869,7 +5869,7 @@ a:focus-visible {
 .opr-ocr-rule strong { color: var(--amon-cream-soft); font-size: .76rem; white-space: nowrap; }
 .opr-ocr-rule span { color: var(--amon-muted); font-size: .76rem; line-height: 1.45; }
 .opr-ocr-states {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px;
   padding: 0; margin: 0; list-style: none;
 }
 .opr-ocr-states li {
@@ -5884,6 +5884,7 @@ a:focus-visible {
   box-shadow: 0 0 20px rgba(97, 242, 163, .06);
 }
 .opr-ocr-states li.is-current.is-confirmed { color: var(--amon-accent); }
+.opr-ocr-states li.is-current.is-submitted { color: var(--amon-accent); }
 .opr-ocr-states li.is-current.is-disputed {
   border-color: rgba(255, 211, 110, .3); background: rgba(255, 211, 110, .07); color: var(--amon-cream-soft);
 }
@@ -5991,6 +5992,7 @@ a:focus-visible {
 .opr-ocr-draft.is-pending { border-color: var(--amon-cream-line); }
 .opr-ocr-draft.is-confirmed { border-color: rgba(97, 242, 163, .2); background: rgba(97, 242, 163, .025); }
 .opr-ocr-draft.is-disputed { border-color: rgba(255, 211, 110, .26); background: rgba(255, 211, 110, .025); }
+.opr-ocr-draft.is-submitted { border-color: rgba(97, 242, 163, .32); background: rgba(97, 242, 163, .05); }
 .opr-ocr-draft-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .opr-ocr-draft-main > div { display: grid; gap: 2px; min-width: 0; }
 .opr-ocr-draft-main strong { overflow: hidden; color: var(--amon-text); font-size: .92rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -6002,6 +6004,7 @@ a:focus-visible {
 }
 .opr-ocr-status.is-confirmed { color: var(--amon-accent); }
 .opr-ocr-status.is-disputed { color: var(--amon-cream-soft); }
+.opr-ocr-status.is-submitted { color: var(--amon-accent); }
 .opr-ocr-draft-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
 .opr-ocr-draft-actions .opr-save,
 .opr-ocr-draft-actions .bf-button { width: auto; min-height: 34px; padding: 0 12px; font-size: .72rem; }

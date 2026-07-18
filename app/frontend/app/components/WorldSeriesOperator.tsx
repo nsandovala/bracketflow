@@ -94,11 +94,23 @@ type WorldSeriesOperatorProps = {
   onSaveKillRaceMap: (matchId: number) => void;
   onCreateNextGame: () => void;
   onBulkImportTeams?: (teams: Array<{ name: string; roster: string }>) => Promise<unknown>;
+  onSubmitOfficialReport?: (
+    matchId: number,
+    teamId: number,
+    kills: number,
+    placement: number | ""
+  ) => Promise<unknown>;
 };
 
 type OperatorMode = "op" | "setup" | "bracket" | "ocr";
 type ResultFilter = "all" | "pending";
-type OcrDraftViewStatus = "empty" | "evidence" | "review" | "confirmed" | "disputed";
+type OcrDraftViewStatus =
+  | "empty"
+  | "evidence"
+  | "review"
+  | "confirmed"
+  | "disputed"
+  | "submitted";
 type OcrDraftPersistenceState = "loading" | "local" | "memory";
 
 const OCR_DRAFT_STATES: Array<{ status: OcrDraftViewStatus; label: string }> = [
@@ -107,6 +119,7 @@ const OCR_DRAFT_STATES: Array<{ status: OcrDraftViewStatus; label: string }> = [
   { status: "review", label: "Draft pendiente de revisión" },
   { status: "confirmed", label: "Confirmado manualmente" },
   { status: "disputed", label: "Disputado / requiere revisión" },
+  { status: "submitted", label: "Enviado como reporte oficial" },
 ];
 
 const OCR_DRAFT_STATUS_LABELS: Record<OcrDraftStatus, string> = Object.fromEntries(
@@ -114,6 +127,7 @@ const OCR_DRAFT_STATUS_LABELS: Record<OcrDraftStatus, string> = Object.fromEntri
     ["pending", "Draft pendiente de revisión"],
     ["confirmed", "Confirmado manualmente"],
     ["disputed", "Disputado / requiere revisión"],
+    ["submitted", "Reporte oficial guardado"],
   ]
 ) as Record<OcrDraftStatus, string>;
 
@@ -130,16 +144,31 @@ function OcrDraftIntake({
   tournamentId,
   matchNumber,
   activeMatchKey,
+  activeMatchId,
   teams,
   usesPlacement,
   effectiveLobbySize,
+  tournamentFinalized,
+  officialReportTeamIds,
+  submitting,
+  onSubmitOfficialReport,
 }: {
   tournamentId: number;
   matchNumber: number;
   activeMatchKey: string | null;
+  activeMatchId: number | null;
   teams: Team[];
   usesPlacement: boolean;
   effectiveLobbySize: number;
+  tournamentFinalized: boolean;
+  officialReportTeamIds: number[];
+  submitting: boolean;
+  onSubmitOfficialReport?: (
+    matchId: number,
+    teamId: number,
+    kills: number,
+    placement: number | ""
+  ) => Promise<unknown>;
 }) {
   const storageKey = getOcrDraftStorageKey(tournamentId, matchNumber);
   const [drafts, setDrafts] = useState<OcrDraftReport[]>([]);
@@ -158,6 +187,7 @@ function OcrDraftIntake({
   );
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [submittingDraftId, setSubmittingDraftId] = useState<string | null>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -198,9 +228,87 @@ function OcrDraftIntake({
       ? "review"
       : hasTextEvidence
         ? "evidence"
-        : drafts.length > 0 && drafts.every((draft) => draft.status === "confirmed")
-          ? "confirmed"
-          : "empty";
+        : drafts.length > 0 && drafts.every((draft) => draft.status === "submitted")
+          ? "submitted"
+          : drafts.length > 0 &&
+              drafts.every(
+                (draft) => draft.status === "confirmed" || draft.status === "submitted"
+              )
+            ? "confirmed"
+            : "empty";
+
+  function getDraftTeam(draft: OcrDraftReport) {
+    return teams.find((team) => team.id === draft.teamId) ?? null;
+  }
+
+  function getDraftTeamLabel(draft: OcrDraftReport) {
+    const team = getDraftTeam(draft);
+    return team ? getTeamDisplayName(team) : draft.teamName;
+  }
+
+  // Razon por la que un draft confirmado NO puede enviarse como reporte oficial.
+  // null = envio permitido. El backend upsertea resultados, asi que el bloqueo de
+  // duplicados vive aqui y en el hook, no en el endpoint.
+  function getOfficialSubmitBlocker(draft: OcrDraftReport): string | null {
+    if (!onSubmitOfficialReport) {
+      return "Envío oficial no disponible en esta vista.";
+    }
+    if (tournamentFinalized) {
+      return "Torneo finalizado: el draft queda solo como revisión local.";
+    }
+    if (activeMatchId === null) {
+      return "Sin partida activa: no se puede guardar reporte oficial.";
+    }
+    if (draft.activeMatchKey !== null && draft.activeMatchKey !== `match:${activeMatchId}`) {
+      return "El draft pertenece a otra partida activa.";
+    }
+    if (!getDraftTeam(draft)) {
+      return "Equipo desconocido: revisa el roster antes de enviar.";
+    }
+    if (officialReportTeamIds.includes(draft.teamId)) {
+      return "Ya existe reporte oficial para este equipo en esta partida.";
+    }
+    if (!Number.isInteger(draft.kills) || draft.kills < 0) {
+      return "Kills inválidas para reporte oficial.";
+    }
+    if (
+      usesPlacement &&
+      (draft.placement === "" ||
+        draft.placement < 1 ||
+        draft.placement > effectiveLobbySize)
+    ) {
+      return `Placement debe estar entre 1 y ${effectiveLobbySize}.`;
+    }
+    return null;
+  }
+
+  async function handleSubmitOfficialReport(draft: OcrDraftReport) {
+    if (!onSubmitOfficialReport || activeMatchId === null) {
+      return;
+    }
+
+    setSubmittingDraftId(draft.id);
+    try {
+      const result = await onSubmitOfficialReport(
+        activeMatchId,
+        draft.teamId,
+        draft.kills,
+        draft.placement
+      );
+      // Solo si el backend acepto el reporte marcamos el draft como enviado;
+      // si fallo, el draft local se conserva confirmado para reintentar.
+      if (result) {
+        const updatedAt = new Date().toISOString();
+        persistDrafts(
+          drafts.map((item) =>
+            item.id === draft.id ? { ...item, status: "submitted", updatedAt } : item
+          )
+        );
+      }
+    } finally {
+      setSubmittingDraftId(null);
+    }
+  }
 
   function persistDrafts(nextDrafts: OcrDraftReport[]) {
     setDrafts(nextDrafts);
@@ -441,9 +549,10 @@ function OcrDraftIntake({
       <div className="opr-ocr-rule">
         <strong>Separado de resultados reales.</strong>
         <span>
-          Esta vista no procesa imágenes ni ejecuta OCR. Confirmar aquí solo cambia el estado
-          local del draft; no suma reportes, no modifica standings y no activa campeón. Los
-          borradores se guardan en este navegador para el torneo y la partida actuales.
+          Esta vista no procesa imágenes ni ejecuta OCR. Importar o confirmar aquí solo cambia
+          el estado local del draft; no suma reportes ni modifica standings. Únicamente la
+          acción explícita “Guardar reporte oficial” sobre un draft confirmado envía el
+          resultado al torneo real.
         </span>
       </div>
 
@@ -479,7 +588,7 @@ function OcrDraftIntake({
             <option value="">Seleccionar equipo</option>
             {teams.map((team) => (
               <option key={team.id} value={team.id}>
-                {team.name}
+                {getTeamDisplayName(team)}
               </option>
             ))}
           </select>
@@ -658,10 +767,15 @@ function OcrDraftIntake({
                   </tr>
                 </thead>
                 <tbody>
-                  {importPreview.rows.map((row) => (
+                  {importPreview.rows.map((row) => {
+                    const rowTeam =
+                      row.teamId !== null
+                        ? teams.find((team) => team.id === row.teamId)
+                        : undefined;
+                    return (
                     <tr key={row.rowNumber} className={`is-${row.status}`}>
                       <td>{row.rowNumber}</td>
-                      <td>{row.teamName || "—"}</td>
+                      <td>{rowTeam ? getTeamDisplayName(rowTeam) : row.teamName || "—"}</td>
                       <td>{row.kills ?? "—"}</td>
                       {usesPlacement ? <td>{row.placement || "—"}</td> : null}
                       <td>{row.note || "—"}</td>
@@ -669,7 +783,8 @@ function OcrDraftIntake({
                         <span>{STATS_IMPORT_STATUS_LABELS[row.status]}</span>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -683,7 +798,9 @@ function OcrDraftIntake({
             <span>Borradores locales</span>
             <strong>{drafts.length}</strong>
           </div>
-          <small>Guardados localmente. No cuentan como reportes cargados.</small>
+          <small>
+            Guardados localmente. Solo cuentan como reporte al usar “Guardar reporte oficial”.
+          </small>
         </div>
 
         {drafts.length === 0 ? (
@@ -692,67 +809,91 @@ function OcrDraftIntake({
           </p>
         ) : (
           <div className="opr-ocr-drafts">
-            {drafts.map((draft) => (
-              <article key={draft.id} className={`opr-ocr-draft is-${draft.status}`}>
-                <div className="opr-ocr-draft-main">
-                  <div>
-                    <strong>{draft.teamName}</strong>
-                    <span>
-                      {draft.kills} kills
-                      {usesPlacement ? ` · #${draft.placement}` : ""} · {draft.source}
+            {drafts.map((draft) => {
+              const submitBlocker =
+                draft.status === "confirmed" ? getOfficialSubmitBlocker(draft) : null;
+
+              return (
+                <article key={draft.id} className={`opr-ocr-draft is-${draft.status}`}>
+                  <div className="opr-ocr-draft-main">
+                    <div>
+                      <strong>{getDraftTeamLabel(draft)}</strong>
+                      <span>
+                        {draft.kills} kills
+                        {usesPlacement ? ` · #${draft.placement}` : ""} · {draft.source}
+                      </span>
+                    </div>
+                    <span className={`opr-ocr-status is-${draft.status}`}>
+                      <i aria-hidden="true" />
+                      {OCR_DRAFT_STATUS_LABELS[draft.status]}
                     </span>
                   </div>
-                  <span className={`opr-ocr-status is-${draft.status}`}>
-                    <i aria-hidden="true" />
-                    {OCR_DRAFT_STATUS_LABELS[draft.status]}
-                  </span>
-                </div>
-                {draft.note ? <p>{draft.note}</p> : null}
-                <div className="opr-ocr-draft-actions">
-                  {draft.status === "pending" ? (
-                    <>
-                      <button
-                        type="button"
-                        className="opr-save"
-                        onClick={() => updateDraftStatus(draft.id, "confirmed")}
-                      >
-                        Confirmar draft local
-                      </button>
+                  {draft.note ? <p>{draft.note}</p> : null}
+                  {submitBlocker ? (
+                    <p className="bf-inline-note" role="status">
+                      {submitBlocker}
+                    </p>
+                  ) : null}
+                  <div className="opr-ocr-draft-actions">
+                    {draft.status === "pending" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="opr-save"
+                          onClick={() => updateDraftStatus(draft.id, "confirmed")}
+                        >
+                          Confirmar draft local
+                        </button>
+                        <button
+                          type="button"
+                          className="bf-button bf-button-ghost"
+                          onClick={() => updateDraftStatus(draft.id, "disputed")}
+                        >
+                          Marcar disputado
+                        </button>
+                      </>
+                    ) : draft.status === "disputed" ? (
                       <button
                         type="button"
                         className="bf-button bf-button-ghost"
-                        onClick={() => updateDraftStatus(draft.id, "disputed")}
+                        onClick={() => updateDraftStatus(draft.id, "pending")}
                       >
-                        Marcar disputado
+                        Volver a revisión
                       </button>
-                    </>
-                  ) : draft.status === "disputed" ? (
+                    ) : draft.status === "confirmed" ? (
+                      <>
+                        {submitBlocker === null ? (
+                          <button
+                            type="button"
+                            className="opr-save"
+                            disabled={submitting || submittingDraftId !== null}
+                            onClick={() => void handleSubmitOfficialReport(draft)}
+                          >
+                            {submittingDraftId === draft.id
+                              ? "Guardando reporte oficial…"
+                              : "Guardar reporte oficial"}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="bf-button bf-button-ghost"
+                          onClick={() => updateDraftStatus(draft.id, "disputed")}
+                        >
+                          Disputar
+                        </button>
+                      </>
+                    ) : null}
                     <button
                       type="button"
                       className="bf-button bf-button-ghost"
-                      onClick={() => updateDraftStatus(draft.id, "pending")}
+                      onClick={() => discardDraft(draft.id)}
                     >
-                      Volver a revisión
+                      Descartar
                     </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="bf-button bf-button-ghost"
-                      onClick={() => updateDraftStatus(draft.id, "disputed")}
-                    >
-                      Disputar
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="bf-button bf-button-ghost"
-                    onClick={() => discardDraft(draft.id)}
-                  >
-                    Descartar
-                  </button>
-                </div>
-              </article>
-            ))}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
@@ -837,6 +978,7 @@ export default function WorldSeriesOperator({
   onSaveKillRaceMap,
   onCreateNextGame,
   onBulkImportTeams,
+  onSubmitOfficialReport,
 }: WorldSeriesOperatorProps) {
   const searchParams = useSearchParams();
   const [now, setNow] = useState(0);
@@ -1889,9 +2031,14 @@ export default function WorldSeriesOperator({
               tournamentId={selectedTournament.id}
               matchNumber={currentGame}
               activeMatchKey={activeMatch ? `match:${activeMatch.id}` : null}
+              activeMatchId={activeMatch?.id ?? null}
               teams={teams}
               usesPlacement={usesPlacement}
               effectiveLobbySize={effectiveLobbySize}
+              tournamentFinalized={isFinalized}
+              officialReportTeamIds={activeMatchResults.map((result) => result.team_id)}
+              submitting={submitting}
+              onSubmitOfficialReport={onSubmitOfficialReport}
             />
           ) : null}
 

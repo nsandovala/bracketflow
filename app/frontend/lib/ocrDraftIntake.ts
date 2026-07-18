@@ -1,5 +1,5 @@
 export type OcrDraftSource = "MANUAL" | "PRINT" | "OCR_DRAFT" | "CSV_IMPORT";
-export type OcrDraftStatus = "pending" | "confirmed" | "disputed";
+export type OcrDraftStatus = "pending" | "confirmed" | "disputed" | "submitted";
 
 export type OcrDraftReport = {
   id: string;
@@ -23,7 +23,12 @@ const OCR_DRAFT_SOURCES: OcrDraftSource[] = [
   "OCR_DRAFT",
   "CSV_IMPORT",
 ];
-const OCR_DRAFT_STATUSES: OcrDraftStatus[] = ["pending", "confirmed", "disputed"];
+const OCR_DRAFT_STATUSES: OcrDraftStatus[] = [
+  "pending",
+  "confirmed",
+  "disputed",
+  "submitted",
+];
 
 export function getOcrDraftStorageKey(tournamentId: number, matchNumber: number) {
   return `bracketflow:operator:ocr-draft-intake:v0.1:tournament:${tournamentId}:match:${matchNumber}`;
