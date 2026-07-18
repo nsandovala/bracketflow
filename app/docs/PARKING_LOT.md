@@ -32,8 +32,49 @@
 - Discord bot
 - agentes/copilot
 
+## Report Intake - diferido (2026-07-18)
+
+- Flujo de reemplazo/edicion de reporte oficial por partida/equipo
+  ("Editar/reemplazar reporte"). Hoy un conflicto CSV vs reporte oficial se
+  marca "Conflicto / revisar" y el reporte oficial existente queda como fuente
+  de verdad; no hay sobreescritura desde import. Requiere decision de backend
+  (el endpoint actual upsertea sin auditoria) antes de exponerlo en UI.
+
 ## Reglas de backlog
 
 - No mezclar estas piezas con fixes chicos de UI.
 - No vender una idea de parking lot como feature ya terminada.
 - No tocar backend para adelantar dashboard visual si el contrato de datos aun no existe.
+
+## Parking Lot — OCR / Stats Automation
+
+### P0 actual
+BracketFlow no dependerá de APIs externas para operar torneos. El core será:
+Manual / CSV-TXT / OCR / Discord / Copilot → Draft revisable → Reporte oficial confirmado por humano.
+
+### OCR estructurado futuro
+- Subida de screenshot.
+- Preprocesado de imagen.
+- Detección de tabla/scoreboard.
+- Extracción de equipo, jugadores, kills, placement, damage.
+- Confianza por campo.
+- Corrección manual.
+- Nunca escribir resultados oficiales sin confirmación.
+
+### Stream/OBS Intelligence futuro
+- Un solo link OBS por torneo.
+- El caster no cambia URL.
+- El operador cambia estado/datos.
+- El stream se actualiza solo.
+- Overlays por URL estable:
+  - standings
+  - top fraggers
+  - match status
+  - champion
+  - caster panel
+
+### Activision/API externa
+- Solo research/opt-in.
+- No core MVP.
+- No promesa comercial.
+- Riesgo por dependencia externa, autenticación, perfiles privados, cambios de endpoint y bloqueo.

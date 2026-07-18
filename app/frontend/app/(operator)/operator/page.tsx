@@ -58,6 +58,7 @@ function OperatorPageClient() {
     generateBracketForSelected,
     createNextGame,
     saveTeamReport,
+    saveOfficialReportFromDraft,
     saveKillRaceMap,
   } = useWorldSeriesPractice(preferredTournamentId);
 
@@ -154,6 +155,7 @@ function OperatorPageClient() {
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);
       }}
+      onSubmitOfficialReport={saveOfficialReportFromDraft}
       onSaveKillRaceMap={(matchId) => {
         void saveKillRaceMap(matchId);
       }}

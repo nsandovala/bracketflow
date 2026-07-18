@@ -854,11 +854,13 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     };
   }
 
-  async function saveTeamReport(matchId: number, teamId: number) {
-    const key = getDraftKey(matchId, teamId);
-    const saved = activeMatchResults.find((result) => result.team_id === teamId);
-    const killsValue = resultDrafts[key]?.kills ?? (saved ? String(saved.kills) : "");
-    const placementValue = resultDrafts[key]?.placement ?? (saved ? String(saved.placement) : "");
+  async function persistTeamReport(
+    matchId: number,
+    teamId: number,
+    killsValue: string,
+    placementValue: string,
+    successMessage: string
+  ) {
     if (selectedTournamentId === null) {
       throw new Error("No active tournament");
     }
@@ -881,10 +883,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       await refreshSelectedTournament(selectedTournamentId);
       setResultDrafts((current) => {
         const next = { ...current };
-        delete next[key];
+        delete next[getDraftKey(matchId, teamId)];
         return next;
       });
-      setMessage(`Reporte guardado: ${teams.find((team) => team.id === teamId)?.name ?? "equipo"}`);
+      setMessage(successMessage);
       return result;
     } catch (error) {
       // El backend devuelve 409 (placement duplicado) con un detail explicativo;
@@ -894,6 +896,47 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function saveTeamReport(matchId: number, teamId: number) {
+    const key = getDraftKey(matchId, teamId);
+    const saved = activeMatchResults.find((result) => result.team_id === teamId);
+    const killsValue = resultDrafts[key]?.kills ?? (saved ? String(saved.kills) : "");
+    const placementValue = resultDrafts[key]?.placement ?? (saved ? String(saved.placement) : "");
+    return persistTeamReport(
+      matchId,
+      teamId,
+      killsValue,
+      placementValue,
+      `Reporte guardado: ${teams.find((team) => team.id === teamId)?.name ?? "equipo"}`
+    );
+  }
+
+  async function saveOfficialReportFromDraft(
+    matchId: number,
+    teamId: number,
+    kills: number,
+    placement: number | ""
+  ) {
+    // El endpoint /matches/{id}/results es upsert: sin este guard, un draft
+    // reenviado sobreescribiria silenciosamente un reporte oficial existente.
+    const existing = tournamentResults.find(
+      (result) => result.match_id === matchId && result.team_id === teamId
+    );
+    if (existing) {
+      setMessage("Ya existe reporte oficial para este equipo en esta partida.");
+      return null;
+    }
+
+    const team = teams.find((candidate) => candidate.id === teamId);
+    const teamLabel = team ? getTeamDisplayName(team) : "equipo";
+    return persistTeamReport(
+      matchId,
+      teamId,
+      String(kills),
+      placement === "" ? "" : String(placement),
+      `Reporte oficial guardado: ${teamLabel}`
+    );
   }
 
   async function openRosterWindow(durationMinutes: number) {
@@ -1192,6 +1235,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     deleteSelectedTournament,
     createNextGame,
     saveTeamReport,
+    saveOfficialReportFromDraft,
     saveKillRaceMap,
     selectMatch: setSelectedMatchId,
   };

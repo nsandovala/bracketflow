@@ -6,7 +6,9 @@ export type StatsDraftImportStatus =
   | "invalid_unknown_team"
   | "invalid_kills"
   | "invalid_placement"
-  | "duplicate_existing_draft";
+  | "duplicate_existing_draft"
+  | "official_report_exists"
+  | "official_conflict";
 
 export type StatsDraftImportRow = {
   rowNumber: number;
@@ -28,11 +30,22 @@ export type StatsDraftImportResult = {
 type StatsDraftImportTeam = {
   id: number;
   name: string;
+  members?: Array<{ player: { nickname: string } }>;
+};
+
+type StatsDraftOfficialResult = {
+  team_id: number;
+  kills: number;
+  placement: number;
 };
 
 type ParseStatsDraftImportOptions = {
   teams: StatsDraftImportTeam[];
   existingDrafts: OcrDraftReport[];
+  // Reportes oficiales ya guardados para la partida activa. Un equipo presente
+  // aqui nunca vuelve a ser "valid": mismo valor = reporte existente, valor
+  // distinto = conflicto que requiere revision humana (sin sobreescritura).
+  officialResults?: StatsDraftOfficialResult[];
   tournamentId: number;
   matchNumber: number;
   usesPlacement: boolean;
@@ -57,6 +70,18 @@ function normalizeHeader(value: string) {
 
 export function normalizeStatsDraftTeamName(value: string) {
   return value.normalize("NFKC").trim().toLocaleLowerCase("es").replace(/\s+/g, " ");
+}
+
+const ROSTER_SEPARATOR = /[/,;]/;
+
+function buildRosterKey(names: string[]) {
+  const normalized = names
+    .map(normalizeStatsDraftTeamName)
+    .filter((name) => name.length > 0);
+  if (normalized.length === 0) {
+    return null;
+  }
+  return normalized.sort().join("|");
 }
 
 function countUnquotedDelimiter(line: string, delimiter: "," | ";" | "\t") {
@@ -207,13 +232,61 @@ export function parseStatsDraftImport(
   }
 
   const teamsByNormalizedName = new Map<string, StatsDraftImportTeam[]>();
+  const teamsByRosterKey = new Map<string, StatsDraftImportTeam[]>();
+  const teamsByPlayer = new Map<string, StatsDraftImportTeam[]>();
   for (const team of options.teams) {
     const normalizedName = normalizeStatsDraftTeamName(team.name);
-    const matches = teamsByNormalizedName.get(normalizedName) ?? [];
-    matches.push(team);
-    teamsByNormalizedName.set(normalizedName, matches);
+    const nameMatches = teamsByNormalizedName.get(normalizedName) ?? [];
+    nameMatches.push(team);
+    teamsByNormalizedName.set(normalizedName, nameMatches);
+
+    const memberNames = (team.members ?? []).map((member) => member.player.nickname);
+    const rosterKey = buildRosterKey(memberNames);
+    if (rosterKey) {
+      const rosterMatches = teamsByRosterKey.get(rosterKey) ?? [];
+      rosterMatches.push(team);
+      teamsByRosterKey.set(rosterKey, rosterMatches);
+    }
+    for (const memberName of memberNames) {
+      const normalizedMember = normalizeStatsDraftTeamName(memberName);
+      if (normalizedMember.length === 0) {
+        continue;
+      }
+      const playerMatches = teamsByPlayer.get(normalizedMember) ?? [];
+      if (!playerMatches.includes(team)) {
+        playerMatches.push(team);
+      }
+      teamsByPlayer.set(normalizedMember, playerMatches);
+    }
   }
 
+  // Matching exacto sin fuzzy: nombre de equipo, roster completo, o un solo
+  // player/captain. Cualquier ambiguedad (2+ equipos posibles) no se infiere.
+  function resolveTeam(teamInput: string): StatsDraftImportTeam | null {
+    const nameMatches = teamsByNormalizedName.get(
+      normalizeStatsDraftTeamName(teamInput)
+    );
+    if (nameMatches) {
+      return nameMatches.length === 1 ? nameMatches[0] : null;
+    }
+
+    if (ROSTER_SEPARATOR.test(teamInput)) {
+      const rosterKey = buildRosterKey(teamInput.split(ROSTER_SEPARATOR));
+      const rosterMatches = rosterKey ? teamsByRosterKey.get(rosterKey) : undefined;
+      if (rosterMatches) {
+        return rosterMatches.length === 1 ? rosterMatches[0] : null;
+      }
+      return null;
+    }
+
+    const playerMatches = teamsByPlayer.get(normalizeStatsDraftTeamName(teamInput));
+    if (playerMatches) {
+      return playerMatches.length === 1 ? playerMatches[0] : null;
+    }
+    return null;
+  }
+
+  // Clave unica de reporte: tournamentId + matchNumber + teamId.
   const duplicateTeamIds = new Set(
     options.existingDrafts
       .filter(
@@ -223,13 +296,13 @@ export function parseStatsDraftImport(
       )
       .map((draft) => draft.teamId)
   );
+  const officialByTeamId = new Map(
+    (options.officialResults ?? []).map((result) => [result.team_id, result])
+  );
 
   const rows = dataRows.map((cells, index): StatsDraftImportRow => {
     const teamInput = teamIndex >= 0 ? (cells[teamIndex] ?? "").trim() : "";
-    const teamMatches = teamsByNormalizedName.get(
-      normalizeStatsDraftTeamName(teamInput)
-    );
-    const team = teamMatches?.length === 1 ? teamMatches[0] : null;
+    const team = teamInput ? resolveTeam(teamInput) : null;
     const kills = killsIndex >= 0 ? parseInteger(cells[killsIndex] ?? "") : null;
     const placement = options.usesPlacement
       ? placementIndex >= 0
@@ -238,6 +311,8 @@ export function parseStatsDraftImport(
       : "";
     const note = noteIndex >= 0 ? (cells[noteIndex] ?? "").trim() : "";
     let status: StatsDraftImportStatus = "valid";
+
+    const official = team ? officialByTeamId.get(team.id) : undefined;
 
     if (!teamInput) {
       status = "invalid_missing_team";
@@ -253,6 +328,12 @@ export function parseStatsDraftImport(
         placement > options.effectiveLobbySize)
     ) {
       status = "invalid_placement";
+    } else if (official) {
+      status =
+        official.kills === kills &&
+        (!options.usesPlacement || official.placement === placement)
+          ? "official_report_exists"
+          : "official_conflict";
     } else if (duplicateTeamIds.has(team.id)) {
       status = "duplicate_existing_draft";
     }
