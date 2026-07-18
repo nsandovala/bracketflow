@@ -2,7 +2,6 @@
 
 import {
   ChangeEvent,
-  FormEvent,
   FormEventHandler,
   useEffect,
   useMemo,
@@ -26,7 +25,6 @@ import { getOperatorNextAction } from "../../lib/operatorNextAction";
 import {
   getOcrDraftStorageKey,
   OcrDraftReport,
-  OcrDraftSource,
   OcrDraftStatus,
   parseOcrDraftReports,
 } from "../../lib/ocrDraftIntake";
@@ -37,6 +35,7 @@ import {
 } from "../../lib/statsDraftImport";
 import {
   getTeamDisplayName,
+  getTeamShortDisplayName,
   isTournamentCompleted,
   findChampion,
   getMatchPointStatus,
@@ -102,25 +101,13 @@ type WorldSeriesOperatorProps = {
   ) => Promise<unknown>;
 };
 
-type OperatorMode = "op" | "setup" | "bracket" | "ocr";
+type OperatorMode = "op" | "setup" | "bracket";
 type ResultFilter = "all" | "pending";
-type OcrDraftViewStatus =
-  | "empty"
-  | "evidence"
-  | "review"
-  | "confirmed"
-  | "disputed"
-  | "submitted";
+// Fuente de entrada de reportes dentro de la única sección "Reportes de partida".
+// No son sistemas paralelos: manual opera las cards oficiales, import crea drafts
+// revisables y ocr queda declarado como futuro no funcional.
+type ReportSource = "manual" | "import" | "ocr";
 type OcrDraftPersistenceState = "loading" | "local" | "memory";
-
-const OCR_DRAFT_STATES: Array<{ status: OcrDraftViewStatus; label: string }> = [
-  { status: "empty", label: "Sin evidencia" },
-  { status: "evidence", label: "Evidencia cargada / pegada" },
-  { status: "review", label: "Draft pendiente de revisión" },
-  { status: "confirmed", label: "Confirmado manualmente" },
-  { status: "disputed", label: "Disputado / requiere revisión" },
-  { status: "submitted", label: "Enviado como reporte oficial" },
-];
 
 const OCR_DRAFT_STATUS_LABELS: Record<OcrDraftStatus, string> = Object.fromEntries(
   [
@@ -138,6 +125,8 @@ const STATS_IMPORT_STATUS_LABELS: Record<StatsDraftImportStatus, string> = {
   invalid_kills: "Kills inválidas",
   invalid_placement: "Placement inválido",
   duplicate_existing_draft: "Draft duplicado",
+  official_report_exists: "Reporte oficial existente",
+  official_conflict: "Conflicto / revisar",
 };
 
 function OcrDraftIntake({
@@ -149,7 +138,7 @@ function OcrDraftIntake({
   usesPlacement,
   effectiveLobbySize,
   tournamentFinalized,
-  officialReportTeamIds,
+  officialResults,
   submitting,
   onSubmitOfficialReport,
 }: {
@@ -161,7 +150,7 @@ function OcrDraftIntake({
   usesPlacement: boolean;
   effectiveLobbySize: number;
   tournamentFinalized: boolean;
-  officialReportTeamIds: number[];
+  officialResults: Array<{ team_id: number; kills: number; placement: number }>;
   submitting: boolean;
   onSubmitOfficialReport?: (
     matchId: number,
@@ -174,12 +163,6 @@ function OcrDraftIntake({
   const [drafts, setDrafts] = useState<OcrDraftReport[]>([]);
   const [persistenceState, setPersistenceState] =
     useState<OcrDraftPersistenceState>("loading");
-  const [teamId, setTeamId] = useState("");
-  const [kills, setKills] = useState("");
-  const [placement, setPlacement] = useState("");
-  const [source, setSource] = useState<OcrDraftSource>("MANUAL");
-  const [note, setNote] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<StatsDraftImportResult | null>(
@@ -213,30 +196,6 @@ function OcrDraftIntake({
     };
   }, [matchNumber, storageKey, tournamentId]);
 
-  const formIsDirty =
-    teamId !== "" ||
-    kills !== "" ||
-    placement !== "" ||
-    source !== "MANUAL" ||
-    note.trim() !== "";
-  const hasTextEvidence = note.trim() !== "";
-  const intakeStatus: OcrDraftViewStatus = drafts.some(
-    (draft) => draft.status === "disputed"
-  )
-    ? "disputed"
-    : drafts.some((draft) => draft.status === "pending")
-      ? "review"
-      : hasTextEvidence
-        ? "evidence"
-        : drafts.length > 0 && drafts.every((draft) => draft.status === "submitted")
-          ? "submitted"
-          : drafts.length > 0 &&
-              drafts.every(
-                (draft) => draft.status === "confirmed" || draft.status === "submitted"
-              )
-            ? "confirmed"
-            : "empty";
-
   function getDraftTeam(draft: OcrDraftReport) {
     return teams.find((team) => team.id === draft.teamId) ?? null;
   }
@@ -265,7 +224,7 @@ function OcrDraftIntake({
     if (!getDraftTeam(draft)) {
       return "Equipo desconocido: revisa el roster antes de enviar.";
     }
-    if (officialReportTeamIds.includes(draft.teamId)) {
+    if (officialResults.some((result) => result.team_id === draft.teamId)) {
       return "Ya existe reporte oficial para este equipo en esta partida.";
     }
     if (!Number.isInteger(draft.kills) || draft.kills < 0) {
@@ -327,60 +286,6 @@ function OcrDraftIntake({
     }
   }
 
-  function clearForm() {
-    setTeamId("");
-    setKills("");
-    setPlacement("");
-    setSource("MANUAL");
-    setNote("");
-    setFormError(null);
-  }
-
-  function handleCreateDraft(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const parsedKills = Number(kills);
-    const parsedPlacement = Number(placement);
-    const selectedTeam = teams.find((team) => team.id === Number(teamId));
-    if (!selectedTeam) {
-      setFormError("Selecciona un equipo real del torneo.");
-      return;
-    }
-    if (kills === "" || !Number.isInteger(parsedKills) || parsedKills < 0) {
-      setFormError("Kills debe ser un número entero igual o mayor que 0.");
-      return;
-    }
-    if (
-      usesPlacement &&
-      (placement === "" ||
-        !Number.isInteger(parsedPlacement) ||
-        parsedPlacement < 1 ||
-        parsedPlacement > effectiveLobbySize)
-    ) {
-      setFormError(`Placement debe estar entre 1 y ${effectiveLobbySize}.`);
-      return;
-    }
-
-    const timestamp = new Date().toISOString();
-    const draft: OcrDraftReport = {
-      id: window.crypto.randomUUID(),
-      tournamentId,
-      matchNumber,
-      activeMatchKey,
-      teamId: selectedTeam.id,
-      teamName: selectedTeam.name,
-      kills: parsedKills,
-      placement: usesPlacement ? parsedPlacement : "",
-      source,
-      status: "pending",
-      note: note.trim(),
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    persistDrafts([draft, ...drafts]);
-    clearForm();
-  }
-
   function updateDraftStatus(id: string, status: OcrDraftStatus) {
     const updatedAt = new Date().toISOString();
     persistDrafts(
@@ -396,6 +301,7 @@ function OcrDraftIntake({
     return parseStatsDraftImport(importText, {
       teams,
       existingDrafts,
+      officialResults,
       tournamentId,
       matchNumber,
       usesPlacement,
@@ -515,6 +421,7 @@ function OcrDraftIntake({
       parseStatsDraftImport(importText, {
         teams,
         existingDrafts: nextDrafts,
+        officialResults,
         tournamentId,
         matchNumber,
         usesPlacement,
@@ -530,139 +437,17 @@ function OcrDraftIntake({
     importPreview?.rows.filter((row) => row.status === "valid").length ?? 0;
 
   return (
-    <section className="opr-panel opr-ocr-intake" aria-labelledby="opr-ocr-title">
-      <div className="opr-ocr-head">
-        <div>
-          <div className="opr-eyebrow">Captura asistida · V0</div>
-          <h2 id="opr-ocr-title">OCR Draft Intake</h2>
-          <p className="sub">
-            Próxima capa: leer captura, crear borrador y confirmar manualmente.
-          </p>
-        </div>
-        <span className="opr-ocr-safety">
-          {persistenceState === "memory"
-            ? "Local · solo memoria"
-            : "Local · este navegador"}
-        </span>
-      </div>
-
+    <section className="opr-panel opr-ocr-intake" aria-labelledby="opr-stats-import-title">
       <div className="opr-ocr-rule">
-        <strong>Separado de resultados reales.</strong>
+        <strong>Borradores locales.</strong>
         <span>
-          Esta vista no procesa imágenes ni ejecuta OCR. Importar o confirmar aquí solo cambia
-          el estado local del draft; no suma reportes ni modifica standings. Únicamente la
-          acción explícita “Guardar reporte oficial” sobre un draft confirmado envía el
-          resultado al torneo real.
+          Importar o confirmar aquí no envía nada al torneo. Solo “Guardar reporte
+          oficial” sobre un draft confirmado impacta los reportes de la partida.
+          {persistenceState === "memory"
+            ? " Almacenamiento local no disponible: los drafts viven en memoria y se pierden al recargar."
+            : " Los drafts se guardan en este navegador."}
         </span>
       </div>
-
-      {persistenceState === "memory" ? (
-        <p className="bf-inline-note" role="status">
-          El almacenamiento local no está disponible. Los drafts seguirán funcionando en
-          memoria, pero se perderán al recargar.
-        </p>
-      ) : null}
-
-      <ol className="opr-ocr-states" aria-label="Estados de OCR Draft Intake">
-        {OCR_DRAFT_STATES.map((item) => (
-          <li
-            key={item.status}
-            className={`is-${item.status}${intakeStatus === item.status ? " is-current" : ""}`}
-            aria-current={intakeStatus === item.status ? "step" : undefined}
-          >
-            <i aria-hidden="true" />
-            <span>{item.label}</span>
-          </li>
-        ))}
-      </ol>
-
-      <form className="opr-ocr-form" onSubmit={handleCreateDraft}>
-        <div className="opr-field">
-          <label htmlFor="opr-ocr-team">Equipo</label>
-          <select
-            id="opr-ocr-team"
-            value={teamId}
-            onChange={(event) => setTeamId(event.target.value)}
-            disabled={persistenceState === "loading"}
-          >
-            <option value="">Seleccionar equipo</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {getTeamDisplayName(team)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="opr-field">
-          <label htmlFor="opr-ocr-kills">Kills</label>
-          <input
-            id="opr-ocr-kills"
-            type="number"
-            inputMode="numeric"
-            min="0"
-            value={kills}
-            placeholder="0"
-            onChange={(event) => setKills(event.target.value)}
-          />
-        </div>
-        {usesPlacement ? (
-          <div className="opr-field">
-            <label htmlFor="opr-ocr-placement">Placement</label>
-            <input
-              id="opr-ocr-placement"
-              type="number"
-              inputMode="numeric"
-              min="1"
-              max={effectiveLobbySize}
-              value={placement}
-              placeholder={`1-${effectiveLobbySize}`}
-              onChange={(event) => setPlacement(event.target.value)}
-            />
-          </div>
-        ) : null}
-        <div className="opr-field">
-          <label htmlFor="opr-ocr-source">Fuente</label>
-          <select
-            id="opr-ocr-source"
-            value={source}
-            onChange={(event) => setSource(event.target.value as OcrDraftSource)}
-          >
-            <option value="MANUAL">MANUAL</option>
-            <option value="PRINT">PRINT</option>
-            <option value="OCR_DRAFT">OCR_DRAFT</option>
-          </select>
-        </div>
-        <div className="opr-field opr-ocr-note">
-          <label htmlFor="opr-ocr-note">Nota o evidencia textual · opcional</label>
-          <textarea
-            id="opr-ocr-note"
-            value={note}
-            rows={2}
-            placeholder="Pega una referencia visible o deja una nota para revisión."
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </div>
-        <div className="opr-ocr-form-actions">
-          <button
-            type="submit"
-            className="opr-save"
-            disabled={persistenceState === "loading"}
-          >
-            Crear draft para revisión
-          </button>
-          {formIsDirty ? (
-            <button type="button" className="bf-button bf-button-ghost" onClick={clearForm}>
-              Limpiar entrada
-            </button>
-          ) : null}
-        </div>
-      </form>
-
-      {formError ? (
-        <p className="bf-inline-error" role="alert">
-          {formError}
-        </p>
-      ) : null}
 
       <section className="opr-stats-import" aria-labelledby="opr-stats-import-title">
         <div className="opr-stats-import-head">
@@ -805,7 +590,7 @@ function OcrDraftIntake({
 
         {drafts.length === 0 ? (
           <p className="opr-ocr-empty">
-            Sin borradores. La operación real continúa en Push Mode.
+            Sin borradores. Importa una tabla o CSV para crear borradores revisables.
           </p>
         ) : (
           <div className="opr-ocr-drafts">
@@ -991,11 +776,13 @@ export default function WorldSeriesOperator({
   const [mode, setMode] = useState<OperatorMode>(
     searchParams.get("roulette") === "1"
       ? "setup"
-      : searchParams.get("tab") === "ocr"
-        ? "ocr"
       : searchParams.get("tab") === "bracket"
         ? "bracket"
         : "op"
+  );
+  // ?tab=ocr sigue siendo un enlace valido: abre Reportes con la fuente CSV/TXT.
+  const [reportSource, setReportSource] = useState<ReportSource>(
+    searchParams.get("tab") === "ocr" ? "import" : "manual"
   );
 
   const rouletteParam = searchParams.get("roulette");
@@ -1012,7 +799,8 @@ export default function WorldSeriesOperator({
     if (rouletteParam === "1") {
       setMode("setup");
     } else if (tabParam === "ocr") {
-      setMode("ocr");
+      setMode("op");
+      setReportSource("import");
     } else if (tabParam === "bracket") {
       setMode("bracket");
     }
@@ -1807,13 +1595,14 @@ export default function WorldSeriesOperator({
                 <div className="opr-stat-value">
                   {gameStats ? (
                     <>
-                      {gameStats.leader.team_name} · <em>{gameStats.leader.total_points.toFixed(1)}</em> pts
+                      {leaderTeam ? getTeamDisplayName(leaderTeam) : gameStats.leader.team_name} ·{" "}
+                      <em>{gameStats.leader.total_points.toFixed(1)}</em> pts
                     </>
                   ) : (
                     "—"
                   )}
                 </div>
-                {gameStats && leaderTeam ? (
+                {gameStats && leaderTeam && rosterText(leaderTeam) !== getTeamDisplayName(leaderTeam) ? (
                   <div className="opr-stat-sub">{rosterText(leaderTeam)}</div>
                 ) : null}
               </div>
@@ -1843,7 +1632,17 @@ export default function WorldSeriesOperator({
                     {gameStats ? <em>#{gameStats.bestPlacement}</em> : "—"}
                   </div>
                   {gameStats && gameStats.bestPlacementResult ? (
-                    <div className="opr-stat-sub">por {gameStats.bestPlacementResult.team_name}</div>
+                    <div className="opr-stat-sub">
+                      por{" "}
+                      {(() => {
+                        const bestTeam = teams.find(
+                          (team) => team.id === gameStats.bestPlacementResult?.team_id
+                        );
+                        return bestTeam
+                          ? getTeamDisplayName(bestTeam)
+                          : gameStats.bestPlacementResult.team_name;
+                      })()}
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -1878,13 +1677,6 @@ export default function WorldSeriesOperator({
               >
                 {requiresRoulette ? "Setup de ruleta" : "Equipos & Roster"}
               </button>
-              <button
-                type="button"
-                className={mode === "ocr" ? "is-on" : ""}
-                onClick={() => setMode("ocr")}
-              >
-                OCR Draft Intake
-              </button>
             </div>
 
             {mode === "op" ? (
@@ -1907,6 +1699,36 @@ export default function WorldSeriesOperator({
             ) : null}
           </div>
 
+          {/* ---- Fuente de reportes: una sola sección, varias entradas ---- */}
+          {mode === "op" ? (
+            <div className="opr-controls opr-report-sources">
+              <span className="opr-chips-label">Reportes de partida · Fuente:</span>
+              <div className="opr-filter">
+                <button
+                  type="button"
+                  className={reportSource === "manual" ? "is-on" : ""}
+                  onClick={() => setReportSource("manual")}
+                >
+                  Manual
+                </button>
+                <button
+                  type="button"
+                  className={reportSource === "import" ? "is-on" : ""}
+                  onClick={() => setReportSource("import")}
+                >
+                  CSV/TXT
+                </button>
+                <button
+                  type="button"
+                  className={reportSource === "ocr" ? "is-on" : ""}
+                  onClick={() => setReportSource("ocr")}
+                >
+                  OCR imagen · futuro
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {/* ---- Chips de pendientes (saltar a) ---- */}
           {mode === "op" && pendingCount > 0 ? (
             <div className="opr-chips">
@@ -1919,13 +1741,43 @@ export default function WorldSeriesOperator({
                   onClick={() => jumpToTeam(team.id)}
                 >
                   <i />
-                  {team.name.replace(/^TEAM\s+/i, "")}
+                  {getTeamShortDisplayName(team, 2).replace(/^TEAM\s+/i, "")}
                 </button>
               ))}
             </div>
           ) : null}
 
-          {/* ---- OPERACIÓN: grilla de reportes ---- */}
+          {/* ---- Entradas no manuales: drafts revisables dentro de la misma sección ---- */}
+          {mode === "op" && reportSource === "import" ? (
+            <OcrDraftIntake
+              key={`${selectedTournament.id}:${currentGame}`}
+              tournamentId={selectedTournament.id}
+              matchNumber={currentGame}
+              activeMatchKey={activeMatch ? `match:${activeMatch.id}` : null}
+              activeMatchId={activeMatch?.id ?? null}
+              teams={teams}
+              usesPlacement={usesPlacement}
+              effectiveLobbySize={effectiveLobbySize}
+              tournamentFinalized={isFinalized}
+              officialResults={activeMatchResults}
+              submitting={submitting}
+              onSubmitOfficialReport={onSubmitOfficialReport}
+            />
+          ) : null}
+
+          {mode === "op" && reportSource === "ocr" ? (
+            <section className="opr-panel">
+              <div className="opr-eyebrow">OCR imagen · Futuro</div>
+              <h2>Lectura de capturas aún no disponible</h2>
+              <p className="sub">
+                Cuando exista, creará borradores revisables aquí mismo, con la misma
+                revisión humana y el mismo botón de reporte oficial. Mientras tanto usa
+                Manual o CSV/TXT.
+              </p>
+            </section>
+          ) : null}
+
+          {/* ---- OPERACIÓN: grilla de reportes oficiales ---- */}
           {mode === "op" ? (
             activeMatch ? (
               <div className="opr-grid">
@@ -1951,6 +1803,8 @@ export default function WorldSeriesOperator({
                       : draft.kills);
                   const isSaved = Boolean(savedResult);
                   const hasVal = estimatedTotal != null && estimatedTotal !== "";
+                  const teamLabel = getTeamDisplayName(team);
+                  const teamRosterLine = rosterText(team);
 
                   return (
                     <article
@@ -1960,12 +1814,18 @@ export default function WorldSeriesOperator({
                     >
                       <div className="opr-card-head">
                         <div>
-                          <div className="opr-team-name">{team.name}</div>
-                          <p className="opr-team-roster">{rosterText(team)}</p>
+                          <div className="opr-team-name">{teamLabel}</div>
+                          {teamRosterLine !== teamLabel ? (
+                            <p className="opr-team-roster">{teamRosterLine}</p>
+                          ) : null}
                         </div>
                         <span className={`opr-tag ${isSaved ? "t-saved" : "t-pending"}`}>
                           <i />
-                          {isFinalized ? "Finalizado" : isSaved ? "Guardado" : "Pendiente"}
+                          {isFinalized
+                            ? "Finalizado"
+                            : isSaved
+                              ? "Reporte oficial guardado"
+                              : "Pendiente"}
                         </span>
                       </div>
 
@@ -2023,23 +1883,6 @@ export default function WorldSeriesOperator({
             ) : (
               <p className="bf-empty">Crea la primera partida para comenzar a cargar reportes.</p>
             )
-          ) : null}
-
-          {mode === "ocr" ? (
-            <OcrDraftIntake
-              key={`${selectedTournament.id}:${currentGame}`}
-              tournamentId={selectedTournament.id}
-              matchNumber={currentGame}
-              activeMatchKey={activeMatch ? `match:${activeMatch.id}` : null}
-              activeMatchId={activeMatch?.id ?? null}
-              teams={teams}
-              usesPlacement={usesPlacement}
-              effectiveLobbySize={effectiveLobbySize}
-              tournamentFinalized={isFinalized}
-              officialReportTeamIds={activeMatchResults.map((result) => result.team_id)}
-              submitting={submitting}
-              onSubmitOfficialReport={onSubmitOfficialReport}
-            />
           ) : null}
 
           {/* ---- SETUP: equipos ---- */}

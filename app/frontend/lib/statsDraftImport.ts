@@ -6,7 +6,9 @@ export type StatsDraftImportStatus =
   | "invalid_unknown_team"
   | "invalid_kills"
   | "invalid_placement"
-  | "duplicate_existing_draft";
+  | "duplicate_existing_draft"
+  | "official_report_exists"
+  | "official_conflict";
 
 export type StatsDraftImportRow = {
   rowNumber: number;
@@ -31,9 +33,19 @@ type StatsDraftImportTeam = {
   members?: Array<{ player: { nickname: string } }>;
 };
 
+type StatsDraftOfficialResult = {
+  team_id: number;
+  kills: number;
+  placement: number;
+};
+
 type ParseStatsDraftImportOptions = {
   teams: StatsDraftImportTeam[];
   existingDrafts: OcrDraftReport[];
+  // Reportes oficiales ya guardados para la partida activa. Un equipo presente
+  // aqui nunca vuelve a ser "valid": mismo valor = reporte existente, valor
+  // distinto = conflicto que requiere revision humana (sin sobreescritura).
+  officialResults?: StatsDraftOfficialResult[];
   tournamentId: number;
   matchNumber: number;
   usesPlacement: boolean;
@@ -274,6 +286,7 @@ export function parseStatsDraftImport(
     return null;
   }
 
+  // Clave unica de reporte: tournamentId + matchNumber + teamId.
   const duplicateTeamIds = new Set(
     options.existingDrafts
       .filter(
@@ -282,6 +295,9 @@ export function parseStatsDraftImport(
           draft.matchNumber === options.matchNumber
       )
       .map((draft) => draft.teamId)
+  );
+  const officialByTeamId = new Map(
+    (options.officialResults ?? []).map((result) => [result.team_id, result])
   );
 
   const rows = dataRows.map((cells, index): StatsDraftImportRow => {
@@ -295,6 +311,8 @@ export function parseStatsDraftImport(
       : "";
     const note = noteIndex >= 0 ? (cells[noteIndex] ?? "").trim() : "";
     let status: StatsDraftImportStatus = "valid";
+
+    const official = team ? officialByTeamId.get(team.id) : undefined;
 
     if (!teamInput) {
       status = "invalid_missing_team";
@@ -310,6 +328,12 @@ export function parseStatsDraftImport(
         placement > options.effectiveLobbySize)
     ) {
       status = "invalid_placement";
+    } else if (official) {
+      status =
+        official.kills === kills &&
+        (!options.usesPlacement || official.placement === placement)
+          ? "official_report_exists"
+          : "official_conflict";
     } else if (duplicateTeamIds.has(team.id)) {
       status = "duplicate_existing_draft";
     }
