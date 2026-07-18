@@ -1,4 +1,4 @@
-export type OcrDraftSource = "MANUAL" | "PRINT" | "OCR_DRAFT";
+export type OcrDraftSource = "MANUAL" | "PRINT" | "OCR_DRAFT" | "CSV_IMPORT";
 export type OcrDraftStatus = "pending" | "confirmed" | "disputed";
 
 export type OcrDraftReport = {
@@ -17,7 +17,12 @@ export type OcrDraftReport = {
   updatedAt: string;
 };
 
-const OCR_DRAFT_SOURCES: OcrDraftSource[] = ["MANUAL", "PRINT", "OCR_DRAFT"];
+const OCR_DRAFT_SOURCES: OcrDraftSource[] = [
+  "MANUAL",
+  "PRINT",
+  "OCR_DRAFT",
+  "CSV_IMPORT",
+];
 const OCR_DRAFT_STATUSES: OcrDraftStatus[] = ["pending", "confirmed", "disputed"];
 
 export function getOcrDraftStorageKey(tournamentId: number, matchNumber: number) {

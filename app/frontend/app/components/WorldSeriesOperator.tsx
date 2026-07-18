@@ -31,6 +31,11 @@ import {
   parseOcrDraftReports,
 } from "../../lib/ocrDraftIntake";
 import {
+  parseStatsDraftImport,
+  StatsDraftImportResult,
+  StatsDraftImportStatus,
+} from "../../lib/statsDraftImport";
+import {
   getTeamDisplayName,
   isTournamentCompleted,
   findChampion,
@@ -112,6 +117,15 @@ const OCR_DRAFT_STATUS_LABELS: Record<OcrDraftStatus, string> = Object.fromEntri
   ]
 ) as Record<OcrDraftStatus, string>;
 
+const STATS_IMPORT_STATUS_LABELS: Record<StatsDraftImportStatus, string> = {
+  valid: "Válida",
+  invalid_missing_team: "Falta equipo",
+  invalid_unknown_team: "Equipo desconocido",
+  invalid_kills: "Kills inválidas",
+  invalid_placement: "Placement inválido",
+  duplicate_existing_draft: "Draft duplicado",
+};
+
 function OcrDraftIntake({
   tournamentId,
   matchNumber,
@@ -137,6 +151,14 @@ function OcrDraftIntake({
   const [source, setSource] = useState<OcrDraftSource>("MANUAL");
   const [note, setNote] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [importText, setImportText] = useState("");
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<StatsDraftImportResult | null>(
+    null
+  );
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,6 +283,143 @@ function OcrDraftIntake({
   function discardDraft(id: string) {
     persistDrafts(drafts.filter((draft) => draft.id !== id));
   }
+
+  function buildImportPreview(existingDrafts = drafts) {
+    return parseStatsDraftImport(importText, {
+      teams,
+      existingDrafts,
+      tournamentId,
+      matchNumber,
+      usesPlacement,
+      effectiveLobbySize,
+    });
+  }
+
+  function handlePreviewStatsImport() {
+    setImportMessage(null);
+    setImportError(null);
+
+    if (importText.trim() === "") {
+      setImportPreview(null);
+      setImportError("Pega una tabla o selecciona un archivo CSV, TSV o TXT.");
+      return;
+    }
+
+    const preview = buildImportPreview();
+    setImportPreview(preview);
+    if (preview.delimiter === null) {
+      setImportError("No se reconoció una tabla con encabezados separados.");
+    } else if (preview.missingColumns.length > 0) {
+      setImportError(
+        `Faltan columnas requeridas: ${preview.missingColumns.join(", ")}.`
+      );
+    }
+  }
+
+  async function handleStatsImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setImportMessage(null);
+    setImportError(null);
+    setImportPreview(null);
+
+    if (!file) {
+      return;
+    }
+
+    const normalizedName = file.name.toLocaleLowerCase("es");
+    if (normalizedName.endsWith(".xlsx") || normalizedName.endsWith(".xls")) {
+      setImportFileName(null);
+      setImportError(
+        "Por ahora exporta el Excel como CSV o pega la tabla aquí."
+      );
+      event.target.value = "";
+      return;
+    }
+
+    if (
+      !normalizedName.endsWith(".csv") &&
+      !normalizedName.endsWith(".tsv") &&
+      !normalizedName.endsWith(".txt")
+    ) {
+      setImportFileName(null);
+      setImportError("Formato no compatible. Usa CSV, TSV, TXT o pega la tabla.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const contents = await file.text();
+      setImportText(contents);
+      setImportFileName(file.name);
+      setImportMessage(`${file.name} cargado localmente. Revisa antes de crear drafts.`);
+    } catch {
+      setImportFileName(null);
+      setImportError("No se pudo leer el archivo local.");
+    }
+  }
+
+  function handleCreateImportedDrafts() {
+    setImportMessage(null);
+    setImportError(null);
+
+    if (!activeMatchKey) {
+      setImportError("Necesitas una partida activa para crear drafts desde una tabla.");
+      return;
+    }
+
+    const currentPreview = buildImportPreview();
+    const validRows = currentPreview.rows.filter((row) => row.status === "valid");
+    if (validRows.length === 0) {
+      setImportPreview(currentPreview);
+      setImportError("No hay filas válidas nuevas para crear.");
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const importedDrafts = validRows.flatMap((row): OcrDraftReport[] => {
+      if (row.teamId === null || row.kills === null) {
+        return [];
+      }
+
+      return [
+        {
+          id: window.crypto.randomUUID(),
+          tournamentId,
+          matchNumber,
+          activeMatchKey,
+          teamId: row.teamId,
+          teamName: row.teamName,
+          kills: row.kills,
+          placement: row.placement,
+          source: "CSV_IMPORT",
+          note:
+            row.note ||
+            `Importación CSV · ${importFileName ?? "tabla pegada"} · fila ${row.rowNumber}`,
+          status: "pending",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ];
+    });
+    const nextDrafts = [...importedDrafts, ...drafts];
+    persistDrafts(nextDrafts);
+    setImportPreview(
+      parseStatsDraftImport(importText, {
+        teams,
+        existingDrafts: nextDrafts,
+        tournamentId,
+        matchNumber,
+        usesPlacement,
+        effectiveLobbySize,
+      })
+    );
+    setImportMessage(
+      `${importedDrafts.length} draft${importedDrafts.length === 1 ? "" : "s"} local${importedDrafts.length === 1 ? "" : "es"} creado${importedDrafts.length === 1 ? "" : "s"} para revisión humana.`
+    );
+  }
+
+  const importValidCount =
+    importPreview?.rows.filter((row) => row.status === "valid").length ?? 0;
 
   return (
     <section className="opr-panel opr-ocr-intake" aria-labelledby="opr-ocr-title">
@@ -395,6 +554,128 @@ function OcrDraftIntake({
           {formError}
         </p>
       ) : null}
+
+      <section className="opr-stats-import" aria-labelledby="opr-stats-import-title">
+        <div className="opr-stats-import-head">
+          <div>
+            <h3 id="opr-stats-import-title">Importar tabla / CSV</h3>
+            <p>
+              Pega una tabla exportada desde Excel o sube un CSV. BracketFlow creará
+              borradores locales para revisión.
+            </p>
+          </div>
+          <span>CSV · TSV · TXT</span>
+        </div>
+
+        <div className="opr-stats-import-inputs">
+          <label className="opr-field opr-stats-import-paste" htmlFor="opr-stats-import-text">
+            <span>Tabla pegada</span>
+            <textarea
+              id="opr-stats-import-text"
+              value={importText}
+              rows={5}
+              placeholder={"team,kills,placement,note\nAmon Reapers,23,1,print partida 1"}
+              onChange={(event) => {
+                setImportText(event.target.value);
+                setImportFileName(null);
+                setImportPreview(null);
+                setImportMessage(null);
+                setImportError(null);
+              }}
+            />
+          </label>
+          <div className="opr-stats-import-file">
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,text/tab-separated-values,text/plain"
+              onChange={(event) => void handleStatsImportFile(event)}
+            />
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              onClick={() => importFileInputRef.current?.click()}
+            >
+              Seleccionar archivo
+            </button>
+            <small>{importFileName ?? "El archivo no sale de este navegador."}</small>
+          </div>
+        </div>
+
+        <div className="opr-stats-import-actions">
+          <button
+            type="button"
+            className="bf-button bf-button-ghost"
+            onClick={handlePreviewStatsImport}
+            disabled={persistenceState === "loading"}
+          >
+            Previsualizar
+          </button>
+          <button
+            type="button"
+            className="opr-save"
+            onClick={handleCreateImportedDrafts}
+            disabled={
+              persistenceState === "loading" ||
+              !activeMatchKey ||
+              importValidCount === 0
+            }
+          >
+            Crear drafts locales
+          </button>
+          {!activeMatchKey ? (
+            <small>Sin partida activa: puedes revisar la tabla, pero no crear drafts.</small>
+          ) : null}
+        </div>
+
+        {importError ? (
+          <p className="bf-inline-error" role="alert">
+            {importError}
+          </p>
+        ) : null}
+        {importMessage ? (
+          <p className="bf-inline-note" role="status">
+            {importMessage}
+          </p>
+        ) : null}
+
+        {importPreview ? (
+          <div className="opr-stats-import-preview">
+            <div className="opr-stats-import-summary">
+              <strong>{importPreview.rows.length} filas</strong>
+              <span>{importValidCount} válidas nuevas</span>
+            </div>
+            <div className="opr-stats-import-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fila</th>
+                    <th>Equipo</th>
+                    <th>Kills</th>
+                    {usesPlacement ? <th>Placement</th> : null}
+                    <th>Nota</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.rows.map((row) => (
+                    <tr key={row.rowNumber} className={`is-${row.status}`}>
+                      <td>{row.rowNumber}</td>
+                      <td>{row.teamName || "—"}</td>
+                      <td>{row.kills ?? "—"}</td>
+                      {usesPlacement ? <td>{row.placement || "—"}</td> : null}
+                      <td>{row.note || "—"}</td>
+                      <td>
+                        <span>{STATS_IMPORT_STATUS_LABELS[row.status]}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <div className="opr-ocr-queue">
         <div className="opr-ocr-queue-head">
