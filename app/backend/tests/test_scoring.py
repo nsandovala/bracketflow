@@ -29,6 +29,7 @@ from app.crud import (
     get_effective_lobby_size,
     get_match_point_threshold,
     get_matches_by_tournament,
+    get_team_result_details_by_tournament,
     get_placement_multiplier,
     get_rebirth_placement_multiplier,
     get_tournament,
@@ -875,3 +876,148 @@ def test_unique_constraint_backstops_direct_duplicate_insert(db_session):
     with pytest.raises(IntegrityError):
         db_session.flush()
     db_session.rollback()
+
+
+# ---------------------------------------------------------------------------
+# Player stats opcionales (P3): desglose por player como metadata del resultado
+# oficial. El score del equipo sigue saliendo de kills/placement del equipo.
+# ---------------------------------------------------------------------------
+
+
+def test_team_only_report_still_works_without_player_stats(db_session):
+    _, match, team_a, _ = _official_report_fixture(db_session)
+
+    created = create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=7, placement=1),
+        db_session,
+    )
+
+    assert created.kills == 7
+    assert created.player_stats == []
+
+
+def test_report_with_player_stats_persists_and_serializes(db_session):
+    tournament, match, team_a, _ = _official_report_fixture(db_session)
+
+    created = create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(
+            team_id=team_a.id,
+            kills=31,
+            placement=2,
+            player_stats=[
+                schemas.TeamResultPlayerStat(player_name="ShadowNox", kills=10),
+                schemas.TeamResultPlayerStat(player_name="Valkyro", kills=12),
+                schemas.TeamResultPlayerStat(player_name="HexDrift", kills=9),
+            ],
+        ),
+        db_session,
+    )
+
+    assert [(s.player_name, s.kills) for s in created.player_stats] == [
+        ("ShadowNox", 10),
+        ("Valkyro", 12),
+        ("HexDrift", 9),
+    ]
+    # El detalle por torneo tambien serializa el desglose.
+    details = get_team_result_details_by_tournament(db_session, tournament)
+    assert len(details) == 1
+    assert [(s.player_name, s.kills) for s in details[0].player_stats] == [
+        ("ShadowNox", 10),
+        ("Valkyro", 12),
+        ("HexDrift", 9),
+    ]
+
+
+def test_player_kills_sum_mismatch_is_rejected(db_session):
+    _, match, team_a, _ = _official_report_fixture(db_session)
+
+    with pytest.raises(HTTPException) as exc:
+        create_match_result(
+            match.id,
+            schemas.TeamResultUpsert(
+                team_id=team_a.id,
+                kills=31,
+                placement=2,
+                player_stats=[
+                    schemas.TeamResultPlayerStat(player_name="ShadowNox", kills=10),
+                    schemas.TeamResultPlayerStat(player_name="Valkyro", kills=12),
+                ],
+            ),
+            db_session,
+        )
+
+    assert exc.value.status_code == 400
+    assert "no coinciden" in exc.value.detail
+    # Nada persistido: ni resultado ni desglose.
+    assert (
+        db_session.query(TeamResult)
+        .filter(TeamResult.match_id == match.id, TeamResult.team_id == team_a.id)
+        .count()
+        == 0
+    )
+
+
+def test_duplicate_report_with_player_stats_still_409(db_session):
+    _, match, team_a, _ = _official_report_fixture(db_session)
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(
+            team_id=team_a.id,
+            kills=10,
+            placement=1,
+            player_stats=[
+                schemas.TeamResultPlayerStat(player_name="ShadowNox", kills=10)
+            ],
+        ),
+        db_session,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        create_match_result(
+            match.id,
+            schemas.TeamResultUpsert(team_id=team_a.id, kills=5, placement=2),
+            db_session,
+        )
+
+    assert exc.value.status_code == 409
+    stored = (
+        db_session.query(TeamResult)
+        .filter(TeamResult.match_id == match.id, TeamResult.team_id == team_a.id)
+        .one()
+    )
+    assert stored.kills == 10
+    assert [(s.player_name, s.kills) for s in stored.player_stats] == [
+        ("ShadowNox", 10)
+    ]
+
+
+def test_leaderboard_uses_team_kills_not_player_breakdown(db_session):
+    tournament, match, team_a, team_b = _official_report_fixture(db_session)
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(
+            team_id=team_a.id,
+            kills=12,
+            placement=1,
+            player_stats=[
+                schemas.TeamResultPlayerStat(player_name="A1", kills=5),
+                schemas.TeamResultPlayerStat(player_name="A2", kills=7),
+            ],
+        ),
+        db_session,
+    )
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_b.id, kills=3, placement=2),
+        db_session,
+    )
+
+    from app.crud import get_leaderboard
+
+    leaderboard = get_leaderboard(db_session, tournament)
+    by_team = {entry.team_id: entry for entry in leaderboard}
+    assert by_team[team_a.id].kills == 12
+    assert by_team[team_a.id].total_points == 24.0  # 12 kills * 2.0 (placement 1)
+    assert by_team[team_b.id].kills == 3

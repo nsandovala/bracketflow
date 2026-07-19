@@ -468,6 +468,14 @@ def create_match_result(
             status_code=409,
             detail="Ya existe reporte oficial para este equipo en esta partida.",
         )
+    except crud.PlayerStatsMismatchError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Las kills por player ({error.player_total}) no coinciden con las "
+                f"kills del equipo ({error.team_kills}). Revisa el desglose."
+            ),
+        )
 
 
 @app.post("/matches/{match_id}/maps", response_model=schemas.Match)

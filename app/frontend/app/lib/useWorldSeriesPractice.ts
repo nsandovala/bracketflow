@@ -859,7 +859,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     teamId: number,
     killsValue: string,
     placementValue: string,
-    successMessage: string
+    successMessage: string,
+    playerStats?: Array<{ player_name: string; kills: number }>
   ) {
     if (selectedTournamentId === null) {
       throw new Error("No active tournament");
@@ -879,6 +880,9 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         team_id: teamId,
         kills: validation.kills,
         placement: validation.placement,
+        ...(playerStats && playerStats.length > 0
+          ? { player_stats: playerStats }
+          : {}),
       });
       await refreshSelectedTournament(selectedTournamentId);
       setResultDrafts((current) => {
@@ -922,7 +926,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     matchId: number,
     teamId: number,
     kills: number,
-    placement: number | ""
+    placement: number | "",
+    playerStats?: Array<{ playerName: string; kills: number }>
   ) {
     // El endpoint /matches/{id}/results es upsert: sin este guard, un draft
     // reenviado sobreescribiria silenciosamente un reporte oficial existente.
@@ -941,7 +946,11 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       teamId,
       String(kills),
       placement === "" ? "" : String(placement),
-      `Reporte oficial guardado: ${teamLabel}`
+      `Reporte oficial guardado: ${teamLabel}`,
+      playerStats?.map((stat) => ({
+        player_name: stat.playerName,
+        kills: stat.kills,
+      }))
     );
   }
 

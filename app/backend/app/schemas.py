@@ -226,10 +226,28 @@ class Match(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TeamResultPlayerStat(BaseModel):
+    player_name: str
+    kills: int = Field(ge=0)
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("player_name")
+    @classmethod
+    def check_player_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("player_name no puede estar vacío.")
+        return stripped
+
+
 class TeamResultUpsert(BaseModel):
     team_id: int
     kills: int = Field(ge=0)
     placement: int = Field(ge=1)
+    # Desglose opcional por player. El score sigue saliendo de kills/placement
+    # del equipo; esto es detalle y debe sumar exactamente las kills del equipo.
+    player_stats: list[TeamResultPlayerStat] | None = None
 
 
 class MapResultUpsert(BaseModel):
@@ -249,6 +267,7 @@ class TeamResult(BaseModel):
     kill_points: float
     placement_points: float
     total_points: float
+    player_stats: list[TeamResultPlayerStat] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -266,6 +285,7 @@ class TeamResultDetail(BaseModel):
     kill_points: float
     placement_points: float
     total_points: float
+    player_stats: list[TeamResultPlayerStat] = Field(default_factory=list)
 
 
 class BracketGenerationResult(BaseModel):

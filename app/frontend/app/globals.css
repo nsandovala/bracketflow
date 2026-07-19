@@ -2697,6 +2697,34 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.bf-standings-row.is-expandable { cursor: pointer; }
+.bf-standings-detail {
+  display: grid;
+  gap: 6px;
+  padding: 10px 18px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.bf-standings-detail-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  color: var(--bf-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.bf-standings-detail-match {
+  color: var(--bf-accent);
+  font-weight: 700;
+}
+.bf-standings-detail-players {
+  flex-basis: 100%;
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+
 .bf-standings-rank,
 .bf-stream-rank {
   color: var(--bf-accent);
@@ -5969,6 +5997,7 @@ a:focus-visible {
 .opr-ocr-draft-main strong { overflow: hidden; color: var(--amon-text); font-size: .92rem; text-overflow: ellipsis; white-space: nowrap; }
 .opr-ocr-draft-main span:not(.opr-ocr-status) { color: var(--amon-muted); font-size: .72rem; }
 .opr-ocr-draft > p { margin: 0; color: var(--amon-muted); font-size: .78rem; line-height: 1.45; }
+.opr-ocr-draft > .opr-ocr-draft-players { color: var(--amon-cream-soft); font-variant-numeric: tabular-nums; }
 .opr-ocr-status {
   display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
   color: var(--amon-cream-soft); font-size: .66rem; letter-spacing: .06em; text-transform: uppercase;
