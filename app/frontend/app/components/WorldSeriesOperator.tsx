@@ -161,6 +161,10 @@ function OcrDraftIntake({
 }) {
   const storageKey = getOcrDraftStorageKey(tournamentId, matchNumber);
   const [drafts, setDrafts] = useState<OcrDraftReport[]>([]);
+  // Fuente sincrona de verdad para mutaciones: un submit oficial async no debe
+  // persistir un array capturado antes de que otra accion (confirmar/disputar/
+  // descartar) haya cambiado los drafts. Toda escritura pasa por applyDrafts.
+  const draftsRef = useRef<OcrDraftReport[]>([]);
   const [persistenceState, setPersistenceState] =
     useState<OcrDraftPersistenceState>("loading");
   const [importText, setImportText] = useState("");
@@ -183,9 +187,12 @@ function OcrDraftIntake({
 
       try {
         const raw = window.localStorage.getItem(storageKey);
-        setDrafts(raw ? parseOcrDraftReports(raw, tournamentId, matchNumber) : []);
+        const parsed = raw ? parseOcrDraftReports(raw, tournamentId, matchNumber) : [];
+        draftsRef.current = parsed;
+        setDrafts(parsed);
         setPersistenceState("local");
       } catch {
+        draftsRef.current = [];
         setDrafts([]);
         setPersistenceState("memory");
       }
@@ -242,7 +249,7 @@ function OcrDraftIntake({
   }
 
   async function handleSubmitOfficialReport(draft: OcrDraftReport) {
-    if (!onSubmitOfficialReport || activeMatchId === null) {
+    if (!onSubmitOfficialReport || activeMatchId === null || submittingDraftId !== null) {
       return;
     }
 
@@ -255,11 +262,13 @@ function OcrDraftIntake({
         draft.placement
       );
       // Solo si el backend acepto el reporte marcamos el draft como enviado;
-      // si fallo, el draft local se conserva confirmado para reintentar.
+      // si fallo (p. ej. 409 por reporte existente), el draft local se conserva
+      // para revision. El updater parte del estado mas reciente: no revive un
+      // draft descartado en vuelo ni revierte otros cambios concurrentes.
       if (result) {
         const updatedAt = new Date().toISOString();
-        persistDrafts(
-          drafts.map((item) =>
+        applyDrafts((previous) =>
+          previous.map((item) =>
             item.id === draft.id ? { ...item, status: "submitted", updatedAt } : item
           )
         );
@@ -269,10 +278,12 @@ function OcrDraftIntake({
     }
   }
 
-  function persistDrafts(nextDrafts: OcrDraftReport[]) {
+  function applyDrafts(updater: (previous: OcrDraftReport[]) => OcrDraftReport[]) {
+    const nextDrafts = updater(draftsRef.current);
+    draftsRef.current = nextDrafts;
     setDrafts(nextDrafts);
     if (persistenceState !== "local") {
-      return;
+      return nextDrafts;
     }
 
     try {
@@ -284,20 +295,21 @@ function OcrDraftIntake({
     } catch {
       setPersistenceState("memory");
     }
+    return nextDrafts;
   }
 
   function updateDraftStatus(id: string, status: OcrDraftStatus) {
     const updatedAt = new Date().toISOString();
-    persistDrafts(
-      drafts.map((draft) => (draft.id === id ? { ...draft, status, updatedAt } : draft))
+    applyDrafts((previous) =>
+      previous.map((draft) => (draft.id === id ? { ...draft, status, updatedAt } : draft))
     );
   }
 
   function discardDraft(id: string) {
-    persistDrafts(drafts.filter((draft) => draft.id !== id));
+    applyDrafts((previous) => previous.filter((draft) => draft.id !== id));
   }
 
-  function buildImportPreview(existingDrafts = drafts) {
+  function buildImportPreview(existingDrafts = draftsRef.current) {
     return parseStatsDraftImport(importText, {
       teams,
       existingDrafts,
@@ -415,8 +427,7 @@ function OcrDraftIntake({
         },
       ];
     });
-    const nextDrafts = [...importedDrafts, ...drafts];
-    persistDrafts(nextDrafts);
+    const nextDrafts = applyDrafts((previous) => [...importedDrafts, ...previous]);
     setImportPreview(
       parseStatsDraftImport(importText, {
         teams,
@@ -662,6 +673,7 @@ function OcrDraftIntake({
                         <button
                           type="button"
                           className="bf-button bf-button-ghost"
+                          disabled={submittingDraftId === draft.id}
                           onClick={() => updateDraftStatus(draft.id, "disputed")}
                         >
                           Disputar
@@ -671,6 +683,7 @@ function OcrDraftIntake({
                     <button
                       type="button"
                       className="bf-button bf-button-ghost"
+                      disabled={submittingDraftId === draft.id}
                       onClick={() => discardDraft(draft.id)}
                     >
                       Descartar

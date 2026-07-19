@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import schemas
-from app.main import create_match, upsert_match_map, upsert_match_result
+from app.main import create_match, upsert_match_map, create_match_result
 from app.crud import (
     calculate_points,
     close_roster_respin,
@@ -40,7 +40,7 @@ from app.crud import (
     requires_unique_placement,
     resolve_roulette_team_size,
     upsert_map_result,
-    upsert_team_result,
+    create_team_result,
     validate_tournament_contract,
 )
 from app.database import Base
@@ -375,7 +375,7 @@ def test_roulette_does_not_regenerate_after_results(db_session):
         schemas.RouletteGenerationRequest(shuffle_seed="initial", reset=True),
     )
     match = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=1))
-    upsert_team_result(
+    create_team_result(
         db_session,
         tournament,
         match,
@@ -587,7 +587,7 @@ def test_upsert_result_crowns_only_when_partida_completes(db_session):
 
     # Primer reporte: aunque Alpha ya cruzo el umbral, la partida no termino
     # (falta Bravo). No se corona a mitad de partida.
-    upsert_team_result(
+    create_team_result(
         db_session,
         tournament,
         match,
@@ -598,7 +598,7 @@ def test_upsert_result_crowns_only_when_partida_completes(db_session):
     assert json.loads(tournament.config or "{}").get("championTeamId") is None
 
     # Segundo reporte: la partida cierra y ahora si se evalua Match Point.
-    upsert_team_result(
+    create_team_result(
         db_session,
         tournament,
         match,
@@ -616,11 +616,11 @@ def test_match_point_tie_stays_active_until_a_tiebreak_partida_decides(db_sessio
 
     # Partida 1: ambos cierran empatados en 30 sobre el umbral -> NO corona.
     partida1 = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=1))
-    upsert_team_result(
+    create_team_result(
         db_session, tournament, partida1,
         schemas.TeamResultUpsert(team_id=team_a.id, kills=15, placement=1),  # 15 * 2.0 = 30
     )
-    upsert_team_result(
+    create_team_result(
         db_session, tournament, partida1,
         schemas.TeamResultUpsert(team_id=team_b.id, kills=30, placement=36),  # 30 * 1.0 = 30
     )
@@ -630,11 +630,11 @@ def test_match_point_tie_stays_active_until_a_tiebreak_partida_decides(db_sessio
 
     # Partida 2 (desempate): Alpha se despega -> lider unico sobre umbral -> corona.
     partida2 = create_battle_royale_match(db_session, tournament, schemas.MatchCreate(round=2))
-    upsert_team_result(
+    create_team_result(
         db_session, tournament, partida2,
         schemas.TeamResultUpsert(team_id=team_a.id, kills=10, placement=1),  # +20 = 50
     )
-    upsert_team_result(
+    create_team_result(
         db_session, tournament, partida2,
         schemas.TeamResultUpsert(team_id=team_b.id, kills=0, placement=2),  # +0 = 30
     )
@@ -684,7 +684,7 @@ def test_finalized_tournament_rejects_result_upsert(db_session):
     tournament, match, team_ids = _crown_wsow_champion(db_session)
 
     with pytest.raises(HTTPException) as exc:
-        upsert_match_result(
+        create_match_result(
             match.id,
             schemas.TeamResultUpsert(team_id=team_ids["Alpha"], kills=999, placement=1),
             db_session,
@@ -742,3 +742,136 @@ def test_finalized_tournament_rejects_kill_race_map(db_session):
     db_session.refresh(first_match)
     assert first_match.maps == []  # ningun mapa persistido
     assert first_match.winner_id is None
+
+
+# ---------------------------------------------------------------------------
+# Guard create-only de resultados oficiales (P1): POST /matches/{id}/results
+# nunca sobreescribe un resultado existente para el mismo match_id + team_id.
+# ---------------------------------------------------------------------------
+DUPLICATE_REPORT_DETAIL = "Ya existe reporte oficial para este equipo en esta partida."
+
+
+def _official_report_fixture(db_session):
+    tournament = _create_wsow_br_tournament(db_session, threshold=500)
+    team_a = create_team(db_session, tournament.id, schemas.TeamCreate(name="Alpha"))
+    team_b = create_team(db_session, tournament.id, schemas.TeamCreate(name="Bravo"))
+    match = create_battle_royale_match(
+        db_session, tournament, schemas.MatchCreate(round=1)
+    )
+    return tournament, match, team_a, team_b
+
+
+def test_first_official_report_creates_result(db_session):
+    _, match, team_a, _ = _official_report_fixture(db_session)
+
+    created = create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=7, placement=1),
+        db_session,
+    )
+
+    assert created.kills == 7
+    assert created.placement == 1
+    stored = (
+        db_session.query(TeamResult)
+        .filter(TeamResult.match_id == match.id, TeamResult.team_id == team_a.id)
+        .all()
+    )
+    assert len(stored) == 1
+
+
+def test_second_official_report_same_team_returns_409(db_session):
+    _, match, team_a, _ = _official_report_fixture(db_session)
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=7, placement=1),
+        db_session,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        create_match_result(
+            match.id,
+            schemas.TeamResultUpsert(team_id=team_a.id, kills=99, placement=2),
+            db_session,
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == DUPLICATE_REPORT_DETAIL
+
+
+def test_second_official_report_does_not_overwrite_original(db_session):
+    _, match, team_a, _ = _official_report_fixture(db_session)
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=7, placement=1),
+        db_session,
+    )
+
+    with pytest.raises(HTTPException):
+        create_match_result(
+            match.id,
+            schemas.TeamResultUpsert(team_id=team_a.id, kills=99, placement=2),
+            db_session,
+        )
+
+    stored = (
+        db_session.query(TeamResult)
+        .filter(TeamResult.match_id == match.id, TeamResult.team_id == team_a.id)
+        .all()
+    )
+    assert len(stored) == 1
+    assert stored[0].kills == 7
+    assert stored[0].placement == 1
+
+
+def test_other_team_can_still_report_after_conflict(db_session):
+    _, match, team_a, team_b = _official_report_fixture(db_session)
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=7, placement=1),
+        db_session,
+    )
+    with pytest.raises(HTTPException):
+        create_match_result(
+            match.id,
+            schemas.TeamResultUpsert(team_id=team_a.id, kills=99, placement=2),
+            db_session,
+        )
+
+    other = create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_b.id, kills=3, placement=2),
+        db_session,
+    )
+
+    assert other.kills == 3
+    assert other.placement == 2
+
+
+def test_unique_constraint_backstops_direct_duplicate_insert(db_session):
+    # Camino de carrera: si dos requests pasan el check de lectura, la unique
+    # constraint (match_id, team_id) corta el segundo INSERT.
+    tournament, match, team_a, _ = _official_report_fixture(db_session)
+    create_match_result(
+        match.id,
+        schemas.TeamResultUpsert(team_id=team_a.id, kills=7, placement=1),
+        db_session,
+    )
+
+    from sqlalchemy.exc import IntegrityError
+
+    db_session.add(
+        TeamResult(
+            tournament_id=tournament.id,
+            match_id=match.id,
+            team_id=team_a.id,
+            kills=99,
+            placement=2,
+            kill_points=99,
+            placement_points=0,
+            total_points=99,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        db_session.flush()
+    db_session.rollback()
