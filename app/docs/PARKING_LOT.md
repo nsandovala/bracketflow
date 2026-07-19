@@ -80,3 +80,123 @@ Manual / CSV-TXT / OCR / Discord / Copilot → Draft revisable → Reporte ofici
 - No core MVP.
 - No promesa comercial.
 - Riesgo por dependencia externa, autenticación, perfiles privados, cambios de endpoint y bloqueo.
+
+## Player Identity / Player Profiles / Historical Stats
+
+### Product thesis
+
+BracketFlow should not depend on external game APIs for competitive history.
+
+Every official tournament report submitted in BracketFlow becomes a source of truth for:
+
+- team standings
+- player history
+- player stats
+- team history
+- MVP calculations
+- caster overlays
+- public player profiles
+- global/ranked leaderboards
+
+### Core concept
+
+Each player gets a BracketFlow identity.
+
+A player may have multiple game identifiers:
+
+- Warzone / Activision ID
+- Battle.net ID
+- PSN ID
+- Xbox ID
+- Steam ID
+- Riot ID for Valorant
+- Epic ID for Fortnite
+- custom aliases
+
+These external IDs are metadata only. They do not need to be verified by external APIs in MVP.
+
+### Suggested model
+
+```txt
+Player
+- id
+- displayName
+- country
+- avatarUrl
+- aliases[]
+- gameIds[]
+- socials[]
+- createdAt
+- updatedAt
+GameIdentity
+- id
+- playerId
+- game
+- platform
+- externalHandle
+- externalTag
+- verifiedStatus: unverified | claimed | verified
+PlayerTournamentStat
+- id
+- playerId
+- tournamentId
+- teamId
+- matchesPlayed
+- kills
+- damage
+- bestPlacement
+- averagePlacement
+- points
+- mvpScore
+PlayerMatchStat
+- id
+- playerId
+- tournamentId
+- matchId
+- teamId
+- kills
+- damage
+- placement
+- source: manual | csv | ocr | api_future
+- confirmedByOperator
+```
+
+### Relacion con el repo actual (2026-07-18)
+
+- Hoy `players` es un registro por torneo (nickname + tournament_id), no una
+  identidad global. La capa Player Identity mapearia esos registros a un ID
+  interno de BracketFlow.
+- Desde P3, `team_result_player_stats` guarda kills por player como texto libre
+  (`player_name`) dentro del reporte oficial. `PlayerMatchStat` seria la version
+  identificada de ese dato: mismo origen (reporte oficial), pero ligado a un
+  `playerId` interno.
+- El score de equipo seguira saliendo de kills/placement del equipo; las stats
+  por player son historial/detalle, nunca motor de scoring.
+
+### MVP: registro gestionado por el operador
+
+- El operador crea/edita players y les asocia game IDs como metadata.
+- Sin login, sin cuentas, sin auth, sin verificacion externa.
+- Sin scraping ni dependencia de APIs externas: los reportes oficiales de
+  BracketFlow son la fuente de verdad del historial.
+- `verifiedStatus` empieza siempre en `unverified`; `claimed`/`verified` son
+  estados futuros que requieren un flujo de producto propio.
+
+### Capas futuras (en orden tentativo)
+
+1. Perfil publico de player: pagina read-only con historial de torneos,
+   stats acumuladas y equipos; solo datos derivados de reportes oficiales.
+2. Iconos de equipo/player: assets subidos por el operador; sin icon packs
+   externos todavia (hoy explicitamente fuera de scope).
+3. Overlays OBS por player: top fraggers, MVP de la partida, player cards;
+   sobre las URLs estables de Stream/OBS Intelligence (ver seccion arriba).
+4. Discord/Copilot: superficies de entrada/salida que crean drafts revisables
+   o publican resultados ya confirmados. Nunca escriben resultados oficiales
+   sin confirmacion humana (mismo contrato que OCR).
+
+### Guardas
+
+- NO implementar aun: esta seccion es contrato de producto, no sprint.
+- No auth, no scraping, no dependencias nuevas.
+- Cualquier implementacion parcial debe ser aditiva (tablas nuevas, campos
+  opcionales) para no romper DBs ni reportes existentes.
