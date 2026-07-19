@@ -154,3 +154,30 @@ class TeamResult(Base):
     )
     match: Mapped["Match"] = relationship("Match", back_populates="results")
     team: Mapped["Team"] = relationship("Team", back_populates="results")
+    player_stats: Mapped[list["TeamResultPlayerStat"]] = relationship(
+        "TeamResultPlayerStat",
+        back_populates="team_result",
+        cascade="all, delete-orphan",
+    )
+
+
+class TeamResultPlayerStat(Base):
+    """Desglose opcional de kills por player de un resultado oficial.
+
+    Tabla separada (no columna nueva) para que las DBs existentes sigan
+    funcionando: create_all agrega tablas nuevas sin migrar las viejas.
+    El score del equipo se calcula SIEMPRE desde TeamResult.kills/placement;
+    esto es metadata de detalle."""
+
+    __tablename__ = "team_result_player_stats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    team_result_id: Mapped[int] = mapped_column(
+        ForeignKey("team_results.id"), nullable=False, index=True
+    )
+    player_name: Mapped[str] = mapped_column(String, nullable=False)
+    kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    team_result: Mapped["TeamResult"] = relationship(
+        "TeamResult", back_populates="player_stats"
+    )

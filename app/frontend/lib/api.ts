@@ -154,6 +154,11 @@ export type MatchMap = {
   map_winner_id: number | null;
 };
 
+export type TeamResultPlayerStat = {
+  player_name: string;
+  kills: number;
+};
+
 export type TeamResult = {
   id: number;
   tournament_id: number;
@@ -164,6 +169,7 @@ export type TeamResult = {
   kill_points: number;
   placement_points: number;
   total_points: number;
+  player_stats?: TeamResultPlayerStat[];
 };
 
 export type TeamResultDetail = {
@@ -179,6 +185,7 @@ export type TeamResultDetail = {
   kill_points: number;
   placement_points: number;
   total_points: number;
+  player_stats?: TeamResultPlayerStat[];
 };
 
 export type BracketGenerationResult = {
@@ -361,7 +368,12 @@ export function createBattleRoyaleMatch(
 
 export function saveMatchResult(
   matchId: number,
-  payload: { team_id: number; kills: number; placement: number }
+  payload: {
+    team_id: number;
+    kills: number;
+    placement: number;
+    player_stats?: TeamResultPlayerStat[];
+  }
 ) {
   return request<TeamResult>(`/matches/${matchId}/results`, {
     method: "POST",

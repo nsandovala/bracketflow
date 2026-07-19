@@ -6,9 +6,16 @@ export type StatsDraftImportStatus =
   | "invalid_unknown_team"
   | "invalid_kills"
   | "invalid_placement"
+  | "invalid_player_kills"
+  | "player_kills_mismatch"
   | "duplicate_existing_draft"
   | "official_report_exists"
   | "official_conflict";
+
+export type StatsDraftImportPlayerStat = {
+  playerName: string;
+  kills: number;
+};
 
 export type StatsDraftImportRow = {
   rowNumber: number;
@@ -17,6 +24,9 @@ export type StatsDraftImportRow = {
   teamName: string;
   kills: number | null;
   placement: number | "";
+  // Desglose opcional por player cuando el CSV trae columnas playerN /
+  // playerN_kills. null = formato team-level clasico.
+  playerStats: StatsDraftImportPlayerStat[] | null;
   note: string;
   status: StatsDraftImportStatus;
 };
@@ -58,6 +68,28 @@ const COLUMN_ALIASES = {
   placement: new Set(["placement", "place", "pos", "posicion", "puesto"]),
   note: new Set(["note", "nota", "evidencia", "source_note"]),
 };
+
+// Columnas opcionales de desglose por player: playerN + playerN_kills
+// (tambien jugadorN). Hasta 4 slots, el maximo de teamSize soportado.
+const MAX_PLAYER_COLUMNS = 4;
+
+function findPlayerColumnPairs(headers: string[]) {
+  const pairs: Array<{ nameIndex: number; killsIndex: number }> = [];
+  for (let slot = 1; slot <= MAX_PLAYER_COLUMNS; slot += 1) {
+    const nameAliases = new Set([`player${slot}`, `jugador${slot}`]);
+    const killsAliases = new Set([
+      `player${slot}_kills`,
+      `jugador${slot}_kills`,
+      `player${slot}kills`,
+    ]);
+    const nameIndex = headers.findIndex((header) => nameAliases.has(header));
+    const killsIndex = headers.findIndex((header) => killsAliases.has(header));
+    if (nameIndex >= 0) {
+      pairs.push({ nameIndex, killsIndex });
+    }
+  }
+  return pairs;
+}
 
 function normalizeHeader(value: string) {
   return value
@@ -219,6 +251,7 @@ export function parseStatsDraftImport(
   const killsIndex = findColumnIndex(headers, COLUMN_ALIASES.kills);
   const placementIndex = findColumnIndex(headers, COLUMN_ALIASES.placement);
   const noteIndex = findColumnIndex(headers, COLUMN_ALIASES.note);
+  const playerColumnPairs = findPlayerColumnPairs(headers);
   const missingColumns: StatsDraftImportResult["missingColumns"] = [];
 
   if (teamIndex < 0) {
@@ -310,6 +343,29 @@ export function parseStatsDraftImport(
         : null
       : "";
     const note = noteIndex >= 0 ? (cells[noteIndex] ?? "").trim() : "";
+
+    let playerStats: StatsDraftImportPlayerStat[] | null = null;
+    let playerStatsInvalid = false;
+    if (playerColumnPairs.length > 0) {
+      const parsedPlayers: StatsDraftImportPlayerStat[] = [];
+      for (const pair of playerColumnPairs) {
+        const playerName = (cells[pair.nameIndex] ?? "").trim();
+        if (!playerName) {
+          continue;
+        }
+        const playerKills =
+          pair.killsIndex >= 0 ? parseInteger(cells[pair.killsIndex] ?? "") : null;
+        if (playerKills === null || playerKills < 0) {
+          playerStatsInvalid = true;
+          break;
+        }
+        parsedPlayers.push({ playerName, kills: playerKills });
+      }
+      if (!playerStatsInvalid && parsedPlayers.length > 0) {
+        playerStats = parsedPlayers;
+      }
+    }
+
     let status: StatsDraftImportStatus = "valid";
 
     const official = team ? officialByTeamId.get(team.id) : undefined;
@@ -328,6 +384,15 @@ export function parseStatsDraftImport(
         placement > options.effectiveLobbySize)
     ) {
       status = "invalid_placement";
+    } else if (playerStatsInvalid) {
+      status = "invalid_player_kills";
+    } else if (
+      playerStats !== null &&
+      playerStats.reduce((sum, player) => sum + player.kills, 0) !== kills
+    ) {
+      // El desglose no cuadra con las kills del equipo: requiere revision
+      // humana; el backend tambien lo rechazaria en el submit oficial.
+      status = "player_kills_mismatch";
     } else if (official) {
       status =
         official.kills === kills &&
@@ -349,6 +414,7 @@ export function parseStatsDraftImport(
       teamName: team?.name ?? teamInput,
       kills,
       placement: placement ?? "",
+      playerStats,
       note,
       status,
     };

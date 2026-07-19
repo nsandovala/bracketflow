@@ -1,6 +1,11 @@
 export type OcrDraftSource = "MANUAL" | "PRINT" | "OCR_DRAFT" | "CSV_IMPORT";
 export type OcrDraftStatus = "pending" | "confirmed" | "disputed" | "submitted";
 
+export type OcrDraftPlayerStat = {
+  playerName: string;
+  kills: number;
+};
+
 export type OcrDraftReport = {
   id: string;
   tournamentId: number;
@@ -13,6 +18,8 @@ export type OcrDraftReport = {
   source: OcrDraftSource;
   note: string;
   status: OcrDraftStatus;
+  // Desglose opcional por player (metadata). Drafts viejos no lo traen.
+  playerStats?: OcrDraftPlayerStat[];
   createdAt: string;
   updatedAt: string;
 };
@@ -40,6 +47,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isTimestamp(value: unknown): value is string {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function isPlayerStats(value: unknown): value is OcrDraftPlayerStat[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.playerName === "string" &&
+        entry.playerName.trim().length > 0 &&
+        typeof entry.kills === "number" &&
+        Number.isInteger(entry.kills) &&
+        entry.kills >= 0
+    )
+  );
 }
 
 function isOcrDraftReport(
@@ -73,6 +95,7 @@ function isOcrDraftReport(
     typeof value.note === "string" &&
     typeof value.status === "string" &&
     OCR_DRAFT_STATUSES.includes(value.status as OcrDraftStatus) &&
+    (value.playerStats === undefined || isPlayerStats(value.playerStats)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );

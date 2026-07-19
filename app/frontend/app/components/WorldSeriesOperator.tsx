@@ -97,7 +97,8 @@ type WorldSeriesOperatorProps = {
     matchId: number,
     teamId: number,
     kills: number,
-    placement: number | ""
+    placement: number | "",
+    playerStats?: Array<{ playerName: string; kills: number }>
   ) => Promise<unknown>;
 };
 
@@ -124,10 +125,18 @@ const STATS_IMPORT_STATUS_LABELS: Record<StatsDraftImportStatus, string> = {
   invalid_unknown_team: "Equipo desconocido",
   invalid_kills: "Kills inválidas",
   invalid_placement: "Placement inválido",
+  invalid_player_kills: "Kills de player inválidas",
+  player_kills_mismatch: "Kills de players no cuadran / revisar",
   duplicate_existing_draft: "Draft duplicado",
   official_report_exists: "Reporte oficial existente",
   official_conflict: "Conflicto / revisar",
 };
+
+function formatPlayerStatsLine(
+  stats: Array<{ playerName: string; kills: number }>
+) {
+  return stats.map((stat) => `${stat.playerName} ${stat.kills}`).join(" · ");
+}
 
 function OcrDraftIntake({
   tournamentId,
@@ -156,7 +165,8 @@ function OcrDraftIntake({
     matchId: number,
     teamId: number,
     kills: number,
-    placement: number | ""
+    placement: number | "",
+    playerStats?: Array<{ playerName: string; kills: number }>
   ) => Promise<unknown>;
 }) {
   const storageKey = getOcrDraftStorageKey(tournamentId, matchNumber);
@@ -259,7 +269,8 @@ function OcrDraftIntake({
         activeMatchId,
         draft.teamId,
         draft.kills,
-        draft.placement
+        draft.placement,
+        draft.playerStats
       );
       // Solo si el backend acepto el reporte marcamos el draft como enviado;
       // si fallo (p. ej. 409 por reporte existente), el draft local se conserva
@@ -417,6 +428,7 @@ function OcrDraftIntake({
           teamName: row.teamName,
           kills: row.kills,
           placement: row.placement,
+          ...(row.playerStats ? { playerStats: row.playerStats } : {}),
           source: "CSV_IMPORT",
           note:
             row.note ||
@@ -558,6 +570,7 @@ function OcrDraftIntake({
                     <th>Equipo</th>
                     <th>Kills</th>
                     {usesPlacement ? <th>Placement</th> : null}
+                    <th>Players</th>
                     <th>Nota</th>
                     <th>Estado</th>
                   </tr>
@@ -574,6 +587,9 @@ function OcrDraftIntake({
                       <td>{rowTeam ? getTeamDisplayName(rowTeam) : row.teamName || "—"}</td>
                       <td>{row.kills ?? "—"}</td>
                       {usesPlacement ? <td>{row.placement || "—"}</td> : null}
+                      <td>
+                        {row.playerStats ? formatPlayerStatsLine(row.playerStats) : "—"}
+                      </td>
                       <td>{row.note || "—"}</td>
                       <td>
                         <span>{STATS_IMPORT_STATUS_LABELS[row.status]}</span>
@@ -624,6 +640,11 @@ function OcrDraftIntake({
                       {OCR_DRAFT_STATUS_LABELS[draft.status]}
                     </span>
                   </div>
+                  {draft.playerStats && draft.playerStats.length > 0 ? (
+                    <p className="opr-ocr-draft-players">
+                      {formatPlayerStatsLine(draft.playerStats)}
+                    </p>
+                  ) : null}
                   {draft.note ? <p>{draft.note}</p> : null}
                   {submitBlocker ? (
                     <p className="bf-inline-note" role="status">

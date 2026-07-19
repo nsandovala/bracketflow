@@ -1096,6 +1096,15 @@ def _cleanup_roulette_teams(db: Session, tournament_id: int) -> None:
         db.query(models.MatchMap).filter(
             models.MatchMap.match_id.in_(match_ids)
         ).delete(synchronize_session=False)
+        delete_player_stats_for_results(
+            db,
+            [
+                row[0]
+                for row in db.query(models.TeamResult.id)
+                .filter(models.TeamResult.match_id.in_(match_ids))
+                .all()
+            ],
+        )
         db.query(models.TeamResult).filter(
             models.TeamResult.match_id.in_(match_ids)
         ).delete(synchronize_session=False)
@@ -1115,6 +1124,15 @@ def _cleanup_roulette_teams(db: Session, tournament_id: int) -> None:
     if not roulette_team_ids:
         return
 
+    delete_player_stats_for_results(
+        db,
+        [
+            row[0]
+            for row in db.query(models.TeamResult.id)
+            .filter(models.TeamResult.team_id.in_(roulette_team_ids))
+            .all()
+        ],
+    )
     db.query(models.TeamResult).filter(
         models.TeamResult.team_id.in_(roulette_team_ids)
     ).delete(synchronize_session=False)
@@ -1356,7 +1374,29 @@ def build_team_result_schema(
         kill_points=kill_points,
         placement_points=placement_points,
         total_points=total_points,
+        player_stats=build_player_stats_schema(result),
     )
+
+
+def build_player_stats_schema(
+    result: models.TeamResult,
+) -> list[schemas.TeamResultPlayerStat]:
+    return [
+        schemas.TeamResultPlayerStat(player_name=stat.player_name, kills=stat.kills)
+        for stat in result.player_stats
+    ]
+
+
+def delete_player_stats_for_results(db: Session, result_ids: list[int]) -> None:
+    """Borra el desglose por player antes de un bulk delete de TeamResult.
+
+    Los bulk deletes ORM no disparan el cascade de la relacion; sin esto
+    quedarian filas huerfanas en team_result_player_stats."""
+    if not result_ids:
+        return
+    db.query(models.TeamResultPlayerStat).filter(
+        models.TeamResultPlayerStat.team_result_id.in_(result_ids)
+    ).delete(synchronize_session=False)
 
 
 def get_conflicting_placement(
@@ -1430,6 +1470,20 @@ class TeamResultAlreadyReportedError(Exception):
     """
 
 
+class PlayerStatsMismatchError(Exception):
+    """La suma de kills por player no coincide con las kills del equipo.
+
+    El desglose por player es metadata: nunca se acepta silenciosamente un
+    desglose inconsistente en un reporte oficial."""
+
+    def __init__(self, player_total: int, team_kills: int) -> None:
+        self.player_total = player_total
+        self.team_kills = team_kills
+        super().__init__(
+            f"player kills sum {player_total} != team kills {team_kills}"
+        )
+
+
 def create_team_result(
     db: Session,
     tournament: models.Tournament,
@@ -1444,6 +1498,11 @@ def create_team_result(
         payload.placement,
         engine_key,
     )
+
+    if payload.player_stats:
+        player_total = sum(stat.kills for stat in payload.player_stats)
+        if player_total != payload.kills:
+            raise PlayerStatsMismatchError(player_total, payload.kills)
 
     existing = (
         db.query(models.TeamResult)
@@ -1475,6 +1534,15 @@ def create_team_result(
         # conflicto y el resultado original queda intacto.
         db.rollback()
         raise TeamResultAlreadyReportedError() from error
+
+    for stat in payload.player_stats or []:
+        db.add(
+            models.TeamResultPlayerStat(
+                team_result_id=db_result.id,
+                player_name=stat.player_name,
+                kills=stat.kills,
+            )
+        )
 
     tournament_team_count = get_tournament_team_count(db, tournament.id)
     result_count = (
@@ -1580,6 +1648,15 @@ def _cleanup_bracket_matches(db: Session, tournament_id: int) -> None:
     db.query(models.MatchMap).filter(
         models.MatchMap.match_id.in_(match_ids)
     ).delete(synchronize_session=False)
+    delete_player_stats_for_results(
+        db,
+        [
+            row[0]
+            for row in db.query(models.TeamResult.id)
+            .filter(models.TeamResult.match_id.in_(match_ids))
+            .all()
+        ],
+    )
     db.query(models.TeamResult).filter(
         models.TeamResult.match_id.in_(match_ids)
     ).delete(synchronize_session=False)
@@ -1610,6 +1687,7 @@ def get_team_result_details_by_tournament(
         .join(models.Team, models.Team.id == models.TeamResult.team_id)
         .join(models.Match, models.Match.id == models.TeamResult.match_id)
         .filter(models.TeamResult.tournament_id == tournament.id)
+        .options(selectinload(models.TeamResult.player_stats))
         .order_by(models.Match.round.asc(), models.Team.name.asc())
         .all()
     )
@@ -1638,6 +1716,7 @@ def get_team_result_details_by_tournament(
                 kill_points=kill_points,
                 placement_points=placement_points,
                 total_points=total_points,
+                player_stats=build_player_stats_schema(result),
             )
         )
     return details

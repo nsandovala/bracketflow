@@ -2,7 +2,7 @@ import StandingsTable from "./StandingsTable";
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 
-import { Match, Team, Tournament } from "../../lib/api";
+import { Match, Team, TeamResultDetail, Tournament } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import {
   findChampion,
@@ -22,6 +22,7 @@ type WorldSeriesStandingsProps = {
   totalTeams: number;
   teams: Team[];
   matches: Match[];
+  results?: TeamResultDetail[];
   onSelectTournament: (tournamentId: number) => void;
 };
 
@@ -34,6 +35,7 @@ export default function WorldSeriesStandings({
   totalTeams,
   teams,
   matches,
+  results,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
   const selectedEngine = selectedTournament
@@ -135,7 +137,7 @@ export default function WorldSeriesStandings({
             mode="standings"
           />
         ) : (
-          <StandingsTable entries={standings} scoringProfile="wsow_like" />
+          <StandingsTable entries={standings} scoringProfile="wsow_like" results={results} />
         )}
       </section>
     </main>
