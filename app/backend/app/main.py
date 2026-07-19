@@ -425,7 +425,7 @@ def create_match(
 
 
 @app.post("/matches/{match_id}/results", response_model=schemas.TeamResult)
-def upsert_match_result(
+def create_match_result(
     match_id: int,
     payload: schemas.TeamResultUpsert,
     db: Session = Depends(get_db),
@@ -461,7 +461,13 @@ def upsert_match_result(
                 detail=f"Placement #{payload.placement} ya fue reportado por {conflict.team.name}.",
             )
 
-    return crud.upsert_team_result(db, tournament, match, payload)
+    try:
+        return crud.create_team_result(db, tournament, match, payload)
+    except crud.TeamResultAlreadyReportedError:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe reporte oficial para este equipo en esta partida.",
+        )
 
 
 @app.post("/matches/{match_id}/maps", response_model=schemas.Match)

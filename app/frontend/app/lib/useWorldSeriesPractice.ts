@@ -889,9 +889,15 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       setMessage(successMessage);
       return result;
     } catch (error) {
-      // El backend devuelve 409 (placement duplicado) con un detail explicativo;
-      // request() lo propaga como Error.message. Surfacearlo en vez del genérico.
+      // El backend devuelve 409 (placement duplicado o reporte ya existente)
+      // con un detail explicativo; request() lo propaga como Error.message.
       setMessage(error instanceof Error ? error.message : "No se pudo guardar el reporte.");
+      // Otro operador pudo haber reportado despues de nuestro ultimo refresh:
+      // sincronizamos para que la UI muestre el resultado existente y bloquee
+      // reintentos, en vez de seguir operando con cache viejo.
+      try {
+        await refreshSelectedTournament(selectedTournamentId);
+      } catch {}
       return null;
     } finally {
       setSubmitting(false);

@@ -1,4 +1,4 @@
-from sqlalchemy import Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -129,6 +129,11 @@ class MatchMap(Base):
 
 class TeamResult(Base):
     __tablename__ = "team_results"
+    # Un resultado oficial por equipo y partida. La correccion de un reporte
+    # queda para un flujo explicito futuro; este endpoint nunca sobreescribe.
+    __table_args__ = (
+        UniqueConstraint("match_id", "team_id", name="uq_team_results_match_team"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     tournament_id: Mapped[int] = mapped_column(

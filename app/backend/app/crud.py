@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from math import ceil, log2
 from collections import defaultdict
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from . import models, schemas
@@ -1420,7 +1421,16 @@ def evaluate_match_point(db: Session, tournament: models.Tournament) -> int | No
     return top.team_id
 
 
-def upsert_team_result(
+class TeamResultAlreadyReportedError(Exception):
+    """Ya existe un resultado oficial para ese match_id + team_id.
+
+    El endpoint de resultados es create-only: corregir un reporte oficial
+    requiere un flujo explicito de correccion (futuro), nunca un overwrite
+    silencioso por re-submit.
+    """
+
+
+def create_team_result(
     db: Session,
     tournament: models.Tournament,
     match: models.Match,
@@ -1435,7 +1445,7 @@ def upsert_team_result(
         engine_key,
     )
 
-    db_result = (
+    existing = (
         db.query(models.TeamResult)
         .filter(
             models.TeamResult.match_id == match.id,
@@ -1443,27 +1453,28 @@ def upsert_team_result(
         )
         .first()
     )
+    if existing is not None:
+        raise TeamResultAlreadyReportedError()
 
-    if db_result is None:
-        db_result = models.TeamResult(
-            tournament_id=tournament.id,
-            match_id=match.id,
-            team_id=payload.team_id,
-            kills=payload.kills,
-            placement=payload.placement,
-            kill_points=kill_points,
-            placement_points=placement_points,
-            total_points=total_points,
-        )
-        db.add(db_result)
-    else:
-        db_result.kills = payload.kills
-        db_result.placement = payload.placement
-        db_result.kill_points = kill_points
-        db_result.placement_points = placement_points
-        db_result.total_points = total_points
-
-    db.flush()
+    db_result = models.TeamResult(
+        tournament_id=tournament.id,
+        match_id=match.id,
+        team_id=payload.team_id,
+        kills=payload.kills,
+        placement=payload.placement,
+        kill_points=kill_points,
+        placement_points=placement_points,
+        total_points=total_points,
+    )
+    db.add(db_result)
+    try:
+        db.flush()
+    except IntegrityError as error:
+        # Carrera entre dos operadores: ambos pasaron el check de arriba y la
+        # unique constraint (match_id, team_id) decide. El perdedor recibe
+        # conflicto y el resultado original queda intacto.
+        db.rollback()
+        raise TeamResultAlreadyReportedError() from error
 
     tournament_team_count = get_tournament_team_count(db, tournament.id)
     result_count = (

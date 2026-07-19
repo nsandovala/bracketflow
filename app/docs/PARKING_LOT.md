@@ -37,8 +37,10 @@
 - Flujo de reemplazo/edicion de reporte oficial por partida/equipo
   ("Editar/reemplazar reporte"). Hoy un conflicto CSV vs reporte oficial se
   marca "Conflicto / revisar" y el reporte oficial existente queda como fuente
-  de verdad; no hay sobreescritura desde import. Requiere decision de backend
-  (el endpoint actual upsertea sin auditoria) antes de exponerlo en UI.
+  de verdad; no hay sobreescritura desde import. Desde el hardening P1
+  (2026-07-18) el backend es create-only: POST /matches/{id}/results devuelve
+  409 si ya existe resultado para ese match/equipo. Corregir un reporte
+  requerira un "explicit correction flow" con decision de producto y auditoria.
 
 ## Reglas de backlog
 
