@@ -223,8 +223,8 @@ function OcrDraftIntake({
   }
 
   // Razon por la que un draft confirmado NO puede enviarse como reporte oficial.
-  // null = envio permitido. El backend upsertea resultados, asi que el bloqueo de
-  // duplicados vive aqui y en el hook, no en el endpoint.
+  // null = envio permitido. El backend es create-only; esto solo adelanta el
+  // bloqueo en la UI para evitar reintentos innecesarios.
   function getOfficialSubmitBlocker(draft: OcrDraftReport): string | null {
     if (!onSubmitOfficialReport) {
       return "Envío oficial no disponible en esta vista.";
@@ -1836,6 +1836,7 @@ export default function WorldSeriesOperator({
                         )
                       : draft.kills);
                   const isSaved = Boolean(savedResult);
+                  const reportLocked = isFinalized || isSaved;
                   const hasVal = estimatedTotal != null && estimatedTotal !== "";
                   const teamLabel = getTeamDisplayName(team);
                   const teamRosterLine = rosterText(team);
@@ -1871,7 +1872,7 @@ export default function WorldSeriesOperator({
                             inputMode="numeric"
                             value={draft.kills}
                             placeholder="0"
-                            disabled={isFinalized}
+                            disabled={reportLocked}
                             onChange={(event) =>
                               onUpdateDraft(activeMatch.id, team.id, { kills: event.target.value })
                             }
@@ -1885,7 +1886,7 @@ export default function WorldSeriesOperator({
                               inputMode="numeric"
                               value={draft.placement}
                               placeholder={`1-${effectiveLobbySize}`}
-                              disabled={isFinalized}
+                              disabled={reportLocked}
                               onChange={(event) =>
                                 onUpdateDraft(activeMatch.id, team.id, {
                                   placement: event.target.value,
@@ -1904,10 +1905,14 @@ export default function WorldSeriesOperator({
                         <button
                           type="button"
                           className="opr-save"
-                          disabled={submitting || isFinalized}
+                          disabled={submitting || reportLocked}
                           onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
                         >
-                          {isFinalized ? "Torneo finalizado" : isSaved ? "Editar" : "Guardar reporte"}
+                          {isFinalized
+                            ? "Torneo finalizado"
+                            : isSaved
+                              ? "Reporte oficial guardado"
+                              : "Guardar reporte"}
                         </button>
                       </div>
                     </article>
