@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-import WorldSeriesStreamView from "../components/WorldSeriesStreamView";
+import WorldSeriesStreamView, { StreamLayout } from "../components/WorldSeriesStreamView";
 
 function parseTournamentId(value: string | null) {
   if (!value) {
@@ -13,8 +13,17 @@ function parseTournamentId(value: string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseLayout(value: string | null): "full" | "sidebar" | "lower" {
-  if (value === "sidebar" || value === "lower") return value;
+function parseLayout(value: string | null): StreamLayout {
+  if (
+    value === "sidebar" ||
+    value === "lower" ||
+    value === "lower-third" ||
+    value === "matchpoint" ||
+    value === "mvp" ||
+    value === "leaderboard"
+  ) {
+    return value;
+  }
   return "full";
 }
 

@@ -11,9 +11,13 @@ type Props = {
   afterGameNumber: number;
   connected: boolean;
   brand: string | null;
+  matchPointTeamId?: number | null;
 };
 
 type DeltaInfo = { dir: "up" | "down"; magnitude: number };
+
+// Filas que entran en el safe-area vertical de 1080p sin desbordar.
+const SIDEBAR_MAX_ROWS = 14;
 
 export default function StreamOverlaySidebar({
   standings,
@@ -22,19 +26,22 @@ export default function StreamOverlaySidebar({
   afterGameNumber,
   connected,
   brand,
+  matchPointTeamId = null,
 }: Props) {
+  const visible = standings.slice(0, SIDEBAR_MAX_ROWS);
+
   const prevRanks = useRef<Map<number, number>>(new Map());
   const [deltas, setDeltas] = useState<Map<number, DeltaInfo>>(new Map());
   const deltaTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
-  const orderKey = standings.map((s) => s.team_id).join(",");
+  const orderKey = visible.map((s) => s.team_id).join(",");
 
   useEffect(() => {
     const prev = prevRanks.current;
     const nextRanks = new Map<number, number>();
     const changed: Array<[number, DeltaInfo]> = [];
 
-    standings.forEach((entry, i) => {
+    visible.forEach((entry, i) => {
       const rank = i + 1;
       nextRanks.set(entry.team_id, rank);
       const old = prev.get(entry.team_id);
@@ -74,7 +81,7 @@ export default function StreamOverlaySidebar({
     };
   }, []);
 
-  if (afterGameNumber === 0 || standings.length === 0) {
+  if (afterGameNumber === 0 || visible.length === 0) {
     return (
       <div className="bf-ov-empty-chip">
         {afterGameNumber === 0 ? "Esperando Partida 1" : "Sin datos"}
@@ -105,9 +112,11 @@ export default function StreamOverlaySidebar({
         <span style={{ width: 52, textAlign: "right" }}>Pts</span>
       </div>
 
-      {standings.map((entry, i) => {
+      {visible.map((entry, i) => {
         const rank = i + 1;
         const top3 = rank <= 3;
+        const isTop1 = rank === 1;
+        const isMatchPoint = matchPointTeamId !== null && entry.team_id === matchPointTeamId;
         const delta = deltas.get(entry.team_id);
         const deltaClass = delta ? ` is-${delta.dir}` : "";
         const roster =
@@ -123,7 +132,10 @@ export default function StreamOverlaySidebar({
         }
 
         return (
-          <div key={entry.team_id} className={`bf-ov-sidebar-row${top3 ? " is-top3" : ""}`}>
+          <div
+            key={entry.team_id}
+            className={`bf-ov-sidebar-row${top3 ? " is-top3" : ""}${isTop1 ? " is-top1" : ""}${isMatchPoint ? " is-mp" : ""}`}
+          >
             <div className="bf-ov-sidebar-rank">{String(rank).padStart(2, "0")}</div>
             <div className="bf-ov-sidebar-team">
               <div className="bf-ov-sidebar-team-name">{entry.team_name}</div>
