@@ -22,7 +22,6 @@ function OperatorPageClient() {
   const {
     backendOnline,
     message,
-    tournaments,
     selectedTournamentId,
     selectedTournament,
     teams,
@@ -44,7 +43,6 @@ function OperatorPageClient() {
     updateResultDraft,
     updateKillRaceMapDraft,
     selectMatch,
-    selectTournament,
     previewParticipantImport,
     importParticipants,
     removeParticipant,
