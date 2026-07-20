@@ -636,13 +636,19 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     }
   }
 
-  async function createTeamWithRoster(payload: { name: string; roster: string }) {
+  async function createTeamWithRoster(payload: {
+    name: string;
+    roster: string;
+    rosterAliases?: string[];
+  }) {
     if (selectedTournamentId === null) {
       throw new Error("No active tournament");
     }
 
     const teamName = payload.name.trim();
-    const rosterAliases = parseRosterAliases(payload.roster);
+    const rosterAliases =
+      payload.rosterAliases?.map((alias) => alias.trim()).filter((alias) => alias.length > 0) ??
+      parseRosterAliases(payload.roster);
 
     if (!teamName) {
       throw new Error("Escribe un nombre de equipo.");

@@ -167,11 +167,6 @@ function slicePath(a0: number, a1: number, r: number): string {
   return `M ${WHEEL_R} ${WHEEL_R} L ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1} Z`;
 }
 
-function fmt(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  return `${m}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
 export default function RouletteArena({
   tournament,
   engine,
@@ -186,7 +181,6 @@ export default function RouletteArena({
   onOpenRosterRespin,
   onLockRosterRespin,
   onGenerateBracket,
-  canRegenerate = true,
 }: RouletteArenaProps) {
   const [bulkValue, setBulkValue] = useState("");
   const [seed, setSeed] = useState(() => `${Date.now()}`);
@@ -230,7 +224,6 @@ export default function RouletteArena({
     return Math.max(0, Math.floor(diff / 1000));
   })();
   const timerIsWarning = timerSecondsRaw <= 30;
-  const timerIsClosed = tournament.roster_status !== "respin_open" || rosterCountdown === "00:00";
   const modeBadge =
     engine.engineKey === "roulette_ws"
       ? engine.gameMode === "br"

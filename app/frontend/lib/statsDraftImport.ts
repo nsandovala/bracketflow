@@ -135,7 +135,7 @@ function countUnquotedDelimiter(line: string, delimiter: "," | ";" | "\t") {
   return count;
 }
 
-function detectDelimiter(value: string): "," | ";" | "\t" | null {
+export function detectDelimiter(value: string): "," | ";" | "\t" | null {
   const headerLine = value
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
@@ -160,7 +160,7 @@ function detectDelimiter(value: string): "," | ";" | "\t" | null {
   return selected;
 }
 
-function parseDelimitedTable(value: string, delimiter: "," | ";" | "\t") {
+export function parseDelimitedTable(value: string, delimiter: "," | ";" | "\t") {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";

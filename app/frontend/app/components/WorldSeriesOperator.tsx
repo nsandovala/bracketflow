@@ -46,12 +46,11 @@ import { KillRaceMapDraft, ResultDraft, WorldSeriesStanding } from "../lib/useWo
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
+import { detectDelimiter, parseDelimitedTable } from "../../lib/statsDraftImport";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
   message: string | null;
-  tournaments: Tournament[];
-  selectedTournamentId: number | null;
   selectedTournament: Tournament | null;
   teams: Team[];
   matches: Match[];
@@ -73,7 +72,6 @@ type WorldSeriesOperatorProps = {
   resultDrafts: Record<string, ResultDraft>;
   killRaceMapDrafts: Record<number, KillRaceMapDraft>;
   onPreviewParticipants?: (rows: string[]) => Promise<ParticipantImportResult | null>;
-  onSelectTournament: (tournamentId: number) => void;
   onTeamNameChange: (value: string) => void;
   onTeamRosterChange: (value: string) => void;
   onCreateTeam: FormEventHandler<HTMLFormElement>;
@@ -730,6 +728,40 @@ function rosterText(team: Team) {
     : "Roster pendiente";
 }
 
+function isTeamImportHeader(cells: string[]) {
+  const first = (cells[0] ?? "").trim().toLocaleLowerCase("es");
+  const second = (cells[1] ?? "").trim().toLocaleLowerCase("es");
+  return (
+    ["team", "equipo", "nombre", "name"].includes(first) &&
+    (second.startsWith("player") ||
+      second.startsWith("jugador") ||
+      second === "roster" ||
+      second === "captain")
+  );
+}
+
+function parseBulkTeamImport(text: string) {
+  const delimiter = detectDelimiter(text) ?? ",";
+  const rows = parseDelimitedTable(text, delimiter);
+  const dataRows = rows.filter((cells) => cells.some((cell) => cell.trim() !== ""));
+  const normalizedRows = isTeamImportHeader(dataRows[0] ?? []) ? dataRows.slice(1) : dataRows;
+
+  return normalizedRows
+    .map((cells) => ({
+      name: (cells[0] ?? "").trim(),
+      rosterAliases: cells
+        .slice(1)
+        .map((cell) => cell.trim())
+        .filter((cell) => cell.length > 0),
+    }))
+    .filter((entry) => entry.name.length > 0 && entry.rosterAliases.length > 0)
+    .map((entry) => ({
+      name: entry.name,
+      roster: entry.rosterAliases.join(", "),
+      rosterAliases: entry.rosterAliases,
+    }));
+}
+
 function jumpToTeam(teamId: number) {
   const el = document.getElementById(`opr-card-${teamId}`);
   if (!el) return;
@@ -754,8 +786,6 @@ function formatCountdown(deadline: string | null, now: number) {
 export default function WorldSeriesOperator({
   backendOnline,
   message,
-  tournaments,
-  selectedTournamentId,
   selectedTournament,
   teams,
   matches,
@@ -777,7 +807,6 @@ export default function WorldSeriesOperator({
   resultDrafts,
   killRaceMapDrafts,
   onPreviewParticipants,
-  onSelectTournament,
   onTeamNameChange,
   onTeamRosterChange,
   onCreateTeam,
@@ -1057,22 +1086,7 @@ export default function WorldSeriesOperator({
     if (!file || !onBulkImportTeams) return;
 
     const text = await file.text();
-    const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
-    const parsed: Array<{ name: string; roster: string }> = [];
-
-    for (const line of lines) {
-      const parts = line.split(/,\s*|,/);
-      if (parts.length < 2) continue;
-      const name = parts[0].trim();
-      const roster = parts
-        .slice(1)
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .join(", ");
-      if (name && roster) {
-        parsed.push({ name, roster });
-      }
-    }
+    const parsed = parseBulkTeamImport(text);
 
     if (parsed.length === 0) {
       setTeamImportMessage(`No se detectaron equipos validos. Formato esperado: ${importFormatExample}.`);
@@ -1829,10 +1843,10 @@ export default function WorldSeriesOperator({
                   const estimatedTotal =
                     savedResult?.total_points.toFixed(1) ??
                     (usesPlacement
-                      ? estimateWorldSeriesPoints(
+                                      ? estimateWorldSeriesPoints(
                           draft.kills,
                           draft.placement,
-                          totalTeams
+                         selectedEngine?.engineKey
                         )
                       : draft.kills);
                   const isSaved = Boolean(savedResult);

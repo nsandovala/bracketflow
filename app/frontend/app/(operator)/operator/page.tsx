@@ -110,8 +110,6 @@ function OperatorPageClient() {
     <WorldSeriesOperator
       backendOnline={backendOnline}
       message={message}
-      tournaments={tournaments}
-      selectedTournamentId={selectedTournamentId}
       selectedTournament={selectedTournament}
       teams={teams}
       matches={matches}
@@ -132,10 +130,6 @@ function OperatorPageClient() {
       teamFormError={teamFormError}
       resultDrafts={resultDrafts}
       killRaceMapDrafts={killRaceMapDrafts}
-      onSelectTournament={(tournamentId) => {
-        selectTournament(tournamentId);
-        router.replace(`/operator?tournamentId=${tournamentId}`);
-      }}
       onTeamNameChange={setTeamName}
       onTeamRosterChange={setTeamRoster}
       onCreateTeam={handleCreateTeam}
