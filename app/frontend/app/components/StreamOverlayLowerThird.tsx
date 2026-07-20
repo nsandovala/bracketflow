@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { StreamStanding } from "../lib/useStreamLeaderboard";
 
 const WINDOW = 5;
+const TOP_ONLY_WINDOW = 3;
 const ROTATE_MS = 4200;
 
 type Props = {
@@ -13,6 +14,9 @@ type Props = {
   afterGameNumber: number;
   connected: boolean;
   brand: string | null;
+  tournamentName?: string | null;
+  // layout=lower-third: top 3 fijo sin rotación. layout=lower conserva la rotación clásica.
+  topOnly?: boolean;
 };
 
 export default function StreamOverlayLowerThird({
@@ -21,17 +25,19 @@ export default function StreamOverlayLowerThird({
   afterGameNumber,
   connected,
   brand,
+  tournamentName = null,
+  topOnly = false,
 }: Props) {
   const [startIdx, setStartIdx] = useState(0);
 
   useEffect(() => {
-    if (standings.length <= WINDOW) return;
+    if (topOnly || standings.length <= WINDOW) return;
     const id = setInterval(
       () => setStartIdx((s) => (s + WINDOW) % standings.length),
       ROTATE_MS
     );
     return () => clearInterval(id);
-  }, [standings.length]);
+  }, [standings.length, topOnly]);
 
   if (afterGameNumber === 0 || standings.length === 0) {
     return (
@@ -41,10 +47,11 @@ export default function StreamOverlayLowerThird({
     );
   }
 
-  const count = Math.min(WINDOW, standings.length);
+  const windowSize = topOnly ? TOP_ONLY_WINDOW : WINDOW;
+  const count = Math.min(windowSize, standings.length);
   const visible: Array<{ entry: StreamStanding; rank: number }> = [];
   for (let i = 0; i < count; i++) {
-    const idx = (startIdx + i) % standings.length;
+    const idx = topOnly ? i : (startIdx + i) % standings.length;
     visible.push({ entry: standings[idx], rank: idx + 1 });
   }
 
@@ -52,7 +59,7 @@ export default function StreamOverlayLowerThird({
   const brandLine = brand ?? "Gedeon Esport";
 
   return (
-    <div className="bf-ov-lower">
+    <div className={`bf-ov-lower${topOnly ? " is-top-only" : ""}`}>
       <div className="bf-ov-lower-card">
         <div className="bf-ov-lower-brand">
           <div className="bf-ov-lower-brand-live">
@@ -62,8 +69,12 @@ export default function StreamOverlayLowerThird({
             />
             <span className="bf-ov-lower-live-label">LIVE</span>
           </div>
-          <div className="bf-ov-lower-brand-title">Standings</div>
-          <div className="bf-ov-lower-brand-sub">{gameLine}</div>
+          <div className="bf-ov-lower-brand-title">
+            {topOnly ? (tournamentName ?? "Standings") : "Standings"}
+          </div>
+          <div className="bf-ov-lower-brand-sub">
+            {topOnly ? `Top 3 · ${gameLine}` : gameLine}
+          </div>
         </div>
 
         <div className="bf-ov-lower-teams">

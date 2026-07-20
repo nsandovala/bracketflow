@@ -6,6 +6,7 @@ import {
   LeaderboardEntry,
   Match,
   Team,
+  TeamResultDetail,
   Tournament,
   getLeaderboard,
   getMatches,
@@ -28,6 +29,7 @@ export type StreamLeaderboardState = {
   teams: Team[];
   matches: Match[];
   standings: StreamStanding[];
+  results: TeamResultDetail[];
   afterGameNumber: number;
   connected: boolean;
   hasLoadedOnce: boolean;
@@ -67,6 +69,7 @@ function buildSignature(
   tournament: Tournament | null,
   teams: Team[],
   standings: StreamStanding[],
+  results: TeamResultDetail[],
   afterGameNumber: number
 ) {
   const championKey =
@@ -85,7 +88,16 @@ function buildSignature(
         `${entry.team_id}:${entry.total_points}:${entry.kills}:${entry.best_placement ?? "-"}:${entry.matches_played}:${entry.players.join(",")}`
     )
     .join("|");
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${afterGameNumber}:${roster}:${rows}`;
+  // player_stats entra en la firma para que overlays (MVP) reaccionen a stats nuevas.
+  const resultRows = results
+    .map(
+      (result) =>
+        `${result.id}:${result.team_id}:${result.kills}:${(result.player_stats ?? [])
+          .map((stat) => `${stat.player_name}=${stat.kills}`)
+          .join(",")}`
+    )
+    .join("|");
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
@@ -112,6 +124,7 @@ export function useStreamLeaderboard(
     teams: [],
     matches: [],
     standings: [],
+    results: [],
     afterGameNumber: 0,
     connected: false,
     hasLoadedOnce: false,
@@ -137,6 +150,7 @@ export function useStreamLeaderboard(
                   teams: [],
                   matches: [],
                   standings: [],
+                  results: [],
                   afterGameNumber: 0,
                   connected: true,
                   hasLoadedOnce: true,
@@ -167,7 +181,7 @@ export function useStreamLeaderboard(
           : results.length === 0
             ? 0
             : Math.max(...results.map((result) => result.round));
-        const nextSignature = buildSignature(tournament, teams, standings, afterGameNumber);
+        const nextSignature = buildSignature(tournament, teams, standings, results, afterGameNumber);
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.
         setState((current) => {
@@ -184,6 +198,7 @@ export function useStreamLeaderboard(
             teams,
             matches,
             standings,
+            results,
             afterGameNumber,
             connected: true,
             hasLoadedOnce: true,
