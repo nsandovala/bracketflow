@@ -13,9 +13,10 @@ type ContextBarProps = {
   matches?: Match[];
   teams?: Team[];
   tournamentStatus?: string;
+  currentView?: "operator" | "standings";
 };
 
-const BACK_CONFIG: Record<string, { label: string; hrefFn: (id: number) => string }> = {
+const OPERATOR_BACK_CONFIG: Record<string, { label: string; hrefFn: (id: number) => string }> = {
   kill_race_bracket: {
     label: "← Volver al bracket",
     hrefFn: (id) => `/operator?tournamentId=${id}&tab=bracket`,
@@ -39,6 +40,30 @@ const DEFAULT_BACK = {
   hrefFn: (id: number) => `/torneos?tournamentId=${id}`,
 };
 
+const STANDINGS_BACK_CONFIG: Record<string, { label: string; hrefFn: (id: number) => string }> = {
+  kill_race_bracket: {
+    label: "← Volver al bracket",
+    hrefFn: (id) => `/operator?tournamentId=${id}&tab=bracket`,
+  },
+  wsow_br: {
+    label: "← Volver al operator",
+    hrefFn: (id) => `/operator?tournamentId=${id}`,
+  },
+  rebirth_ws: {
+    label: "← Volver al operator",
+    hrefFn: (id) => `/operator?tournamentId=${id}`,
+  },
+  roulette_ws: {
+    label: "← Volver al operator",
+    hrefFn: (id) => `/operator?tournamentId=${id}`,
+  },
+};
+
+const DEFAULT_STANDINGS_BACK = {
+  label: "← Volver al operator",
+  hrefFn: (id: number) => `/operator?tournamentId=${id}`,
+};
+
 export default function ContextBar({
   engineKey,
   tournamentName,
@@ -46,9 +71,13 @@ export default function ContextBar({
   matches = [],
   teams = [],
   tournamentStatus,
+  currentView = "operator",
 }: ContextBarProps) {
   const router = useRouter();
-  const back = (engineKey ? BACK_CONFIG[engineKey] : null) ?? DEFAULT_BACK;
+  const back =
+    currentView === "standings"
+      ? (engineKey ? STANDINGS_BACK_CONFIG[engineKey] : null) ?? DEFAULT_STANDINGS_BACK
+      : (engineKey ? OPERATOR_BACK_CONFIG[engineKey] : null) ?? DEFAULT_BACK;
 
   if (!tournamentId) return null;
 
@@ -80,18 +109,38 @@ export default function ContextBar({
       </div>
 
       <div className="opr-context-actions">
-        <Link
-          href={`/standings?tournamentId=${tournamentId}`}
-          className="opr-context-standings"
-        >
-          Standings →
-        </Link>
-        {engineKey === "kill_race_bracket" ? (
+        {currentView !== "operator" ? (
           <Link
-            href={`/stream?tournamentId=${tournamentId}&obs=1`}
+            href={
+              engineKey === "kill_race_bracket"
+                ? `/operator?tournamentId=${tournamentId}&tab=bracket`
+                : `/operator?tournamentId=${tournamentId}`
+            }
             className="opr-context-standings"
           >
-            Stream →
+            Operator →
+          </Link>
+        ) : null}
+        {currentView !== "standings" ? (
+          <Link
+            href={`/standings?tournamentId=${tournamentId}`}
+            className="opr-context-standings"
+          >
+            Standings →
+          </Link>
+        ) : null}
+        <Link
+          href={`/stream?tournamentId=${tournamentId}${engineKey === "kill_race_bracket" ? "&obs=1" : ""}`}
+          className="opr-context-standings"
+        >
+          Stream →
+        </Link>
+        {currentView !== "operator" ? (
+          <Link
+            href="/dashboard"
+            className="opr-context-standings"
+          >
+            Dashboard →
           </Link>
         ) : null}
         <Link href="/torneos" className="opr-context-standings">

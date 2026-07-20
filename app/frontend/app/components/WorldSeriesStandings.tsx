@@ -72,6 +72,7 @@ export default function WorldSeriesStandings({
         matches={matches}
         teams={teams}
         tournamentStatus={selectedTournament?.status}
+        currentView="standings"
       />
 
       <section className="bf-standings-toolbar">

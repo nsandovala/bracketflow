@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 
@@ -11,11 +12,53 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def ensure_sqlite_schema() -> None:
-    if engine.dialect.name != "sqlite":
+def _sqlite_has_match_team_unique_index(db_engine: Engine) -> bool:
+    with db_engine.begin() as connection:
+        indexes = connection.exec_driver_sql("PRAGMA index_list(team_results)").all()
+        for _, index_name, is_unique, *_ in indexes:
+            if not is_unique:
+                continue
+            columns = [
+                row[2]
+                for row in connection.exec_driver_sql(f"PRAGMA index_info('{index_name}')").all()
+            ]
+            if columns == ["match_id", "team_id"]:
+                return True
+    return False
+
+
+def _sqlite_duplicate_match_team_rows(db_engine: Engine) -> list[tuple[int, int, int, str]]:
+    with db_engine.begin() as connection:
+        duplicates = connection.exec_driver_sql(
+            """
+            SELECT
+                match_id,
+                team_id,
+                COUNT(*) AS duplicate_count,
+                GROUP_CONCAT(id) AS result_ids
+            FROM team_results
+            GROUP BY match_id, team_id
+            HAVING COUNT(*) > 1
+            ORDER BY match_id, team_id
+            """
+        ).all()
+    return [
+        (
+            int(match_id),
+            int(team_id),
+            int(duplicate_count),
+            str(result_ids),
+        )
+        for match_id, team_id, duplicate_count, result_ids in duplicates
+    ]
+
+
+def ensure_sqlite_schema(db_engine: Engine | None = None) -> None:
+    db_engine = db_engine or engine
+    if db_engine.dialect.name != "sqlite":
         return
 
-    with engine.begin() as connection:
+    with db_engine.begin() as connection:
         columns = {
             row[1]
             for row in connection.exec_driver_sql("PRAGMA table_info(tournaments)").all()
@@ -92,6 +135,33 @@ def ensure_sqlite_schema() -> None:
                 FOREIGN KEY(match_id) REFERENCES matches(id),
                 FOREIGN KEY(map_winner_id) REFERENCES teams(id)
             )
+            """
+        )
+
+    with db_engine.begin() as connection:
+        team_result_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(team_results)").all()
+        }
+    if not team_result_columns or _sqlite_has_match_team_unique_index(db_engine):
+        return
+
+    duplicates = _sqlite_duplicate_match_team_rows(db_engine)
+    if duplicates:
+        sample = "; ".join(
+            f"match_id={match_id}, team_id={team_id}, count={duplicate_count}, ids={result_ids}"
+            for match_id, team_id, duplicate_count, result_ids in duplicates[:5]
+        )
+        raise RuntimeError(
+            "No se pudo aplicar la unicidad de team_results(match_id, team_id) porque "
+            f"ya existen reportes oficiales duplicados: {sample}"
+        )
+
+    with db_engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_team_results_match_team
+            ON team_results (match_id, team_id)
             """
         )
 

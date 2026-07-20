@@ -219,26 +219,40 @@ export function formatPoints(totalPoints: number, format: TournamentFormat) {
 
 export function estimateWorldSeriesPoints(
   killsValue: string,
-  placementValue: string, 
-  teamCount: number     
-) { 
+  placementValue: string,
+  engineKey?: string
+) {
   const kills = parseFloat(killsValue);
   const placement = parseFloat(placementValue);
-  // Espejo de backend/app/crud.py::get_placement_multiplier — mantener sincronizados.
-const WSOW_PLACEMENT_BANDS: Array<[number, number]> = [
-  [1, 2.0],
-  [5, 1.8],
-  [10, 1.6],
-  [20, 1.4],
-  [35, 1.2],
-];
-const WSOW_MIN_MULTIPLIER = 1.0;
-
-function getPlacementMultiplier(placement: number): number {
-  for (const [maxPlace, multiplier] of WSOW_PLACEMENT_BANDS) {
-    if (placement <= maxPlace) return multiplier;
+  if (!Number.isFinite(kills) || kills < 0) {
+    return "";
   }
-  return WSOW_MIN_MULTIPLIER;
-} 
+  if (!Number.isFinite(placement) || placement < 1) {
+    return "";
+  }
 
+  const placementBands: Array<[number, number]> =
+    engineKey === "rebirth_ws"
+      ? [
+          [1, 1.6],
+          [5, 1.4],
+          [10, 1.2],
+        ]
+      : [
+          [1, 2.0],
+          [5, 1.8],
+          [10, 1.6],
+          [20, 1.4],
+          [35, 1.2],
+        ];
+
+  let multiplier = 1.0;
+  for (const [maxPlace, value] of placementBands) {
+    if (placement <= maxPlace) {
+      multiplier = value;
+      break;
+    }
+  }
+
+  return (Math.round(kills * multiplier * 10) / 10).toFixed(1);
 }

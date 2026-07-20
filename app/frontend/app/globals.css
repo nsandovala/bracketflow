@@ -35,6 +35,9 @@
   --amon-gold-line-soft: rgba(201, 162, 75, 0.16);
   --amon-green-mate: #5cb596;
   --amon-green-mate-border: rgba(92, 181, 150, 0.22);
+  --font-geist-sans: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-rajdhani: "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
 }
 
 @theme inline {

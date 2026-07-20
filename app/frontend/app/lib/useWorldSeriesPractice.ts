@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  ApiError,
   LeaderboardEntry,
   Match,
   Team,
@@ -635,13 +636,19 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     }
   }
 
-  async function createTeamWithRoster(payload: { name: string; roster: string }) {
+  async function createTeamWithRoster(payload: {
+    name: string;
+    roster: string;
+    rosterAliases?: string[];
+  }) {
     if (selectedTournamentId === null) {
       throw new Error("No active tournament");
     }
 
     const teamName = payload.name.trim();
-    const rosterAliases = parseRosterAliases(payload.roster);
+    const rosterAliases =
+      payload.rosterAliases?.map((alias) => alias.trim()).filter((alias) => alias.length > 0) ??
+      parseRosterAliases(payload.roster);
 
     if (!teamName) {
       throw new Error("Escribe un nombre de equipo.");
@@ -896,12 +903,14 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       // El backend devuelve 409 (placement duplicado o reporte ya existente)
       // con un detail explicativo; request() lo propaga como Error.message.
       setMessage(error instanceof Error ? error.message : "No se pudo guardar el reporte.");
-      // Otro operador pudo haber reportado despues de nuestro ultimo refresh:
-      // sincronizamos para que la UI muestre el resultado existente y bloquee
-      // reintentos, en vez de seguir operando con cache viejo.
-      try {
-        await refreshSelectedTournament(selectedTournamentId);
-      } catch {}
+      if (error instanceof ApiError && error.status === 409) {
+        // Otro operador pudo haber reportado despues de nuestro ultimo refresh:
+        // sincronizamos para que la UI muestre el resultado existente y bloquee
+        // reintentos, en vez de seguir operando con cache viejo.
+        try {
+          await refreshSelectedTournament(selectedTournamentId);
+        } catch {}
+      }
       return null;
     } finally {
       setSubmitting(false);
@@ -929,8 +938,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     placement: number | "",
     playerStats?: Array<{ playerName: string; kills: number }>
   ) {
-    // El endpoint /matches/{id}/results es upsert: sin este guard, un draft
-    // reenviado sobreescribiria silenciosamente un reporte oficial existente.
+    // Guard local UX-only: el backend mantiene la garantía real create-only.
     const existing = tournamentResults.find(
       (result) => result.match_id === matchId && result.team_id === teamId
     );
