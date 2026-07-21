@@ -5816,6 +5816,394 @@ a:focus-visible {
 }
 
 /* ============================================================
+   Ajustes — Broadcast Setup v0
+   Configuracion de presentacion stream/caster. Vive en /ajustes
+   dentro del shell del operador; hereda tokens --amon-*.
+   ============================================================ */
+
+.bf-ajustes {
+  display: grid;
+  gap: var(--amon-space-4);
+  max-width: 920px;
+}
+
+.bf-ajustes-note {
+  margin: 0;
+  color: var(--amon-faint);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.bf-bset {
+  display: grid;
+  gap: var(--amon-space-5);
+  padding: var(--amon-space-5);
+  border-radius: var(--amon-radius-lg);
+  border: 1px solid var(--amon-glass-v2-border);
+  background: var(--amon-glass-v2-bg);
+  backdrop-filter: var(--amon-glass-v2-blur);
+  -webkit-backdrop-filter: var(--amon-glass-v2-blur);
+  box-shadow: var(--amon-glass-v2-shadow);
+}
+
+.bf-bset-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--amon-space-4);
+  flex-wrap: wrap;
+}
+
+.bf-bset-eyebrow {
+  color: var(--amon-accent);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.bf-bset-head h2 {
+  margin: 4px 0 6px;
+  font-family: var(--amon-font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--amon-text);
+}
+
+.bf-bset-head p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--amon-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.bf-bset-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--amon-line-strong);
+  background: var(--amon-surface);
+  color: var(--amon-text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bf-bset-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--amon-faint);
+}
+
+.bf-bset-status.is-dirty {
+  color: var(--amon-gold-hi);
+  border-color: var(--amon-gold-line);
+}
+
+.bf-bset-status.is-dirty i {
+  background: var(--amon-gold-hi);
+}
+
+.bf-bset-status.is-saved {
+  color: var(--amon-accent);
+  border-color: var(--amon-nav-active-border);
+}
+
+.bf-bset-status.is-saved i {
+  background: var(--amon-accent);
+}
+
+.bf-bset-form {
+  display: grid;
+  gap: var(--amon-space-5);
+}
+
+.bf-bset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--amon-space-4);
+}
+
+.bf-bset-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.bf-bset-field > span {
+  color: var(--amon-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bf-bset-field input,
+.bf-bset-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: var(--amon-radius-sm);
+  border: 1px solid var(--amon-line-strong);
+  background: var(--amon-bg);
+  color: var(--amon-text);
+  font-family: var(--amon-font-sans);
+  font-size: 0.9rem;
+}
+
+.bf-bset-field select {
+  padding-right: 34px;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--amon-muted) 50%),
+    linear-gradient(135deg, var(--amon-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 18px, calc(100% - 13px) 18px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.bf-bset-field input::placeholder {
+  color: var(--amon-faint);
+}
+
+.bf-bset-field input:focus-visible,
+.bf-bset-field select:focus-visible {
+  outline: none;
+  border-color: var(--amon-nav-active-border);
+  box-shadow: 0 0 0 3px var(--amon-accent-glow);
+}
+
+.bf-bset-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 16px 0 10px;
+  border-radius: var(--amon-radius-sm);
+  border: 1px solid var(--amon-line-strong);
+  background: var(--amon-bg);
+  color: var(--amon-text-dim);
+  font-family: var(--amon-font-sans);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  justify-self: start;
+}
+
+.bf-bset-switch i {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--amon-surface-2);
+  border: 1px solid var(--amon-line-strong);
+  transition: background 160ms ease;
+  flex-shrink: 0;
+}
+
+.bf-bset-switch i::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--amon-muted);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.bf-bset-switch.is-on {
+  color: var(--amon-text);
+  border-color: var(--amon-nav-active-border);
+}
+
+.bf-bset-switch.is-on i {
+  background: var(--amon-accent-dim);
+  border-color: var(--amon-nav-active-border);
+}
+
+.bf-bset-switch.is-on i::after {
+  transform: translateX(16px);
+  background: var(--amon-accent);
+}
+
+.bf-bset-switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--amon-accent-glow);
+}
+
+.bf-bset-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bf-bset-save,
+.bf-bset-reset {
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: var(--amon-radius-sm);
+  font-family: var(--amon-font-sans);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: filter 140ms ease, opacity 140ms ease;
+}
+
+.bf-bset-save {
+  border: 1px solid var(--amon-nav-active-border);
+  background: var(--amon-accent);
+  color: #05140d;
+}
+
+.bf-bset-save:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.bf-bset-reset {
+  border: 1px solid var(--amon-line-strong);
+  background: transparent;
+  color: var(--amon-text-dim);
+}
+
+.bf-bset-reset:hover:not(:disabled) {
+  border-color: var(--amon-text-dim);
+}
+
+.bf-bset-save:disabled,
+.bf-bset-reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .bf-bset-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- Caster Hub: perfil broadcast + overlay recomendado ---- */
+.bf-caster-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--bf-border);
+  border-radius: 4px;
+  background: rgba(10, 15, 26, 0.72);
+  flex-wrap: wrap;
+}
+
+.bf-caster-profile-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--bf-border-strong);
+  background: rgba(95, 227, 154, 0.08);
+  color: var(--bf-text);
+  font-family: var(--amon-font-display);
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  max-width: 84px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bf-caster-profile-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bf-caster-profile-copy strong {
+  color: var(--bf-text);
+  font-size: 0.92rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bf-caster-profile-copy span {
+  color: var(--bf-muted);
+  font-size: 0.76rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bf-caster-profile-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.bf-caster-profile-chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--bf-border);
+  color: var(--bf-text-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.bf-caster-profile-edit {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--bf-border-strong);
+  color: var(--amon-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bf-caster-profile-edit:hover {
+  background: rgba(95, 227, 154, 0.08);
+}
+
+.bf-caster-overlay.is-recommended {
+  border-color: var(--bf-border-strong);
+  box-shadow: inset 3px 0 0 var(--amon-accent);
+}
+
+.bf-caster-overlay-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--amon-accent-dim);
+  border: 1px solid var(--amon-nav-active-border);
+  color: var(--amon-accent);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* ============================================================
    Dashboard home
    ============================================================ */
 

@@ -14,6 +14,7 @@ import {
   isTournamentCompleted,
 } from "../../lib/tournamentStatus";
 import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
+import { layoutLabel, useBroadcastSetup } from "../lib/broadcastSetup";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
@@ -111,6 +112,9 @@ export default function CasterHub() {
     selectedEngine,
     selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
+
+  // Perfil broadcast configurado en /ajustes (solo lectura, low-risk).
+  const { setup: broadcastSetup } = useBroadcastSetup();
 
   useEffect(() => {
     return () => {
@@ -294,6 +298,26 @@ export default function CasterHub() {
         </div>
       </header>
 
+      <section className="bf-caster-profile" aria-label="Perfil de transmisión">
+        <span className="bf-caster-profile-mark">{broadcastSetup.brandMark || "BF"}</span>
+        <div className="bf-caster-profile-copy">
+          <strong>{broadcastSetup.eventName || "Evento sin configurar"}</strong>
+          <span>
+            {broadcastSetup.organizer || "Sin organizador"}
+            {broadcastSetup.casterName ? ` · Caster: ${broadcastSetup.casterName}` : ""}
+          </span>
+        </div>
+        <div className="bf-caster-profile-meta">
+          <span className="bf-caster-profile-chip">
+            Overlay: {layoutLabel(broadcastSetup.defaultLayout)}
+          </span>
+          <span className="bf-caster-profile-chip">{broadcastSetup.obsTarget}</span>
+          <Link href="/ajustes" className="bf-caster-profile-edit">
+            Editar
+          </Link>
+        </div>
+      </section>
+
       <section className="bf-caster-context" aria-label="Torneo de transmisión">
         <label className="bf-caster-select-label" htmlFor="caster-tournament">
           Torneo de transmisión
@@ -383,10 +407,19 @@ export default function CasterHub() {
                 {OVERLAYS.map((overlay) => {
                   const url = getOverlayUrl(selectedTournament.id, overlay);
                   const status = copyState?.key === overlay.layout ? copyState.status : null;
+                  const isRecommended = overlay.layout === broadcastSetup.defaultLayout;
                   return (
-                    <article className="bf-caster-overlay" key={overlay.layout}>
+                    <article
+                      className={`bf-caster-overlay${isRecommended ? " is-recommended" : ""}`}
+                      key={overlay.layout}
+                    >
                       <div className="bf-caster-overlay-copy">
-                        <h3>{overlay.title}</h3>
+                        <h3>
+                          {overlay.title}
+                          {isRecommended && (
+                            <span className="bf-caster-overlay-badge">Recomendado</span>
+                          )}
+                        </h3>
                         <p>{overlay.description}</p>
                         <code>{url}</code>
                       </div>
