@@ -4830,6 +4830,111 @@ a:focus-visible {
 }
 
 /* ============================================================
+   Iridescent edge system — anillo de borde animado (emerald →
+   cyan → violet → gold) sobre las CARDS del stream: las filas de
+   equipo de la tabla principal y del leaderboard broadcast, mas
+   los paneles-card individuales (sidebar, lower-third, MVP, match
+   point). No hay marco exterior de escena. Conic-gradient
+   enmascarado a 1.25-1.5px: pinta unicamente el filo, asi funciona
+   sobre gameplay y sobre OBS transparente sin agregar fondo opaco.
+   El angulo es una custom property compartida, asi todas las cards
+   giran sincronizadas (se lee premium, no caotico). Movimiento
+   lento (12-16s) e intensidad baja.
+   Fallback (sin @property o sin mask-composite): se conserva el
+   borde estatico existente de cada card. Se apaga con
+   prefers-reduced-motion.
+   ============================================================ */
+@property --bf-iris-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.bf-stream-page {
+  --bf-iris-stops:
+    rgba(97, 242, 163, 0.72),
+    rgba(58, 218, 218, 0.66),
+    rgba(150, 130, 245, 0.62),
+    rgba(232, 194, 104, 0.72),
+    rgba(58, 218, 218, 0.66),
+    rgba(97, 242, 163, 0.72);
+}
+
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  /* Containing block para el pseudo-anillo en las cards que
+     aun no eran position: relative. */
+  .bf-ov-sidebar,
+  .bf-ov-lower-card,
+  .bf-ov-mp,
+  .bf-stream-row-inner,
+  .bf-ov-board-row {
+    position: relative;
+  }
+
+  .bf-stream-row-inner::before,
+  .bf-ov-sidebar::before,
+  .bf-ov-lower-card::before,
+  .bf-ov-mp::before,
+  .bf-ov-mvp::after,
+  .bf-ov-board-row::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(from var(--bf-iris-angle), var(--bf-iris-stops));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.72;
+    animation: bf-iris-spin 16s linear infinite;
+  }
+
+  /* Cards de fila (tabla /stream full + leaderboard broadcast):
+     el anillo va un punto mas fino y tenue porque se repite en
+     cada fila; el angulo compartido las mantiene sincronizadas. */
+  .bf-stream-row-inner::before,
+  .bf-ov-board-row::before {
+    padding: 1.25px;
+    opacity: 0.6;
+  }
+
+  /* Match point: acento iridiscente un punto mas intenso. */
+  .bf-ov-mp::before {
+    opacity: 0.9;
+    animation-duration: 12s;
+  }
+
+  .bf-ov-mvp::after {
+    opacity: 0.8;
+  }
+}
+
+@keyframes bf-iris-spin {
+  to {
+    --bf-iris-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-stream-row-inner::before,
+  .bf-ov-sidebar::before,
+  .bf-ov-lower-card::before,
+  .bf-ov-mp::before,
+  .bf-ov-mvp::after,
+  .bf-ov-board-row::before {
+    animation: none;
+  }
+}
+
+/* ============================================================
    MUNDO OPERADOR — Shell (sidebar + topbar) + Dashboard home
    Línea Amon (grafito + blanco nieve). Hereda de tokens.css.
    El route group (operator) hace que este shell NUNCA envuelva
