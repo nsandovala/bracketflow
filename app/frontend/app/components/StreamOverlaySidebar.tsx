@@ -121,6 +121,7 @@ export default function StreamOverlaySidebar({
         const deltaClass = delta ? ` is-${delta.dir}` : "";
         const roster =
           entry.players.length > 0 ? entry.players.join(" · ") : "Roster pendiente";
+        const bestTag = entry.best_placement != null ? ` · Best #${entry.best_placement}` : "";
 
         let deltaLabel: string;
         if (delta?.dir === "up") {
@@ -139,7 +140,10 @@ export default function StreamOverlaySidebar({
             <div className="bf-ov-sidebar-rank">{String(rank).padStart(2, "0")}</div>
             <div className="bf-ov-sidebar-team">
               <div className="bf-ov-sidebar-team-name">{entry.team_name}</div>
-              <div className="bf-ov-sidebar-roster">{roster}</div>
+              <div className="bf-ov-sidebar-roster">
+                {roster}
+                {bestTag}
+              </div>
             </div>
             <div className={`bf-ov-sidebar-delta${deltaClass}`}>{deltaLabel}</div>
             <div className="bf-ov-sidebar-kills">{entry.kills}</div>

@@ -3799,26 +3799,31 @@ a:focus-visible {
   pointer-events: auto;
 }
 
-/* ---- Sidebar overlay ---- */
+/* ---- Sidebar overlay ----
+   Panel unico y continuo (no chips flotando) para que se lea limpio
+   sobre gameplay: header + rows + footer comparten un mismo fondo,
+   separados por hairlines internos en vez de huecos entre tarjetas. */
 .bf-ov-sidebar {
   width: 340px;
   font-family: var(--amon-font-display);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(7, 10, 16, 0.88), rgba(7, 10, 16, 0.78));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.52);
+  overflow: hidden;
 }
 
 .bf-ov-sidebar-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: linear-gradient(150deg, rgba(10, 14, 22, 0.82), rgba(10, 14, 22, 0.62));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4);
+  padding: 14px 16px 12px;
+  background: linear-gradient(120deg, rgba(95, 227, 154, 0.09), transparent 65%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .bf-ov-sidebar-mark {
@@ -3881,7 +3886,7 @@ a:focus-visible {
 
 .bf-ov-sidebar-col-hint {
   display: flex;
-  padding: 0 16px;
+  padding: 8px 16px 5px;
   color: rgba(255, 255, 255, 0.3);
   font-size: 9.5px;
   letter-spacing: 1.4px;
@@ -3890,20 +3895,17 @@ a:focus-visible {
 }
 
 .bf-ov-sidebar-row {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 9px 14px;
-  border-radius: 11px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(10, 14, 22, 0.62);
+  padding: 8px 16px 8px 14px;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
 }
 
 .bf-ov-sidebar-row.is-top3 {
   background: var(--bf-ov-top3-glass);
-  border-color: rgba(120, 230, 170, 0.22);
 }
 
 .bf-ov-sidebar-rank {
@@ -3988,8 +3990,8 @@ a:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 2px 16px;
-  margin-top: 2px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .bf-ov-sidebar-footer span {
@@ -4025,11 +4027,11 @@ a:focus-visible {
   align-items: stretch;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(10, 14, 22, 0.86), rgba(10, 14, 22, 0.72));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(7, 10, 16, 0.92), rgba(7, 10, 16, 0.82));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
 }
 
 .bf-ov-lower-brand {
@@ -4112,6 +4114,14 @@ a:focus-visible {
   color: var(--bf-st-accent);
 }
 
+.bf-ov-lower-team.is-top1 {
+  background: linear-gradient(180deg, rgba(232, 194, 104, 0.1), transparent);
+}
+
+.bf-ov-lower-team.is-top1 .bf-ov-lower-rank {
+  color: var(--bf-ov-gold);
+}
+
 .bf-ov-lower-team-body {
   min-width: 0;
   flex: 1;
@@ -4146,18 +4156,40 @@ a:focus-visible {
   color: var(--bf-ov-accent-soft);
 }
 
+.bf-ov-lower-team.is-top1 .bf-ov-lower-pts {
+  color: var(--bf-ov-gold-soft);
+}
+
 .bf-ov-lower-kills {
   color: rgba(255, 255, 255, 0.42);
   font-size: 11px;
 }
 
 .bf-ov-lower-footer {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin-top: 6px;
   color: rgba(255, 255, 255, 0.24);
   font-size: 9px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
+}
+
+.bf-ov-lower-footer-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(95, 227, 154, 0.08);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 @keyframes bfOvFade {
@@ -4176,7 +4208,8 @@ a:focus-visible {
   .bf-ov-lower-live-dot {
     animation: none;
   }
-  .bf-ov-lower-team {
+  .bf-ov-lower-team,
+  .bf-ov-sidebar-row.is-mp {
     animation: none;
   }
 }
@@ -4195,7 +4228,7 @@ a:focus-visible {
 /* ---- Sidebar: top 1 gold + acento match point ---- */
 .bf-ov-sidebar-row.is-top1 {
   background: var(--bf-ov-top1-glass);
-  border-color: rgba(232, 194, 104, 0.34);
+  border-left-color: var(--bf-ov-gold);
 }
 
 .bf-ov-sidebar-row.is-top1 .bf-ov-sidebar-rank {
@@ -4206,9 +4239,20 @@ a:focus-visible {
   color: var(--bf-ov-gold-soft);
 }
 
+/* Match point: acento pulsante para distinguir "en juego" del oro estatico de top1. */
 .bf-ov-sidebar-row.is-mp {
-  border-color: rgba(232, 194, 104, 0.45);
-  box-shadow: 0 0 0 1px rgba(232, 194, 104, 0.18), 0 6px 22px rgba(0, 0, 0, 0.34);
+  border-left-color: var(--bf-ov-gold);
+  animation: bf-ov-mp-alert 1.8s ease-in-out infinite;
+}
+
+@keyframes bf-ov-mp-alert {
+  0%,
+  100% {
+    border-left-color: rgba(232, 194, 104, 0.5);
+  }
+  50% {
+    border-left-color: var(--bf-ov-gold);
+  }
 }
 
 /* En 720p el sidebar corta a top 10 (14 filas no entran verticalmente).
@@ -4251,6 +4295,22 @@ a:focus-visible {
 .bf-ov-mp.is-champion {
   border-color: rgba(232, 194, 104, 0.55);
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5), 0 0 28px rgba(232, 194, 104, 0.16);
+}
+
+/* Match point activo (sin campeon todavia): borde pulsante = urgencia en curso.
+   El campeon usa el glow estatico de arriba = estado ya resuelto. */
+.bf-ov-mp:not(.is-champion) {
+  animation: bf-ov-mp-border-alert 2.2s ease-in-out infinite;
+}
+
+@keyframes bf-ov-mp-border-alert {
+  0%,
+  100% {
+    border-color: rgba(232, 194, 104, 0.32);
+  }
+  50% {
+    border-color: rgba(232, 194, 104, 0.7);
+  }
 }
 
 .bf-ov-mp-head {
@@ -4341,7 +4401,7 @@ a:focus-visible {
   align-items: center;
   gap: 14px;
   width: min(380px, 88vw);
-  padding: 16px 18px;
+  padding: 18px 18px 16px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   background: linear-gradient(150deg, rgba(10, 14, 22, 0.86), rgba(10, 14, 22, 0.68));
@@ -4349,6 +4409,19 @@ a:focus-visible {
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.46);
   font-family: var(--amon-font-display);
+  overflow: hidden;
+}
+
+/* Linea de spotlight: marca la card como "player highlight", no dashboard tile. */
+.bf-ov-mvp::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--bf-ov-gold), var(--bf-st-accent) 70%, transparent);
+  opacity: 0.85;
 }
 
 .bf-ov-mvp-badge {
@@ -4616,10 +4689,11 @@ a:focus-visible {
   grid-template-columns: var(--bf-ov-board-grid);
   align-items: center;
   gap: 12px;
-  padding: clamp(8px, 1.1vh, 12px) 16px;
+  padding: clamp(8px, 1.1vh, 12px) 16px clamp(8px, 1.1vh, 12px) 13px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .bf-ov-board-table[data-density="dense"] .bf-ov-board-row {
@@ -4630,11 +4704,13 @@ a:focus-visible {
 .bf-ov-board-row[data-tier="top"] {
   background: var(--bf-ov-top3-glass);
   border-color: rgba(120, 230, 170, 0.2);
+  border-left-color: var(--bf-st-accent);
 }
 
 .bf-ov-board-row[data-tier="gold"] {
   background: var(--bf-ov-top1-glass);
   border-color: rgba(232, 194, 104, 0.36);
+  border-left-color: var(--bf-ov-gold);
   box-shadow: 0 0 0 1px rgba(232, 194, 104, 0.1), 0 8px 26px rgba(0, 0, 0, 0.3);
 }
 
@@ -4747,7 +4823,113 @@ a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .bf-ov-mp-dot,
   .bf-ov-mvp-dot,
-  .bf-ov-board-live-dot {
+  .bf-ov-board-live-dot,
+  .bf-ov-mp:not(.is-champion) {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   Iridescent edge system — anillo de borde animado (emerald →
+   cyan → violet → gold) sobre las CARDS del stream: las filas de
+   equipo de la tabla principal y del leaderboard broadcast, mas
+   los paneles-card individuales (sidebar, lower-third, MVP, match
+   point). No hay marco exterior de escena. Conic-gradient
+   enmascarado a 1.25-1.5px: pinta unicamente el filo, asi funciona
+   sobre gameplay y sobre OBS transparente sin agregar fondo opaco.
+   El angulo es una custom property compartida, asi todas las cards
+   giran sincronizadas (se lee premium, no caotico). Movimiento
+   lento (12-16s) e intensidad baja.
+   Fallback (sin @property o sin mask-composite): se conserva el
+   borde estatico existente de cada card. Se apaga con
+   prefers-reduced-motion.
+   ============================================================ */
+@property --bf-iris-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.bf-stream-page {
+  --bf-iris-stops:
+    rgba(97, 242, 163, 0.72),
+    rgba(58, 218, 218, 0.66),
+    rgba(150, 130, 245, 0.62),
+    rgba(232, 194, 104, 0.72),
+    rgba(58, 218, 218, 0.66),
+    rgba(97, 242, 163, 0.72);
+}
+
+@supports ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  /* Containing block para el pseudo-anillo en las cards que
+     aun no eran position: relative. */
+  .bf-ov-sidebar,
+  .bf-ov-lower-card,
+  .bf-ov-mp,
+  .bf-stream-row-inner,
+  .bf-ov-board-row {
+    position: relative;
+  }
+
+  .bf-stream-row-inner::before,
+  .bf-ov-sidebar::before,
+  .bf-ov-lower-card::before,
+  .bf-ov-mp::before,
+  .bf-ov-mvp::after,
+  .bf-ov-board-row::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(from var(--bf-iris-angle), var(--bf-iris-stops));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.72;
+    animation: bf-iris-spin 16s linear infinite;
+  }
+
+  /* Cards de fila (tabla /stream full + leaderboard broadcast):
+     el anillo va un punto mas fino y tenue porque se repite en
+     cada fila; el angulo compartido las mantiene sincronizadas. */
+  .bf-stream-row-inner::before,
+  .bf-ov-board-row::before {
+    padding: 1.25px;
+    opacity: 0.6;
+  }
+
+  /* Match point: acento iridiscente un punto mas intenso. */
+  .bf-ov-mp::before {
+    opacity: 0.9;
+    animation-duration: 12s;
+  }
+
+  .bf-ov-mvp::after {
+    opacity: 0.8;
+  }
+}
+
+@keyframes bf-iris-spin {
+  to {
+    --bf-iris-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-stream-row-inner::before,
+  .bf-ov-sidebar::before,
+  .bf-ov-lower-card::before,
+  .bf-ov-mp::before,
+  .bf-ov-mvp::after,
+  .bf-ov-board-row::before {
     animation: none;
   }
 }
