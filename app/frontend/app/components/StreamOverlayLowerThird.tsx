@@ -80,10 +80,11 @@ export default function StreamOverlayLowerThird({
         <div className="bf-ov-lower-teams">
           {visible.map(({ entry, rank }, i) => {
             const top3 = rank <= 3;
+            const isTop1 = rank === 1;
             return (
               <div
                 key={`${entry.team_id}-${startIdx}-${i}`}
-                className={`bf-ov-lower-team${top3 ? " is-top3" : ""}`}
+                className={`bf-ov-lower-team${top3 ? " is-top3" : ""}${isTop1 ? " is-top1" : ""}`}
               >
                 <div className="bf-ov-lower-rank">{String(rank).padStart(2, "0")}</div>
                 <div className="bf-ov-lower-team-body">
@@ -99,6 +100,7 @@ export default function StreamOverlayLowerThird({
         </div>
       </div>
       <div className="bf-ov-lower-footer">
+        <span className="bf-ov-lower-footer-mark">BF</span>
         BracketFlow · {tournamentGame ?? brandLine}
       </div>
     </div>
