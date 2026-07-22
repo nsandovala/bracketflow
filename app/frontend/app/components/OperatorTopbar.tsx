@@ -28,8 +28,8 @@ const ROUTE_COPY: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Crea, selecciona y administra la arena activa.",
   },
   "/equipos": {
-    title: "Setup",
-    subtitle: "Roster y ruleta del torneo activo.",
+    title: "Identity Registry",
+    subtitle: "Identidad de equipos y jugadores, más el setup del torneo activo.",
   },
   "/operator": {
     title: "Operator",
