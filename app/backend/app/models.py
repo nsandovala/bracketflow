@@ -181,3 +181,78 @@ class TeamResultPlayerStat(Base):
     team_result: Mapped["TeamResult"] = relationship(
         "TeamResult", back_populates="player_stats"
     )
+
+
+# ---------------------------------------------------------------------------
+# Identity metadata v0 (aditivo, no toca scoring ni reports)
+#
+# Perfiles estables de jugador y equipo, y game-handles por juego. Los torneos
+# existentes siguen usando Player/Team locales al torneo. Esto es solo un
+# catalogo consultable a nivel workspace para futuras superficies (Caster,
+# MVP, stats historicas). NO hay FK desde Player/Team hacia estos perfiles
+# todavia: el link puede hacerse en una v1 posterior sin migracion destructiva.
+# ---------------------------------------------------------------------------
+
+
+class PlayerProfile(Base):
+    __tablename__ = "player_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    short_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    country: Mapped[str | None] = mapped_column(String, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    game_identities: Mapped[list["PlayerGameIdentity"]] = relationship(
+        "PlayerGameIdentity",
+        back_populates="player_profile",
+        cascade="all, delete-orphan",
+    )
+
+
+class TeamProfile(Base):
+    __tablename__ = "team_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    display_name: Mapped[str] = mapped_column(String, nullable=False)
+    short_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    primary_color: Mapped[str | None] = mapped_column(String, nullable=True)
+    secondary_color: Mapped[str | None] = mapped_column(String, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class PlayerGameIdentity(Base):
+    __tablename__ = "player_game_identities"
+    __table_args__ = (
+        UniqueConstraint(
+            "player_profile_id",
+            "game",
+            "game_handle",
+            name="uq_player_game_identity",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    player_profile_id: Mapped[int] = mapped_column(
+        ForeignKey("player_profiles.id"), nullable=False, index=True
+    )
+    game: Mapped[str] = mapped_column(String, nullable=False)
+    game_handle: Mapped[str] = mapped_column(String, nullable=False)
+    game_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    platform: Mapped[str | None] = mapped_column(String, nullable=True)
+    region: Mapped[str | None] = mapped_column(String, nullable=True)
+    verified_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="unverified"
+    )
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    player_profile: Mapped["PlayerProfile"] = relationship(
+        "PlayerProfile", back_populates="game_identities"
+    )

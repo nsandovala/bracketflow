@@ -200,3 +200,33 @@ PlayerMatchStat
 - No auth, no scraping, no dependencias nuevas.
 - Cualquier implementacion parcial debe ser aditiva (tablas nuevas, campos
   opcionales) para no romper DBs ni reportes existentes.
+
+### Player Identity v0 - iniciado (2026-07-21)
+
+Estado: **v0 metadata-only** iniciado en `feat/team-player-identity-metadata-v0`.
+Esto es un catalogo estable y opcional, **no** login/accounts/perfiles publicos.
+
+Alcance v0:
+
+- Tablas nuevas aditivas: `player_profiles`, `team_profiles`,
+  `player_game_identities`. Sin FK desde `players`/`teams` de torneo hacia
+  estos perfiles: el link se hara en una v1 posterior sin migracion
+  destructiva.
+- Endpoints solo lectura/creacion:
+  - `GET /identity/players`, `POST /identity/players`
+  - `GET /identity/teams`, `POST /identity/teams`
+  - `GET /identity/game-identities?player_profile_id=`,
+    `POST /identity/game-identities`
+- Los reportes oficiales siguen siendo la fuente de verdad del scoring; esta
+  capa no altera calculos ni el shape del leaderboard.
+- `verified_status` empieza en `unverified` y sigue siendo estado futuro
+  (ver Capas futuras arriba).
+- Sin UI operator por ahora: si aparece, va detras de `/setup` o `/ajustes`
+  como "Identidad / proximamente".
+
+Fuera de v0 (siguen en backlog):
+
+- Update/delete de perfiles.
+- Link `Player.tournament -> PlayerProfile` y `Team -> TeamProfile`.
+- `PlayerTournamentStat` / `PlayerMatchStat` derivadas de reportes.
+- Perfiles publicos, iconos, overlays por player, Discord/Copilot.

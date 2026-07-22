@@ -1804,3 +1804,120 @@ def get_leaderboard(
     else:
         leaderboard.sort(key=lambda entry: (-entry.kills, entry.team_name.casefold()))
     return leaderboard
+
+
+# ---------------------------------------------------------------------------
+# Identity metadata v0 CRUD — perfiles y game handles independientes del
+# scoring/reports. Sin efectos secundarios sobre tournaments/matches/results.
+# ---------------------------------------------------------------------------
+
+
+def _identity_now_iso() -> str:
+    return utc_now_iso()
+
+
+def list_player_profiles(db: Session) -> list[models.PlayerProfile]:
+    return (
+        db.query(models.PlayerProfile)
+        .order_by(models.PlayerProfile.display_name.asc(), models.PlayerProfile.id.asc())
+        .all()
+    )
+
+
+def get_player_profile(db: Session, profile_id: int) -> models.PlayerProfile | None:
+    return db.query(models.PlayerProfile).filter(models.PlayerProfile.id == profile_id).first()
+
+
+def create_player_profile(
+    db: Session, payload: schemas.PlayerProfileCreate
+) -> models.PlayerProfile:
+    now = _identity_now_iso()
+    profile = models.PlayerProfile(
+        display_name=payload.display_name,
+        short_name=payload.short_name,
+        country=payload.country,
+        avatar_url=payload.avatar_url,
+        notes=payload.notes,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def list_team_profiles(db: Session) -> list[models.TeamProfile]:
+    return (
+        db.query(models.TeamProfile)
+        .order_by(models.TeamProfile.display_name.asc(), models.TeamProfile.id.asc())
+        .all()
+    )
+
+
+def get_team_profile(db: Session, profile_id: int) -> models.TeamProfile | None:
+    return db.query(models.TeamProfile).filter(models.TeamProfile.id == profile_id).first()
+
+
+def create_team_profile(
+    db: Session, payload: schemas.TeamProfileCreate
+) -> models.TeamProfile:
+    now = _identity_now_iso()
+    profile = models.TeamProfile(
+        display_name=payload.display_name,
+        short_name=payload.short_name,
+        logo_url=payload.logo_url,
+        primary_color=payload.primary_color,
+        secondary_color=payload.secondary_color,
+        notes=payload.notes,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def list_player_game_identities(
+    db: Session, player_profile_id: int | None = None
+) -> list[models.PlayerGameIdentity]:
+    query = db.query(models.PlayerGameIdentity)
+    if player_profile_id is not None:
+        query = query.filter(models.PlayerGameIdentity.player_profile_id == player_profile_id)
+    return query.order_by(
+        models.PlayerGameIdentity.player_profile_id.asc(),
+        models.PlayerGameIdentity.game.asc(),
+        models.PlayerGameIdentity.id.asc(),
+    ).all()
+
+
+def create_player_game_identity(
+    db: Session, payload: schemas.PlayerGameIdentityCreate
+) -> models.PlayerGameIdentity:
+    profile = get_player_profile(db, payload.player_profile_id)
+    if profile is None:
+        raise ValueError("player_profile_id no existe.")
+
+    now = _identity_now_iso()
+    identity = models.PlayerGameIdentity(
+        player_profile_id=payload.player_profile_id,
+        game=payload.game,
+        game_handle=payload.game_handle,
+        game_id=payload.game_id,
+        platform=payload.platform,
+        region=payload.region,
+        verified_status=payload.verified_status,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(identity)
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise ValueError(
+            "Ya existe un game_handle igual para este jugador y juego."
+        ) from error
+    db.refresh(identity)
+    return identity
