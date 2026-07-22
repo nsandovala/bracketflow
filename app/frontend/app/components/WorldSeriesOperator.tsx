@@ -47,6 +47,7 @@ import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
 import { detectDelimiter, parseDelimitedTable } from "../../lib/statsDraftImport";
+import { validateManualPlayerStats } from "../../lib/manualPlayerStats";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
@@ -1839,7 +1840,29 @@ export default function WorldSeriesOperator({
                     placement:
                       resultDrafts[key]?.placement ??
                       (savedResult ? String(savedResult.placement) : ""),
+                    playerKills: resultDrafts[key]?.playerKills,
                   };
+                  const playerRows = team.members.map((member) => ({
+                    id: member.player.id,
+                    name: member.player.nickname,
+                  }));
+                  const savedPlayerKills = new Map(
+                    (savedResult?.player_stats ?? []).map((stat) => [stat.player_name, stat.kills])
+                  );
+                  const playerKillValues = Object.fromEntries(
+                    playerRows.map((player) => [
+                      player.id,
+                      draft.playerKills?.[player.id] ??
+                        (savedPlayerKills.has(player.name)
+                          ? String(savedPlayerKills.get(player.name))
+                          : ""),
+                    ])
+                  );
+                  const playerStatsValidation = validateManualPlayerStats(
+                    playerRows,
+                    playerKillValues,
+                    draft.kills
+                  );
                   const estimatedTotal =
                     savedResult?.total_points.toFixed(1) ??
                     (usesPlacement
@@ -1915,11 +1938,53 @@ export default function WorldSeriesOperator({
                         </div>
                       </div>
 
+                      {playerRows.length > 0 ? (
+                        <div className="opr-player-stats">
+                          <div className="opr-player-stats-head">
+                            <div>
+                              <strong>Player stats</strong>
+                              <span>Opcional · detalle para MVP y caster</span>
+                            </div>
+                            <span>No cambia el scoring</span>
+                          </div>
+                          <div className="opr-player-stats-grid">
+                            {playerRows.map((player) => (
+                              <label key={player.id} className="opr-player-stat-row">
+                                <span>{player.name}</span>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="0"
+                                  step="1"
+                                  value={playerKillValues[player.id]}
+                                  placeholder="—"
+                                  aria-label={`Kills de ${player.name}`}
+                                  disabled={reportLocked}
+                                  onChange={(event) =>
+                                    onUpdateDraft(activeMatch.id, team.id, {
+                                      playerKills: {
+                                        ...draft.playerKills,
+                                        [player.id]: event.target.value,
+                                      },
+                                    })
+                                  }
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          {!playerStatsValidation.ok ? (
+                            <p className="opr-player-stats-error" role="alert">
+                              {playerStatsValidation.message}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+
                       <div className="opr-card-foot">
                         <button
                           type="button"
                           className="opr-save"
-                          disabled={submitting || reportLocked}
+                          disabled={submitting || reportLocked || !playerStatsValidation.ok}
                           onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
                         >
                           {isFinalized

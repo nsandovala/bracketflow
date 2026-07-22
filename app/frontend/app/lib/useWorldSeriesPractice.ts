@@ -47,12 +47,14 @@ import {
   resolveTournamentEngine,
 } from "../../lib/tournamentModel";
 import { getTeamDisplayName } from "../../lib/tournamentStatus";
+import { validateManualPlayerStats } from "../../lib/manualPlayerStats";
 
 export const ACTIVE_WORLD_SERIES_TOURNAMENT_KEY = "bf:world-series-practice:tournament-id";
 
 export type ResultDraft = {
   kills: string;
   placement: string;
+  playerKills?: Record<number, string>;
 };
 
 export type KillRaceMapDraft = {
@@ -304,6 +306,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       [key]: {
         kills: patch.kills ?? current[key]?.kills ?? "",
         placement: patch.placement ?? current[key]?.placement ?? "",
+        playerKills: patch.playerKills ?? current[key]?.playerKills,
       },
     }));
   }
@@ -922,12 +925,26 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     const saved = activeMatchResults.find((result) => result.team_id === teamId);
     const killsValue = resultDrafts[key]?.kills ?? (saved ? String(saved.kills) : "");
     const placementValue = resultDrafts[key]?.placement ?? (saved ? String(saved.placement) : "");
+    const team = teams.find((candidate) => candidate.id === teamId);
+    const playerStatsValidation = validateManualPlayerStats(
+      team?.members.map((member) => ({
+        id: member.player.id,
+        name: member.player.nickname,
+      })) ?? [],
+      resultDrafts[key]?.playerKills,
+      killsValue
+    );
+    if (!playerStatsValidation.ok) {
+      setMessage(playerStatsValidation.message);
+      return null;
+    }
     return persistTeamReport(
       matchId,
       teamId,
       killsValue,
       placementValue,
-      `Reporte guardado: ${teams.find((team) => team.id === teamId)?.name ?? "equipo"}`
+      `Reporte guardado: ${team?.name ?? "equipo"}`,
+      playerStatsValidation.playerStats
     );
   }
 
