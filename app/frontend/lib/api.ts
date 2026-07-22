@@ -220,6 +220,68 @@ export type LeaderboardEntry = {
   best_placement: number | null;
 };
 
+export type PlayerProfile = {
+  id: number;
+  display_name: string;
+  short_name: string | null;
+  country: string | null;
+  avatar_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeamProfile = {
+  id: number;
+  display_name: string;
+  short_name: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlayerGameIdentity = {
+  id: number;
+  player_profile_id: number;
+  game: string;
+  game_handle: string;
+  game_id: string | null;
+  platform: string | null;
+  region: string | null;
+  verified_status: "unverified" | "self_reported" | "verified";
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlayerProfileCreate = Pick<
+  PlayerProfile,
+  "display_name" | "short_name" | "country" | "avatar_url" | "notes"
+>;
+
+export type TeamProfileCreate = Pick<
+  TeamProfile,
+  | "display_name"
+  | "short_name"
+  | "logo_url"
+  | "primary_color"
+  | "secondary_color"
+  | "notes"
+>;
+
+export type PlayerGameIdentityCreate = Pick<
+  PlayerGameIdentity,
+  | "player_profile_id"
+  | "game"
+  | "game_handle"
+  | "game_id"
+  | "platform"
+  | "region"
+  | "verified_status"
+>;
+
 export function getHealth() {
   return request<{ status: string }>("/health");
 }
@@ -439,4 +501,32 @@ export function getLeaderboard(tournamentId: number) {
 
 export function getTournamentResults(tournamentId: number) {
   return request<TeamResultDetail[]>(`/tournaments/${tournamentId}/results`);
+}
+
+export function getIdentityPlayers() {
+  return request<PlayerProfile[]>("/identity/players");
+}
+
+export function createIdentityPlayer(payload: PlayerProfileCreate) {
+  return request<PlayerProfile>("/identity/players", { method: "POST", body: payload });
+}
+
+export function getIdentityTeams() {
+  return request<TeamProfile[]>("/identity/teams");
+}
+
+export function createIdentityTeam(payload: TeamProfileCreate) {
+  return request<TeamProfile>("/identity/teams", { method: "POST", body: payload });
+}
+
+export function getPlayerGameIdentities(playerProfileId?: number) {
+  const query = playerProfileId ? `?player_profile_id=${playerProfileId}` : "";
+  return request<PlayerGameIdentity[]>(`/identity/game-identities${query}`);
+}
+
+export function createPlayerGameIdentity(payload: PlayerGameIdentityCreate) {
+  return request<PlayerGameIdentity>("/identity/game-identities", {
+    method: "POST",
+    body: payload,
+  });
 }

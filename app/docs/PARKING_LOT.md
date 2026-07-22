@@ -227,6 +227,8 @@ Alcance v0:
 Fuera de v0 (siguen en backlog):
 
 - Update/delete de perfiles.
+- Edicion de display name y del resto de metadata desde UI (el contrato HTTP
+  actual solo permite listar/crear).
 - Link `Player.tournament -> PlayerProfile` y `Team -> TeamProfile`.
 - `PlayerTournamentStat` / `PlayerMatchStat` derivadas de reportes.
 - Perfiles publicos, iconos, overlays por player, Discord/Copilot.

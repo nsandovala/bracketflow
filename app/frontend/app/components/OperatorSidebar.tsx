@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/standings", label: "Standings", Icon: IconStandings },
   { href: "/stream", label: "Stream", Icon: IconStream },
   { href: "/caster", label: "Caster", Icon: IconStream },
-  { href: "/equipos", label: "Setup", Icon: IconTeams },
+  { href: "/equipos", label: "Equipos", Icon: IconTeams },
   { href: "/ajustes", label: "Ajustes", Icon: IconSettings },
 ];
 
