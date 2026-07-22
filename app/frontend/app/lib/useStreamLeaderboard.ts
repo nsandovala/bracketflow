@@ -9,11 +9,20 @@ import {
   TeamResultDetail,
   Tournament,
   getLeaderboard,
+  getIdentityPlayers,
+  getIdentityTeams,
   getMatches,
   getTeams,
   getTournament,
   getTournamentResults,
+  getPlayerGameIdentities,
 } from "../../lib/api";
+import {
+  EMPTY_IDENTITY_CATALOG,
+  getTeamIdentityContext,
+  resolveTournamentResults,
+  resolveTournamentTeams,
+} from "../../lib/identityResolver";
 import { ACTIVE_WORLD_SERIES_TOURNAMENT_KEY } from "./useWorldSeriesPractice";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 
@@ -22,6 +31,7 @@ export const STREAM_POLL_INTERVAL_MS = 7000;
 
 export type StreamStanding = LeaderboardEntry & {
   players: string[];
+  identity_short_name?: string | null;
 };
 
 export type StreamLeaderboardState = {
@@ -85,7 +95,7 @@ function buildSignature(
   const rows = standings
     .map(
       (entry) =>
-        `${entry.team_id}:${entry.total_points}:${entry.kills}:${entry.best_placement ?? "-"}:${entry.matches_played}:${entry.players.join(",")}`
+        `${entry.team_id}:${entry.team_name}:${entry.identity_short_name ?? "-"}:${entry.total_points}:${entry.kills}:${entry.best_placement ?? "-"}:${entry.matches_played}:${entry.players.join(",")}`
     )
     .join("|");
   // player_stats entra en la firma para que overlays (MVP) reaccionen a stats nuevas.
@@ -164,16 +174,33 @@ export function useStreamLeaderboard(
         const isBracket =
           engine.scoringProfile === "kill_race" ||
           engine.tournamentStructure !== "cumulative";
-        const [teams, results, matches] = await Promise.all([
+        const [rawTeams, rawResults, matches, identityTeams, identityPlayers, gameIdentities] = await Promise.all([
           getTeams(tournamentId),
           isBracket ? Promise.resolve([]) : getTournamentResults(tournamentId),
           getMatches(tournamentId),
+          getIdentityTeams().catch(() => EMPTY_IDENTITY_CATALOG.teams),
+          getIdentityPlayers().catch(() => EMPTY_IDENTITY_CATALOG.players),
+          getPlayerGameIdentities().catch(() => EMPTY_IDENTITY_CATALOG.gameIdentities),
         ]);
         const leaderboard = isBracket ? [] : await getLeaderboard(tournamentId);
 
         if (!active) return;
 
-        const standings = buildStandings(leaderboard, teams);
+        const catalog = { teams: identityTeams, players: identityPlayers, gameIdentities };
+        const teams = resolveTournamentTeams(rawTeams, catalog);
+        const results = resolveTournamentResults(rawResults, rawTeams, catalog);
+        const rawTeamById = new Map(rawTeams.map((team) => [team.id, team]));
+        const resolvedTeamById = new Map(teams.map((team) => [team.id, team]));
+        const standings = buildStandings(leaderboard, teams).map((entry) => {
+          const rawTeam = rawTeamById.get(entry.team_id);
+          return {
+            ...entry,
+            team_name: resolvedTeamById.get(entry.team_id)?.name ?? entry.team_name,
+            identity_short_name: rawTeam
+              ? getTeamIdentityContext(rawTeam, catalog).shortName
+              : null,
+          };
+        });
         const afterGameNumber = isBracket
           ? matches.some((match) => match.maps.length > 0 || match.winner_id !== null)
             ? 1

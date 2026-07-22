@@ -95,9 +95,9 @@ export default function StreamOverlayMvp({
   const name = playerMvp ? playerMvp.playerName : teamMvp!.team_name;
   const subline = playerMvp
     ? playerMvp.teamName
-    : teamMvp!.players.length > 0
-      ? teamMvp!.players.join(" · ")
-      : "Roster pendiente";
+    : `Player stats pending${
+        teamMvp!.players.length > 0 ? ` · ${teamMvp!.players.join(" · ")}` : ""
+      }`;
 
   return (
     <div className="bf-ov-mvp">

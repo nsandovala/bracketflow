@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import {
@@ -15,6 +15,13 @@ import {
 } from "../../lib/tournamentStatus";
 import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
 import { layoutLabel, useBroadcastSetup } from "../lib/broadcastSetup";
+import { useIdentityMetadata } from "../lib/useIdentityMetadata";
+import {
+  getPlayerIdentityContext,
+  getTeamIdentityContext,
+  resolveTournamentResults,
+  resolveTournamentTeams,
+} from "../../lib/identityResolver";
 import BroadcastSetup from "./BroadcastSetup";
 
 const STREAM_ORIGIN = "http://localhost:3000";
@@ -105,7 +112,7 @@ export default function CasterHub() {
     backendOnline,
     loading,
     tournaments,
-    teams,
+    teams: rawTeams,
     matches,
     selectedTournament,
     selectedTournamentId,
@@ -113,10 +120,19 @@ export default function CasterHub() {
     sortedStandings,
     latestReportedRound,
     totalTeams,
-    tournamentResults,
+    tournamentResults: rawTournamentResults,
     selectedEngine,
     selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
+  const identityCatalog = useIdentityMetadata();
+  const teams = useMemo(
+    () => resolveTournamentTeams(rawTeams, identityCatalog),
+    [rawTeams, identityCatalog]
+  );
+  const tournamentResults = useMemo(
+    () => resolveTournamentResults(rawTournamentResults, rawTeams, identityCatalog),
+    [rawTournamentResults, rawTeams, identityCatalog]
+  );
 
   // El perfil se persiste con el mismo store local y se edita desde Caster Hub.
   const { setup: broadcastSetup } = useBroadcastSetup();
@@ -131,7 +147,10 @@ export default function CasterHub() {
 
   const engine = selectedTournament ? selectedEngine ?? resolveTournamentEngine(selectedTournament) : null;
   const isBracket = engine?.primaryView === "bracket";
-  const standings = [...sortedStandings].sort((left, right) => {
+  const standings = sortedStandings.map((entry) => ({
+    ...entry,
+    team_name: teams.find((team) => team.id === entry.team_id)?.name ?? entry.team_name,
+  })).sort((left, right) => {
     if (right.total_points !== left.total_points) {
       return right.total_points - left.total_points;
     }
@@ -147,6 +166,11 @@ export default function CasterHub() {
     return left.team_name.localeCompare(right.team_name);
   });
   const teamById = new Map(teams.map((team) => [team.id, team]));
+  const rawTeamById = new Map(rawTeams.map((team) => [team.id, team]));
+  const getIdentityTeamContext = (teamId: number) => {
+    const team = rawTeamById.get(teamId) ?? teamById.get(teamId);
+    return team ? getTeamIdentityContext(team, identityCatalog) : null;
+  };
   const leader = standings[0] ?? null;
   const highestKills = [...standings].sort((left, right) => right.kills - left.kills)[0] ?? null;
   const completedMatches = matches.filter(
@@ -176,10 +200,10 @@ export default function CasterHub() {
     }
   }
 
-  let mvp: { name: string; kills: number } | null = null;
+  let mvp: { name: string; kills: number; notes: string | null } | null = null;
   for (const [name, kills] of playerKills) {
     if (!mvp || kills > mvp.kills || (kills === mvp.kills && name.localeCompare(mvp.name) < 0)) {
-      mvp = { name, kills };
+      mvp = { name, kills, notes: getPlayerIdentityContext(name, identityCatalog).notes };
     }
   }
 
@@ -187,8 +211,11 @@ export default function CasterHub() {
   const resolvedLeaderLabel = leaderLabel
     ? getTeamDisplayName(leaderLabel)
     : leader?.team_name ?? "Sin líder";
+  const highestKillsContext = highestKills
+    ? getIdentityTeamContext(highestKills.team_id)
+    : null;
   const topKillsLabel = highestKills
-    ? `${highestKills.team_name} · ${highestKills.kills} K`
+    ? `${highestKills.team_name}${highestKillsContext?.shortName ? ` (${highestKillsContext.shortName})` : ""} · ${highestKills.kills} K`
     : "Datos pendientes";
   const championLabel =
     matchPointStatus.state === "champion"
@@ -223,6 +250,7 @@ export default function CasterHub() {
     : leader
       ? resolvedLeaderLabel
       : "Sin datos suficientes";
+  const teamToWatchContext = highestKillsContext;
 
   const nowNarration = (() => {
     if (!selectedTournament) {
@@ -518,6 +546,7 @@ export default function CasterHub() {
                 <p>
                   <strong>{teamToWatch}</strong>
                   {highestKills ? ` lidera en kills con ${highestKills.kills}.` : " no tiene estadísticas todavía."}
+                  {teamToWatchContext?.notes ? ` Nota Identity: ${teamToWatchContext.notes}` : ""}
                 </p>
               </div>
 
@@ -525,7 +554,7 @@ export default function CasterHub() {
                 <span>MVP fallback</span>
                 <p>
                   {mvp ? (
-                    <><strong>{mvp.name}</strong> suma {mvp.kills} kills reportadas.</>
+                    <><strong>{mvp.name}</strong> suma {mvp.kills} kills reportadas.{mvp.notes ? ` Nota Identity: ${mvp.notes}` : ""}</>
                   ) : highestKills ? (
                     <><strong>{highestKills.team_name}</strong> es la referencia por equipo con {highestKills.kills} kills.</>
                   ) : (
