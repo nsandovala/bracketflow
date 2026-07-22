@@ -80,3 +80,27 @@ Estos warnings ya existian y no fueron abiertos por D1.
 - Push Mode
 - OCR
 - Caster Suite
+
+## Mac / Next Dev: Turbopack cache reset
+
+### Context
+
+When working from `/Volumes/Dev-storage` on Mac, Next.js / Turbopack can occasionally serve a stale CSS snapshot after a large pull or merge.
+
+Symptoms:
+
+- Operator shell loads, but inner screens look like plain text.
+- `/caster`, `/dashboard`, `/torneos`, or `/ajustes` lose layout/card styling.
+- Sidebar/background still render, but component-level classes are missing.
+- `npm run build` can still pass because production CSS is correct.
+- Backend and tests can also be healthy.
+
+This is usually not a backend or feature-code issue.
+
+### Confirm
+
+Check Git first:
+
+```bash
+git status -sb
+git log --oneline --decorate -5
