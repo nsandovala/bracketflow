@@ -12,8 +12,8 @@ import {
   useBroadcastSetup,
 } from "../lib/broadcastSetup";
 
-// Panel de configuracion de presentacion broadcast (vive en /ajustes dentro del
-// shell del operador). El valor persistido viene de useBroadcastSetup (SSR-safe);
+// Panel de configuracion de presentacion broadcast dentro de Caster Hub. El
+// valor persistido viene de useBroadcastSetup (SSR-safe);
 // `draft` es la edicion local no guardada. `form = draft ?? persisted`, asi no
 // hay setState dentro de un efecto y no hay mismatch de hidratacion.
 export default function BroadcastSetup() {
@@ -53,9 +53,18 @@ export default function BroadcastSetup() {
     <section className="bf-bset" aria-label="Broadcast Setup">
       <header className="bf-bset-head">
         <div>
-          <span className="bf-bset-eyebrow">Broadcast / OBS</span>
-          <h2>Broadcast Setup</h2>
-          <p>Perfil de transmisión y valores por defecto para overlays y Caster Hub. Se guarda en este navegador.</p>
+          <span className="bf-bset-eyebrow">Perfil broadcast activo</span>
+          <h2>Editar perfil broadcast</h2>
+          <p>
+            Configura el perfil broadcast local que Caster Hub usa para recomendar y abrir overlays.
+            Se guarda solo en este navegador.
+          </p>
+          <p className="bf-bset-flow" aria-label="Flujo broadcast">
+            Caster Hub <span aria-hidden="true">→</span> Stream/OBS
+          </p>
+          <p className="bf-bset-scope">
+            No crea reportes, no cambia el scoring ni genera datos del torneo.
+          </p>
         </div>
         <span className={`bf-bset-status ${statusTone}`}>
           <i />
