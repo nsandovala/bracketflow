@@ -15,6 +15,7 @@ import {
 } from "../../lib/tournamentStatus";
 import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
 import { layoutLabel, useBroadcastSetup } from "../lib/broadcastSetup";
+import BroadcastSetup from "./BroadcastSetup";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
@@ -22,6 +23,7 @@ type OverlayDefinition = {
   layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard";
   title: string;
   description: string;
+  note?: string;
   transparent: boolean;
 };
 
@@ -42,12 +44,14 @@ const OVERLAYS: OverlayDefinition[] = [
     layout: "matchpoint",
     title: "Match point",
     description: "Estado de umbral y campeón confirmado en la transmisión.",
+    note: "Visible solo con Match Point o Campeón.",
     transparent: true,
   },
   {
     layout: "mvp",
     title: "MVP",
     description: "Jugador destacado desde los stats reportados de la partida.",
+    note: "Usa player stats si existen; si no, Team MVP.",
     transparent: true,
   },
   {
@@ -94,6 +98,7 @@ export default function CasterHub() {
   const searchParams = useSearchParams();
   const preferredTournamentId = parseTournamentId(searchParams.get("tournamentId"));
   const [copyState, setCopyState] = useState<{ key: string; status: "copied" | "error" } | null>(null);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
 
   const {
@@ -113,7 +118,7 @@ export default function CasterHub() {
     selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
 
-  // Perfil broadcast configurado en /ajustes (solo lectura, low-risk).
+  // El perfil se persiste con el mismo store local y se edita desde Caster Hub.
   const { setup: broadcastSetup } = useBroadcastSetup();
 
   useEffect(() => {
@@ -301,22 +306,41 @@ export default function CasterHub() {
       <section className="bf-caster-profile" aria-label="Perfil de transmisión">
         <span className="bf-caster-profile-mark">{broadcastSetup.brandMark || "BF"}</span>
         <div className="bf-caster-profile-copy">
+          <span className="bf-caster-profile-label">Perfil broadcast activo</span>
           <strong>{broadcastSetup.eventName || "Evento sin configurar"}</strong>
           <span>
             {broadcastSetup.organizer || "Sin organizador"}
             {broadcastSetup.casterName ? ` · Caster: ${broadcastSetup.casterName}` : ""}
           </span>
+          <small>
+            Guardado en este navegador. Caster Hub usa este perfil para recomendar y abrir URLs;
+            /stream renderiza el overlay real para OBS.
+          </small>
         </div>
         <div className="bf-caster-profile-meta">
           <span className="bf-caster-profile-chip">
             Overlay: {layoutLabel(broadcastSetup.defaultLayout)}
           </span>
           <span className="bf-caster-profile-chip">{broadcastSetup.obsTarget}</span>
-          <Link href="/ajustes" className="bf-caster-profile-edit">
-            Editar
-          </Link>
+          <button
+            type="button"
+            className="bf-caster-profile-edit"
+            aria-expanded={profileEditorOpen}
+            aria-controls="caster-broadcast-profile-editor"
+            onClick={() => setProfileEditorOpen((open) => !open)}
+          >
+            {profileEditorOpen ? "Cerrar editor" : "Editar perfil"}
+          </button>
         </div>
       </section>
+
+      <div
+        id="caster-broadcast-profile-editor"
+        className="bf-caster-profile-editor"
+        hidden={!profileEditorOpen}
+      >
+        <BroadcastSetup />
+      </div>
 
       <section className="bf-caster-context" aria-label="Torneo de transmisión">
         <label className="bf-caster-select-label" htmlFor="caster-tournament">
@@ -417,10 +441,11 @@ export default function CasterHub() {
                         <h3>
                           {overlay.title}
                           {isRecommended && (
-                            <span className="bf-caster-overlay-badge">Recomendado</span>
+                            <span className="bf-caster-overlay-badge">Recomendado por tu perfil</span>
                           )}
                         </h3>
                         <p>{overlay.description}</p>
+                        {overlay.note && <small className="bf-caster-overlay-note">{overlay.note}</small>}
                         <code>{url}</code>
                       </div>
                       <div className="bf-caster-overlay-actions">
