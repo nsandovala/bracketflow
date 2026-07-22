@@ -232,3 +232,14 @@ Fuera de v0 (siguen en backlog):
 - Link `Player.tournament -> PlayerProfile` y `Team -> TeamProfile`.
 - `PlayerTournamentStat` / `PlayerMatchStat` derivadas de reportes.
 - Perfiles publicos, iconos, overlays por player, Discord/Copilot.
+
+### Identity matching en Caster/Stream v0 (2026-07-22)
+
+- El matching actual es heuristico y solo frontend: compara nombres
+  normalizados de forma exacta contra `display_name`, `short_name` y
+  `game_handle`. Si hay mas de un candidato, conserva el nombre local.
+- No existe merge/deduplicacion automatica ni se modifica data del torneo.
+- Siguen pendientes update/delete de perfiles y auth/aislamiento por
+  tenant/workspace.
+- Futuro: links explicitos `TeamProfile <-> Team` y
+  `PlayerProfile <-> Player` para reemplazar el matching heuristico.

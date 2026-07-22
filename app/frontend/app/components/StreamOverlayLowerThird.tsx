@@ -88,7 +88,9 @@ export default function StreamOverlayLowerThird({
               >
                 <div className="bf-ov-lower-rank">{String(rank).padStart(2, "0")}</div>
                 <div className="bf-ov-lower-team-body">
-                  <div className="bf-ov-lower-team-name">{entry.team_name}</div>
+                  <div className="bf-ov-lower-team-name">
+                    {entry.identity_short_name ?? entry.team_name}
+                  </div>
                   <div className="bf-ov-lower-team-stats">
                     <span className="bf-ov-lower-pts">{entry.total_points.toFixed(1)}</span>
                     <span className="bf-ov-lower-kills">{entry.kills}K</span>
