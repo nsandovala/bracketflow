@@ -535,3 +535,69 @@ def get_leaderboard(
     tournament = get_tournament_or_404(db, tournament_id)
     ensure_battle_royale_tournament(tournament)
     return crud.get_leaderboard(db, tournament)
+
+
+# ---------------------------------------------------------------------------
+# Identity metadata v0 — perfiles opcionales de jugador/equipo y game handles.
+# Endpoints read/create solamente; no hay update/delete todavia. No afecta
+# scoring, reports, ni el shape del leaderboard.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/identity/players", response_model=list[schemas.PlayerProfile])
+def list_identity_players(db: Session = Depends(get_db)) -> list[schemas.PlayerProfile]:
+    return crud.list_player_profiles(db)
+
+
+@app.post(
+    "/identity/players",
+    response_model=schemas.PlayerProfile,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_identity_player(
+    payload: schemas.PlayerProfileCreate,
+    db: Session = Depends(get_db),
+) -> schemas.PlayerProfile:
+    return crud.create_player_profile(db, payload)
+
+
+@app.get("/identity/teams", response_model=list[schemas.TeamProfile])
+def list_identity_teams(db: Session = Depends(get_db)) -> list[schemas.TeamProfile]:
+    return crud.list_team_profiles(db)
+
+
+@app.post(
+    "/identity/teams",
+    response_model=schemas.TeamProfile,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_identity_team(
+    payload: schemas.TeamProfileCreate,
+    db: Session = Depends(get_db),
+) -> schemas.TeamProfile:
+    return crud.create_team_profile(db, payload)
+
+
+@app.get("/identity/game-identities", response_model=list[schemas.PlayerGameIdentity])
+def list_identity_game_identities(
+    player_profile_id: int | None = None,
+    db: Session = Depends(get_db),
+) -> list[schemas.PlayerGameIdentity]:
+    return crud.list_player_game_identities(db, player_profile_id=player_profile_id)
+
+
+@app.post(
+    "/identity/game-identities",
+    response_model=schemas.PlayerGameIdentity,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_identity_game_identity(
+    payload: schemas.PlayerGameIdentityCreate,
+    db: Session = Depends(get_db),
+) -> schemas.PlayerGameIdentity:
+    try:
+        return crud.create_player_game_identity(db, payload)
+    except ValueError as error:
+        message = str(error)
+        code = 404 if "no existe" in message else 400
+        raise HTTPException(status_code=code, detail=message) from error

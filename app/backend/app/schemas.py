@@ -315,3 +315,170 @@ class LeaderboardEntry(BaseModel):
     placement_points: float
     total_points: float
     best_placement: int | None
+
+
+# ---------------------------------------------------------------------------
+# Identity metadata v0 — perfiles opcionales de jugador/equipo y game handles.
+# Aditivo: no altera schemas de scoring, reports ni tournaments existentes.
+# ---------------------------------------------------------------------------
+
+
+def _validate_identity_display_name(value: str) -> str:
+    stripped = value.strip()
+    if len(stripped) < 2:
+        raise ValueError("display_name debe tener al menos 2 caracteres.")
+    return stripped
+
+
+def _validate_optional_str(value: str | None, *, max_length: int | None = None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if max_length is not None and len(stripped) > max_length:
+        raise ValueError(f"El campo excede el máximo de {max_length} caracteres.")
+    return stripped
+
+
+VERIFIED_STATUSES = ("unverified", "self_reported", "verified")
+
+
+class PlayerProfileCreate(BaseModel):
+    display_name: str
+    short_name: str | None = None
+    country: str | None = None
+    avatar_url: str | None = None
+    notes: str | None = None
+
+    @field_validator("display_name")
+    @classmethod
+    def check_display_name(cls, value: str) -> str:
+        return _validate_identity_display_name(value)
+
+    @field_validator("short_name")
+    @classmethod
+    def check_short_name(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=24)
+
+    @field_validator("country")
+    @classmethod
+    def check_country(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=48)
+
+    @field_validator("avatar_url")
+    @classmethod
+    def check_avatar_url(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=500)
+
+    @field_validator("notes")
+    @classmethod
+    def check_notes(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value)
+
+
+class PlayerProfile(BaseModel):
+    id: int
+    display_name: str
+    short_name: str | None
+    country: str | None
+    avatar_url: str | None
+    notes: str | None
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TeamProfileCreate(BaseModel):
+    display_name: str
+    short_name: str | None = None
+    logo_url: str | None = None
+    primary_color: str | None = None
+    secondary_color: str | None = None
+    notes: str | None = None
+
+    @field_validator("display_name")
+    @classmethod
+    def check_display_name(cls, value: str) -> str:
+        return _validate_identity_display_name(value)
+
+    @field_validator("short_name")
+    @classmethod
+    def check_short_name(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=24)
+
+    @field_validator("logo_url")
+    @classmethod
+    def check_logo_url(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=500)
+
+    @field_validator("primary_color", "secondary_color")
+    @classmethod
+    def check_color(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=32)
+
+    @field_validator("notes")
+    @classmethod
+    def check_notes(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value)
+
+
+class TeamProfile(BaseModel):
+    id: int
+    display_name: str
+    short_name: str | None
+    logo_url: str | None
+    primary_color: str | None
+    secondary_color: str | None
+    notes: str | None
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlayerGameIdentityCreate(BaseModel):
+    player_profile_id: int = Field(ge=1)
+    game: str
+    game_handle: str
+    game_id: str | None = None
+    platform: str | None = None
+    region: str | None = None
+    verified_status: Literal["unverified", "self_reported", "verified"] = "unverified"
+
+    @field_validator("game")
+    @classmethod
+    def check_game(cls, value: str) -> str:
+        stripped = value.strip()
+        if len(stripped) < 2:
+            raise ValueError("game es requerido (min 2 chars).")
+        return stripped
+
+    @field_validator("game_handle")
+    @classmethod
+    def check_game_handle(cls, value: str) -> str:
+        stripped = value.strip()
+        if len(stripped) < 2:
+            raise ValueError("game_handle es requerido (min 2 chars).")
+        return stripped
+
+    @field_validator("game_id", "platform", "region")
+    @classmethod
+    def check_optional_short(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=64)
+
+
+class PlayerGameIdentity(BaseModel):
+    id: int
+    player_profile_id: int
+    game: str
+    game_handle: str
+    game_id: str | None
+    platform: str | None
+    region: str | None
+    verified_status: str
+    created_at: str
+    updated_at: str
+
+    model_config = ConfigDict(from_attributes=True)
