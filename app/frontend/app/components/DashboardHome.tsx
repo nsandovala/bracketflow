@@ -177,11 +177,7 @@ export default function DashboardHome() {
   const matchPointActive =
     matchPointStatus.state === "threshold_reached" ||
     matchPointStatus.state === "champion";
-  const mvpReadinessLabel = hasPlayerStats
-    ? "MVP listo"
-    : hasOfficialReports
-      ? "Team MVP fallback"
-      : "MVP pendiente";
+  const mvpReadinessLabel = hasPlayerStats ? "MVP LISTO" : "MVP PENDIENTE";
 
   const pendingReportsCount = activeMatch ? Math.max(totalTeams - activeMatchResults.length, 0) : 0;
   const hasPendingOperation =

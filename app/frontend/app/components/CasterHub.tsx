@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import { getMvpState } from "../../lib/mvp";
 import {
   findChampion,
   getMatchPointStatus,
@@ -193,19 +194,11 @@ export default function CasterHub() {
       : { state: "idle" as const };
   const matchPointMessage = getMatchPointStatusMessage(matchPointStatus);
 
-  const playerKills = new Map<string, number>();
-  for (const result of tournamentResults) {
-    for (const playerStat of result.player_stats ?? []) {
-      playerKills.set(playerStat.player_name, (playerKills.get(playerStat.player_name) ?? 0) + playerStat.kills);
-    }
-  }
-
-  let mvp: { name: string; kills: number; notes: string | null } | null = null;
-  for (const [name, kills] of playerKills) {
-    if (!mvp || kills > mvp.kills || (kills === mvp.kills && name.localeCompare(mvp.name) < 0)) {
-      mvp = { name, kills, notes: getPlayerIdentityContext(name, identityCatalog).notes };
-    }
-  }
+  const mvp = getMvpState(tournamentResults, standings);
+  const playerMvpIdentity =
+    mvp.kind === "player"
+      ? getPlayerIdentityContext(mvp.playerName, identityCatalog)
+      : null;
 
   const leaderLabel = leader ? teamById.get(leader.team_id) : null;
   const resolvedLeaderLabel = leaderLabel
@@ -426,7 +419,13 @@ export default function CasterHub() {
             <article className="bf-caster-stat">
               <span>Top kills / equipo</span>
               <strong>{topKillsLabel}</strong>
-              <small>{mvp ? `MVP actual: ${mvp.name} · ${mvp.kills} K` : "MVP pendiente de player stats"}</small>
+              <small>
+                {mvp.kind === "player"
+                  ? `MVP actual: ${mvp.playerName} · ${mvp.kills} K`
+                  : mvp.kind === "team"
+                    ? `Team MVP: ${mvp.teamName} · ${mvp.kills} K`
+                    : "MVP pendiente: faltan player stats"}
+              </small>
             </article>
             <article className="bf-caster-stat is-gold">
               <span>Definición</span>
@@ -551,14 +550,12 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-note-block">
-                <span>MVP fallback</span>
+                <span>{mvp.kind === "player" ? "MVP actual" : "MVP pendiente"}</span>
                 <p>
-                  {mvp ? (
-                    <><strong>{mvp.name}</strong> suma {mvp.kills} kills reportadas.{mvp.notes ? ` Nota Identity: ${mvp.notes}` : ""}</>
-                  ) : highestKills ? (
-                    <><strong>{highestKills.team_name}</strong> es la referencia por equipo con {highestKills.kills} kills.</>
+                  {mvp.kind === "player" ? (
+                    <>MVP actual: <strong>{mvp.playerName}</strong> suma {mvp.kills} kills.{playerMvpIdentity?.notes ? ` Nota Identity: ${playerMvpIdentity.notes}` : ""}</>
                   ) : (
-                    "Sin player stats ni kills reportadas."
+                    "MVP pendiente: faltan player stats reportadas."
                   )}
                 </p>
               </div>
