@@ -4570,6 +4570,10 @@ a:focus-visible {
   letter-spacing: 0.5px;
   line-height: 1;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .bf-ov-lower-brand-sub {
@@ -4577,6 +4581,10 @@ a:focus-visible {
   font-size: 10px;
   letter-spacing: 1px;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .bf-ov-lower-teams {

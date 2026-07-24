@@ -11,6 +11,7 @@ import {
   getTeamDisplayName,
   isTournamentCompleted,
 } from "../../lib/tournamentStatus";
+import { getMvpState } from "../../lib/mvp";
 import { useWorldSeriesPractice } from "../lib/useWorldSeriesPractice";
 import {
   IconArrowRight,
@@ -177,7 +178,13 @@ export default function DashboardHome() {
   const matchPointActive =
     matchPointStatus.state === "threshold_reached" ||
     matchPointStatus.state === "champion";
-  const mvpReadinessLabel = hasPlayerStats ? "MVP LISTO" : "MVP PENDIENTE";
+  const mvp = getMvpState(tournamentResults, sortedStandings);
+  const mvpReadinessLabel =
+    mvp.kind === "pending"
+      ? "MVP PENDIENTE"
+      : mvp.kind === "player_tie" || mvp.kind === "team_tie"
+        ? `MVP EMPATADO · ${mvp.kills} K`
+        : "MVP LISTO";
 
   const pendingReportsCount = activeMatch ? Math.max(totalTeams - activeMatchResults.length, 0) : 0;
   const hasPendingOperation =

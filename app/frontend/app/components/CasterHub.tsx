@@ -198,7 +198,9 @@ export default function CasterHub() {
   const playerMvpIdentity =
     mvp.kind === "player"
       ? getPlayerIdentityContext(mvp.playerName, identityCatalog)
-      : null;
+      : mvp.kind === "player_tie"
+        ? getPlayerIdentityContext(mvp.players[0].playerName, identityCatalog)
+        : null;
 
   const leaderLabel = leader ? teamById.get(leader.team_id) : null;
   const resolvedLeaderLabel = leaderLabel
@@ -422,9 +424,13 @@ export default function CasterHub() {
               <small>
                 {mvp.kind === "player"
                   ? `MVP actual: ${mvp.playerName} · ${mvp.kills} K`
-                  : mvp.kind === "team"
-                    ? `Team MVP: ${mvp.teamName} · ${mvp.kills} K`
-                    : "MVP pendiente: faltan player stats"}
+                  : mvp.kind === "player_tie"
+                    ? `MVP empatado: ${mvp.players.slice(0, 2).map((p) => p.playerName).join(" / ")}${mvp.players.length > 2 ? " +" + (mvp.players.length - 2) : ""} · ${mvp.kills} K`
+                    : mvp.kind === "team"
+                      ? `Team MVP: ${mvp.teamName} · ${mvp.kills} K`
+                      : mvp.kind === "team_tie"
+                        ? `Team MVP empatado: ${mvp.teams.slice(0, 2).map((t) => t.teamName).join(" / ")}${mvp.teams.length > 2 ? " +" + (mvp.teams.length - 2) : ""} · ${mvp.kills} K`
+                        : "MVP pendiente: faltan player stats"}
               </small>
             </article>
             <article className="bf-caster-stat is-gold">
@@ -550,10 +556,24 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-note-block">
-                <span>{mvp.kind === "player" ? "MVP actual" : "MVP pendiente"}</span>
+                <span>
+                  {mvp.kind === "player"
+                    ? "MVP actual"
+                    : mvp.kind === "player_tie"
+                      ? "MVP empatado"
+                      : mvp.kind === "team" || mvp.kind === "team_tie"
+                        ? "Team MVP"
+                        : "MVP pendiente"}
+                </span>
                 <p>
                   {mvp.kind === "player" ? (
                     <>MVP actual: <strong>{mvp.playerName}</strong> suma {mvp.kills} kills.{playerMvpIdentity?.notes ? ` Nota Identity: ${playerMvpIdentity.notes}` : ""}</>
+                  ) : mvp.kind === "player_tie" ? (
+                    <>MVP empatado: <strong>{mvp.players.map((p) => p.playerName).join(" / ")}</strong> · {mvp.kills} K</>
+                  ) : mvp.kind === "team" ? (
+                    <>Team MVP: <strong>{mvp.teamName}</strong> · {mvp.kills} K</>
+                  ) : mvp.kind === "team_tie" ? (
+                    <>Team MVP empatado: <strong>{mvp.teams.map((t) => t.teamName).join(" / ")}</strong> · {mvp.kills} K</>
                   ) : (
                     "MVP pendiente: faltan player stats reportadas."
                   )}

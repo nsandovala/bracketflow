@@ -16,6 +16,13 @@ export type PlayerMvp = {
   matches: number;
 };
 
+export type PlayerMvpTie = {
+  kind: "player_tie";
+  players: PlayerMvp[];
+  kills: number;
+  matches: number;
+};
+
 export type TeamMvp = {
   kind: "team";
   teamId: number;
@@ -24,9 +31,17 @@ export type TeamMvp = {
   totalPoints: number;
 };
 
+export type TeamMvpTie = {
+  kind: "team_tie";
+  teams: TeamMvp[];
+  kills: number;
+};
+
 export type MvpState =
   | PlayerMvp
+  | PlayerMvpTie
   | TeamMvp
+  | TeamMvpTie
   | { kind: "pending" };
 
 export function getMvpState(
@@ -60,19 +75,35 @@ export function getMvpState(
     }
   }
 
-  let playerMvp: PlayerMvp | null = null;
-  for (const candidate of byPlayer.values()) {
-    if (
-      !playerMvp ||
-      candidate.kills > playerMvp.kills ||
-      (candidate.kills === playerMvp.kills &&
-        candidate.playerName.localeCompare(playerMvp.playerName) < 0)
-    ) {
-      playerMvp = candidate;
+  if (byPlayer.size > 0) {
+    let maxKills = -1;
+    for (const candidate of byPlayer.values()) {
+      if (candidate.kills > maxKills) {
+        maxKills = candidate.kills;
+      }
     }
-  }
-  if (playerMvp) {
-    return playerMvp;
+    const tiedPlayers: PlayerMvp[] = [];
+    for (const candidate of byPlayer.values()) {
+      if (candidate.kills === maxKills) {
+        tiedPlayers.push(candidate);
+      }
+    }
+    if (tiedPlayers.length === 1) {
+      return tiedPlayers[0];
+    }
+    if (tiedPlayers.length > 1) {
+      // Deterministic ordering: matches desc, then alphabetical
+      tiedPlayers.sort((a, b) => {
+        if (b.matches !== a.matches) return b.matches - a.matches;
+        return a.playerName.localeCompare(b.playerName);
+      });
+      return {
+        kind: "player_tie",
+        players: tiedPlayers,
+        kills: maxKills,
+        matches: tiedPlayers[0].matches,
+      };
+    }
   }
 
   let teamMvp: MvpStanding | null = null;
@@ -90,13 +121,35 @@ export function getMvpState(
     }
   }
 
-  return teamMvp
-    ? {
-        kind: "team",
-        teamId: teamMvp.team_id,
-        teamName: teamMvp.team_name,
+  if (teamMvp) {
+    // Check for team ties at top
+    const tiedTeams = standings.filter(
+      (s) =>
+        s.kills === teamMvp!.kills &&
+        s.total_points === teamMvp!.total_points
+    );
+    if (tiedTeams.length > 1) {
+      tiedTeams.sort((a, b) => a.team_name.localeCompare(b.team_name));
+      return {
+        kind: "team_tie",
+        teams: tiedTeams.map((t) => ({
+          kind: "team" as const,
+          teamId: t.team_id,
+          teamName: t.team_name,
+          kills: t.kills,
+          totalPoints: t.total_points,
+        })),
         kills: teamMvp.kills,
-        totalPoints: teamMvp.total_points,
-      }
-    : { kind: "pending" };
+      };
+    }
+    return {
+      kind: "team",
+      teamId: teamMvp.team_id,
+      teamName: teamMvp.team_name,
+      kills: teamMvp.kills,
+      totalPoints: teamMvp.total_points,
+    };
+  }
+
+  return { kind: "pending" };
 }

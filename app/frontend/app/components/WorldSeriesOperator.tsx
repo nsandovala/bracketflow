@@ -47,7 +47,7 @@ import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
 import { detectDelimiter, parseDelimitedTable } from "../../lib/statsDraftImport";
-import { validateManualPlayerStats } from "../../lib/manualPlayerStats";
+import { parsePlayerStatsPaste, validateManualPlayerStats } from "../../lib/manualPlayerStats";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
@@ -871,6 +871,9 @@ export default function WorldSeriesOperator({
   }
   const [filter, setFilter] = useState<ResultFilter>("all");
   const [teamImportMessage, setTeamImportMessage] = useState<string | null>(null);
+  const [playerStatsPasteErrors, setPlayerStatsPasteErrors] = useState<
+    Record<string, string | null>
+  >({});
   const teamFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentGame = activeMatch ? activeMatch.round : nextGameNumber;
@@ -1877,6 +1880,13 @@ export default function WorldSeriesOperator({
                   const hasVal = estimatedTotal != null && estimatedTotal !== "";
                   const teamLabel = getTeamDisplayName(team);
                   const teamRosterLine = rosterText(team);
+                  const placementNum = Number(draft.placement);
+                  const placementConflict =
+                    usesPlacement && !reportLocked && draft.placement !== "" && !Number.isNaN(placementNum) && placementNum > 0
+                      ? activeMatchResults.find(
+                          (result) => result.placement === placementNum && result.team_id !== team.id
+                        )
+                      : null;
 
                   return (
                     <article
@@ -1930,6 +1940,11 @@ export default function WorldSeriesOperator({
                                 })
                               }
                             />
+                            {placementConflict ? (
+                              <p className="bf-inline-error" role="alert" style={{ marginTop: 4, fontSize: "0.78rem" }}>
+                                Placement ya reportado por {placementConflict.team_name} en esta partida.
+                              </p>
+                            ) : null}
                           </div>
                         ) : null}
                         <div className="opr-total">
@@ -1947,6 +1962,34 @@ export default function WorldSeriesOperator({
                             </div>
                             <span>No cambia el scoring</span>
                           </div>
+                          {!reportLocked ? (
+                            <div className="opr-field" style={{ marginTop: 4 }}>
+                              <label>Pegar kills (opcional)</label>
+                              <textarea
+                                rows={2}
+                                placeholder={`Ej: 5 6 6 o VITO 5 JOAN 6 JASFA 6`}
+                                onBlur={(event) => {
+                                  const text = event.target.value.trim();
+                                  if (!text) return;
+                                  const parsed = parsePlayerStatsPaste(text, playerRows);
+                                  if (parsed.ok) {
+                                    onUpdateDraft(activeMatch.id, team.id, {
+                                      playerKills: { ...draft.playerKills, ...parsed.values },
+                                    });
+                                    setPlayerStatsPasteErrors((prev) => ({ ...prev, [key]: null }));
+                                    event.target.value = "";
+                                  } else {
+                                    setPlayerStatsPasteErrors((prev) => ({ ...prev, [key]: parsed.message }));
+                                  }
+                                }}
+                              />
+                              {playerStatsPasteErrors[key] ? (
+                                <p className="bf-inline-error" role="alert" style={{ fontSize: "0.78rem", marginTop: 4 }}>
+                                  {playerStatsPasteErrors[key]}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
                           <div className="opr-player-stats-grid">
                             {playerRows.map((player) => (
                               <label key={player.id} className="opr-player-stat-row">
@@ -1984,7 +2027,7 @@ export default function WorldSeriesOperator({
                         <button
                           type="button"
                           className="opr-save"
-                          disabled={submitting || reportLocked || !playerStatsValidation.ok}
+                          disabled={submitting || reportLocked || !playerStatsValidation.ok || Boolean(placementConflict)}
                           onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
                         >
                           {isFinalized

@@ -30,6 +30,72 @@ export default function StreamOverlayMvp({
     return <div className="bf-ov-empty-chip">MVP pendiente: faltan player stats</div>;
   }
 
+  if (mvp.kind === "player_tie") {
+    const visiblePlayers = mvp.players.slice(0, 3);
+    const extra = mvp.players.length - visiblePlayers.length;
+    return (
+      <div className="bf-ov-mvp">
+        <div className="bf-ov-mvp-badge">{getInitials(visiblePlayers[0].playerName)}</div>
+        <div className="bf-ov-mvp-body">
+          <div className="bf-ov-mvp-kicker">
+            <span
+              className="bf-ov-mvp-dot"
+              style={connected ? undefined : { opacity: 0.4 }}
+            />
+            MVP EMPATADO
+          </div>
+          <div className="bf-ov-mvp-name">
+            {visiblePlayers.map((p) => p.playerName).join(" / ")}
+            {extra > 0 ? ` +${extra}` : ""}
+          </div>
+          <div className="bf-ov-mvp-team">
+            {visiblePlayers[0].teamName}
+            {visiblePlayers.length > 1 ? ` · ${visiblePlayers.length} jugadores` : ""}
+          </div>
+          <div className="bf-ov-mvp-stats">
+            <span className="bf-ov-mvp-stat">
+              <strong>{mvp.kills}</strong> kills
+            </span>
+            <span className="bf-ov-mvp-stat">
+              <strong>{mvp.matches}</strong> partidas
+            </span>
+          </div>
+        </div>
+        <div className="bf-ov-mvp-brand">{tournamentName ?? "BracketFlow"}</div>
+      </div>
+    );
+  }
+
+  if (mvp.kind === "team_tie") {
+    const visibleTeams = mvp.teams.slice(0, 3);
+    const extra = mvp.teams.length - visibleTeams.length;
+    return (
+      <div className="bf-ov-mvp">
+        <div className="bf-ov-mvp-badge">{getInitials(visibleTeams[0].teamName)}</div>
+        <div className="bf-ov-mvp-body">
+          <div className="bf-ov-mvp-kicker">
+            <span
+              className="bf-ov-mvp-dot"
+              style={connected ? undefined : { opacity: 0.4 }}
+            />
+            TEAM MVP EMPATADO
+          </div>
+          <div className="bf-ov-mvp-name">
+            {visibleTeams.map((t) => t.teamName).join(" / ")}
+            {extra > 0 ? ` +${extra}` : ""}
+          </div>
+          <div className="bf-ov-mvp-team">Empate en kills de equipo</div>
+          <div className="bf-ov-mvp-stats">
+            <span className="bf-ov-mvp-stat">
+              <strong>{mvp.kills}</strong> kills
+            </span>
+          </div>
+        </div>
+        <div className="bf-ov-mvp-brand">{tournamentName ?? "BracketFlow"}</div>
+      </div>
+    );
+  }
+
   const isPlayerMvp = mvp.kind === "player";
   const label = isPlayerMvp ? "MVP actual" : "Team MVP";
   const name = isPlayerMvp ? mvp.playerName : mvp.teamName;
