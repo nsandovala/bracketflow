@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import { getMvpState } from "../../lib/mvp";
 import { getOperatorNextAction } from "../../lib/operatorNextAction";
 import {
   findChampion,
@@ -177,7 +178,13 @@ export default function DashboardHome() {
   const matchPointActive =
     matchPointStatus.state === "threshold_reached" ||
     matchPointStatus.state === "champion";
-  const mvpReadinessLabel = hasPlayerStats ? "MVP LISTO" : "MVP PENDIENTE";
+  const mvpState = getMvpState(tournamentResults, sortedStandings);
+  const mvpTied = mvpState.kind === "player" && mvpState.tiedWith.length > 0;
+  const mvpReadinessLabel = hasPlayerStats
+    ? mvpTied
+      ? "MVP LISTO · EMPATE"
+      : "MVP LISTO"
+    : "MVP PENDIENTE";
 
   const pendingReportsCount = activeMatch ? Math.max(totalTeams - activeMatchResults.length, 0) : 0;
   const hasPendingOperation =
