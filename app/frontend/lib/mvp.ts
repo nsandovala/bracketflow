@@ -7,13 +7,18 @@ export type MvpStanding = {
   total_points: number;
 };
 
-export type PlayerMvp = {
-  kind: "player";
+export type MvpPlayerEntry = {
   playerName: string;
   teamId: number;
   teamName: string;
   kills: number;
   matches: number;
+};
+
+export type PlayerMvp = MvpPlayerEntry & {
+  kind: "player";
+  // Otros jugadores con el mismo total de kills que el MVP. Excluye al propio MVP.
+  tiedWith: MvpPlayerEntry[];
 };
 
 export type TeamMvp = {
@@ -33,7 +38,7 @@ export function getMvpState(
   results: TeamResultDetail[],
   standings: MvpStanding[]
 ): MvpState {
-  const byPlayer = new Map<string, PlayerMvp>();
+  const byPlayer = new Map<string, MvpPlayerEntry>();
 
   for (const result of results) {
     for (const stat of result.player_stats ?? []) {
@@ -49,7 +54,6 @@ export function getMvpState(
         current.matches += 1;
       } else {
         byPlayer.set(key, {
-          kind: "player",
           playerName,
           teamId: result.team_id,
           teamName: result.team_name,
@@ -60,19 +64,25 @@ export function getMvpState(
     }
   }
 
-  let playerMvp: PlayerMvp | null = null;
-  for (const candidate of byPlayer.values()) {
-    if (
-      !playerMvp ||
-      candidate.kills > playerMvp.kills ||
-      (candidate.kills === playerMvp.kills &&
-        candidate.playerName.localeCompare(playerMvp.playerName) < 0)
-    ) {
-      playerMvp = candidate;
+  const players = Array.from(byPlayer.values());
+  if (players.length > 0) {
+    const topKills = players.reduce(
+      (max, candidate) => (candidate.kills > max ? candidate.kills : max),
+      0
+    );
+    // topKills=0 sigue significando "sin ninguna kill reportada"; mantenemos el
+    // fallback a Team MVP para no anunciar un empate 0-0 como MVP legitimo.
+    if (topKills > 0) {
+      const topPlayers = players
+        .filter((candidate) => candidate.kills === topKills)
+        .sort((left, right) => left.playerName.localeCompare(right.playerName));
+      const [head, ...rest] = topPlayers;
+      return {
+        kind: "player",
+        ...head,
+        tiedWith: rest,
+      };
     }
-  }
-  if (playerMvp) {
-    return playerMvp;
   }
 
   let teamMvp: MvpStanding | null = null;

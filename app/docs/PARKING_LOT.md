@@ -32,6 +32,15 @@
 - Discord bot
 - agentes/copilot
 
+## Operator intake pre-OCR hardening v0 (2026-07-24)
+
+- Match Completion Policy queda en backlog: es un sprint backend/producto
+  separado. El frontend no la implementa aqui.
+- OCR Image Draft Intake depende de que el flujo manual quede estable. Este
+  hardening pre-OCR (pre-validacion de placement, paste de player stats,
+  MVP con empate y overflow de overlays) es el prerequisito antes de
+  automatizar la ingesta por imagen.
+
 ## Report Intake - diferido (2026-07-18)
 
 - Flujo de reemplazo/edicion de reporte oficial por partida/equipo

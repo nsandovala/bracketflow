@@ -11,6 +11,9 @@ type Props = {
   connected: boolean;
 };
 
+// Limite de nombres visibles en el overlay MVP EMPATADO. Mas alla mostramos "+N".
+const MAX_TIED_NAMES = 3;
+
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "??";
@@ -31,15 +34,22 @@ export default function StreamOverlayMvp({
   }
 
   const isPlayerMvp = mvp.kind === "player";
-  const label = isPlayerMvp ? "MVP actual" : "Team MVP";
+  const isTiedMvp = isPlayerMvp && mvp.tiedWith.length > 0;
+  const label = isTiedMvp ? "MVP EMPATADO" : isPlayerMvp ? "MVP actual" : "Team MVP";
   const name = isPlayerMvp ? mvp.playerName : mvp.teamName;
   const subline = isPlayerMvp
     ? mvp.teamName
     : "MVP pendiente: faltan player stats";
 
+  const tiedNames = isTiedMvp
+    ? [mvp.playerName, ...mvp.tiedWith.map((entry) => entry.playerName)]
+    : [];
+  const visibleTiedNames = tiedNames.slice(0, MAX_TIED_NAMES);
+  const hiddenTied = tiedNames.length - visibleTiedNames.length;
+
   return (
-    <div className="bf-ov-mvp">
-      <div className="bf-ov-mvp-badge">{getInitials(name)}</div>
+    <div className={`bf-ov-mvp${isTiedMvp ? " is-tied" : ""}`}>
+      <div className="bf-ov-mvp-badge">{isTiedMvp ? "T" : getInitials(name)}</div>
       <div className="bf-ov-mvp-body">
         <div className="bf-ov-mvp-kicker">
           <span
@@ -48,7 +58,20 @@ export default function StreamOverlayMvp({
           />
           {label}
         </div>
-        <div className="bf-ov-mvp-name">{name}</div>
+        {isTiedMvp ? (
+          <div className="bf-ov-mvp-tied-list">
+            {visibleTiedNames.map((tiedName) => (
+              <span key={tiedName} className="bf-ov-mvp-tied-name">
+                {tiedName}
+              </span>
+            ))}
+            {hiddenTied > 0 ? (
+              <span className="bf-ov-mvp-tied-more">+{hiddenTied}</span>
+            ) : null}
+          </div>
+        ) : (
+          <div className="bf-ov-mvp-name">{name}</div>
+        )}
         <div className="bf-ov-mvp-team">{subline}</div>
         <div className="bf-ov-mvp-stats">
           {isPlayerMvp ? (

@@ -47,7 +47,7 @@ import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
 import { detectDelimiter, parseDelimitedTable } from "../../lib/statsDraftImport";
-import { validateManualPlayerStats } from "../../lib/manualPlayerStats";
+import { parsePlayerStatsPaste, validateManualPlayerStats } from "../../lib/manualPlayerStats";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
@@ -721,6 +721,58 @@ function OcrDraftIntake({
 
 function getDraftKey(matchId: number, teamId: number) {
   return `${matchId}:${teamId}`;
+}
+
+type PlayerStatsPasteHelperProps = {
+  roster: Array<{ id: number; name: string }>;
+  disabled: boolean;
+  onApply: (values: Record<number, string>) => void;
+};
+
+function PlayerStatsPasteHelper({ roster, disabled, onApply }: PlayerStatsPasteHelperProps) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function handleApply() {
+    const parsed = parsePlayerStatsPaste(value, roster);
+    if (!parsed.ok) {
+      setError(parsed.message);
+      return;
+    }
+    setError(null);
+    setValue("");
+    onApply(parsed.values);
+  }
+
+  return (
+    <div className="opr-player-stats-paste">
+      <textarea
+        className="opr-player-stats-paste-input"
+        value={value}
+        rows={1}
+        placeholder={"Pegar kills · 5 6 6  ·  VITO 5, JOAN 6, JASFA 6"}
+        aria-label="Pegar kills por jugador"
+        disabled={disabled}
+        onChange={(event) => {
+          setValue(event.target.value);
+          if (error) setError(null);
+        }}
+      />
+      <button
+        type="button"
+        className="bf-button bf-button-ghost opr-player-stats-paste-apply"
+        disabled={disabled || value.trim() === ""}
+        onClick={handleApply}
+      >
+        Aplicar
+      </button>
+      {error ? (
+        <p className="opr-player-stats-paste-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function rosterText(team: Team) {
@@ -1863,6 +1915,30 @@ export default function WorldSeriesOperator({
                     playerKillValues,
                     draft.kills
                   );
+                  // Pre-validacion de placement: solo advertimos si el operador ya
+                  // escribio un entero. Empty/default no bloquea. Ignora al propio
+                  // equipo por si edita una vez y vuelve a guardar (aunque hoy
+                  // los reportes son read-only tras guardar).
+                  const trimmedPlacement = String(draft.placement ?? "").trim();
+                  const parsedPlacement = /^\d+$/.test(trimmedPlacement)
+                    ? Number(trimmedPlacement)
+                    : null;
+                  const placementConflictResult =
+                    usesPlacement && parsedPlacement !== null
+                      ? activeMatchResults.find(
+                          (result) =>
+                            result.team_id !== team.id &&
+                            result.placement === parsedPlacement
+                        ) ?? null
+                      : null;
+                  const placementConflictTeam = placementConflictResult
+                    ? teams.find((t) => t.id === placementConflictResult.team_id) ?? null
+                    : null;
+                  const placementConflictLabel = placementConflictResult
+                    ? placementConflictTeam
+                      ? getTeamDisplayName(placementConflictTeam)
+                      : placementConflictResult.team_name
+                    : null;
                   const estimatedTotal =
                     savedResult?.total_points.toFixed(1) ??
                     (usesPlacement
@@ -1924,6 +2000,7 @@ export default function WorldSeriesOperator({
                               value={draft.placement}
                               placeholder={`1-${effectiveLobbySize}`}
                               disabled={reportLocked}
+                              aria-invalid={placementConflictLabel !== null}
                               onChange={(event) =>
                                 onUpdateDraft(activeMatch.id, team.id, {
                                   placement: event.target.value,
@@ -1938,6 +2015,12 @@ export default function WorldSeriesOperator({
                         </div>
                       </div>
 
+                      {placementConflictLabel ? (
+                        <p className="opr-placement-conflict" role="alert">
+                          Placement ya reportado por {placementConflictLabel} en esta partida.
+                        </p>
+                      ) : null}
+
                       {playerRows.length > 0 ? (
                         <div className="opr-player-stats">
                           <div className="opr-player-stats-head">
@@ -1947,6 +2030,15 @@ export default function WorldSeriesOperator({
                             </div>
                             <span>No cambia el scoring</span>
                           </div>
+                          <PlayerStatsPasteHelper
+                            roster={playerRows}
+                            disabled={reportLocked}
+                            onApply={(values) =>
+                              onUpdateDraft(activeMatch.id, team.id, {
+                                playerKills: { ...draft.playerKills, ...values },
+                              })
+                            }
+                          />
                           <div className="opr-player-stats-grid">
                             {playerRows.map((player) => (
                               <label key={player.id} className="opr-player-stat-row">
@@ -1984,7 +2076,12 @@ export default function WorldSeriesOperator({
                         <button
                           type="button"
                           className="opr-save"
-                          disabled={submitting || reportLocked || !playerStatsValidation.ok}
+                          disabled={
+                            submitting ||
+                            reportLocked ||
+                            !playerStatsValidation.ok ||
+                            placementConflictLabel !== null
+                          }
                           onClick={() => onSaveTeamReport(activeMatch.id, team.id)}
                         >
                           {isFinalized
