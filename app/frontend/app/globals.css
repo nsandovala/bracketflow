@@ -257,13 +257,40 @@ a:focus-visible {
 }
 
 .bf-caster-stat {
+  appearance: none;
   display: grid;
   align-content: space-between;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   min-height: 128px;
   padding: 15px;
   border: 1px solid rgba(223, 230, 242, 0.1);
   border-top-color: rgba(97, 242, 163, 0.38);
   background: linear-gradient(155deg, rgba(19, 29, 43, 0.94), rgba(8, 13, 23, 0.9));
+}
+
+.bf-caster-stat:hover {
+  border-color: rgba(97, 242, 163, 0.28);
+}
+
+.bf-caster-stat.is-active {
+  border-color: rgba(97, 242, 163, 0.42);
+  background:
+    linear-gradient(155deg, rgba(24, 40, 48, 0.96), rgba(8, 16, 24, 0.94));
+  box-shadow: inset 3px 0 0 rgba(97, 242, 163, 0.58);
+}
+
+.bf-caster-stat.is-active.is-gold {
+  border-color: rgba(232, 197, 120, 0.42);
+  box-shadow: inset 3px 0 0 rgba(232, 197, 120, 0.62);
+}
+
+.bf-caster-stat:focus-visible {
+  outline: 2px solid var(--bf-accent);
+  outline-offset: 2px;
 }
 
 .bf-caster-stat.is-gold {
@@ -292,6 +319,139 @@ a:focus-visible {
   margin-top: 7px;
   font-size: 0.73rem;
   line-height: 1.35;
+}
+
+.bf-caster-inspector {
+  max-height: 390px;
+  margin: 0 0 14px;
+  overflow: auto;
+  border: 1px solid rgba(97, 242, 163, 0.22);
+  background:
+    linear-gradient(145deg, rgba(15, 25, 35, 0.96), rgba(7, 12, 21, 0.94));
+  box-shadow: inset 3px 0 0 rgba(97, 242, 163, 0.34);
+}
+
+.bf-caster-inspector[hidden] {
+  display: none;
+}
+
+.bf-caster-inspector-head,
+.bf-caster-inspector-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(223, 230, 242, 0.09);
+}
+
+.bf-caster-inspector-head > div:first-child > span,
+.bf-caster-inspector-title > span,
+.bf-caster-definition span {
+  color: var(--bf-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.bf-caster-inspector-head h2,
+.bf-caster-inspector-title h2 {
+  margin: 3px 0 0;
+  color: var(--bf-text);
+  font-family: var(--font-rajdhani), sans-serif;
+  font-size: 1.22rem;
+  text-transform: uppercase;
+}
+
+.bf-caster-inspector-head h2 small {
+  margin-left: 8px;
+  color: var(--amon-gold-hi);
+  font-size: 0.66rem;
+}
+
+.bf-caster-inspector-head p {
+  margin: 3px 0 0;
+  color: var(--bf-muted);
+  font-size: 0.75rem;
+}
+
+.bf-caster-inspector-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.bf-caster-inspector-metrics.is-inline {
+  justify-content: flex-start;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(223, 230, 242, 0.07);
+}
+
+.bf-caster-inspector-metrics span {
+  padding: 6px 8px;
+  border: 1px solid rgba(223, 230, 242, 0.1);
+  color: var(--bf-muted);
+  font-size: 0.68rem;
+}
+
+.bf-caster-inspector-metrics b {
+  color: var(--bf-text);
+}
+
+.bf-caster-compact-table {
+  min-width: 560px;
+}
+
+.bf-caster-compact-row {
+  display: grid;
+  border-bottom: 1px solid rgba(223, 230, 242, 0.065);
+}
+
+.bf-caster-compact-row:last-child {
+  border-bottom: 0;
+}
+
+.bf-caster-compact-row span {
+  padding: 7px 16px;
+  color: var(--bf-text-soft);
+  font-size: 0.73rem;
+}
+
+.bf-caster-compact-row.is-head span {
+  color: var(--bf-muted);
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bf-caster-inspector-empty {
+  margin: 0;
+  padding: 18px 16px;
+  color: var(--bf-muted);
+  font-size: 0.78rem;
+}
+
+.bf-caster-definition {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(280px, 1fr);
+  gap: 1px;
+  background: rgba(223, 230, 242, 0.07);
+}
+
+.bf-caster-definition p {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 10px 16px;
+  background: rgba(8, 13, 23, 0.96);
+}
+
+.bf-caster-definition strong {
+  color: var(--bf-text-soft);
+  font-size: 0.75rem;
 }
 
 .bf-caster-grid {
@@ -552,6 +712,20 @@ a:focus-visible {
 
   .bf-caster-stat {
     min-height: 118px;
+  }
+
+  .bf-caster-inspector-head,
+  .bf-caster-inspector-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bf-caster-inspector-metrics {
+    justify-content: flex-start;
+  }
+
+  .bf-caster-definition {
+    grid-template-columns: 1fr;
   }
 
   .bf-caster-overlay-actions {

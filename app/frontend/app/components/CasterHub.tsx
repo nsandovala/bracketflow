@@ -24,6 +24,7 @@ import {
   resolveTournamentTeams,
 } from "../../lib/identityResolver";
 import BroadcastSetup from "./BroadcastSetup";
+import CasterContextInspector from "./CasterContextInspector";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
@@ -119,8 +120,6 @@ export default function CasterHub() {
     selectedTournamentId,
     activeMatch,
     sortedStandings,
-    latestReportedRound,
-    totalTeams,
     tournamentResults: rawTournamentResults,
     selectedEngine,
     selectTournament,
@@ -174,12 +173,6 @@ export default function CasterHub() {
   };
   const leader = standings[0] ?? null;
   const highestKills = [...standings].sort((left, right) => right.kills - left.kills)[0] ?? null;
-  const completedMatches = matches.filter(
-    (match) => match.status === "completed" && (match.winner_id !== null || match.maps.length > 0)
-  );
-  const reportedMatches = matches.filter(
-    (match) => match.team_a_id === null && match.team_b_id === null && match.status === "completed"
-  );
   const bracketChampion = isBracket ? findChampion(matches, teams) : null;
   const bracketCompleted = isBracket ? isTournamentCompleted(matches) : false;
   const matchPointStatus =
@@ -207,26 +200,10 @@ export default function CasterHub() {
   const highestKillsContext = highestKills
     ? getIdentityTeamContext(highestKills.team_id)
     : null;
-  const topKillsLabel = highestKills
-    ? `${highestKills.team_name}${highestKillsContext?.shortName ? ` (${highestKillsContext.shortName})` : ""} · ${highestKills.kills} K`
-    : "Datos pendientes";
   const championLabel =
     matchPointStatus.state === "champion"
       ? matchPointStatus.championLabel
       : bracketChampion?.displayName ?? null;
-  const matchPointLabel = championLabel
-    ? `Campeón: ${championLabel}`
-    : matchPointStatus.state === "threshold_reached"
-      ? "Match Point activo"
-      : "Sin Match Point";
-  const reportedLabel = isBracket
-    ? `${completedMatches.length}/${matches.length || 0}`
-    : String(reportedMatches.length);
-  const reportedDescription = isBracket
-    ? "Series reportadas"
-    : latestReportedRound > 0
-      ? `Hasta Partida ${latestReportedRound}`
-      : "Sin partidas reportadas";
   const getMatchTeamLabel = (teamId: number) => {
     const team = teamById.get(teamId);
     return team ? getTeamDisplayName(team) : "Equipo pendiente";
@@ -404,47 +381,24 @@ export default function CasterHub() {
         </section>
       ) : (
         <>
-          <section className="bf-caster-snapshot" aria-label="Snapshot del torneo">
-            <article className="bf-caster-stat is-leader">
-              <span>Líder actual</span>
-              <strong>{championLabel ?? resolvedLeaderLabel}</strong>
-              <small>
-                {championLabel
-                  ? "Campeonato confirmado"
-                  : leader
-                    ? `${formatPoints(leader.total_points)} pts · ${leader.kills} K`
-                    : "Leaderboard pendiente"}
-              </small>
-            </article>
-            <article className="bf-caster-stat">
-              <span>Top kills / equipo</span>
-              <strong>{topKillsLabel}</strong>
-              <small>
-                {mvp.kind === "player"
-                  ? mvp.tiedWith.length > 0
-                    ? `MVP empatado: ${[mvp.playerName, ...mvp.tiedWith.map((entry) => entry.playerName)].join(" / ")} · ${mvp.kills} K`
-                    : `MVP actual: ${mvp.playerName} · ${mvp.kills} K`
-                  : mvp.kind === "team"
-                    ? `Team MVP: ${mvp.teamName} · ${mvp.kills} K`
-                    : "MVP pendiente: faltan player stats"}
-              </small>
-            </article>
-            <article className="bf-caster-stat is-gold">
-              <span>Definición</span>
-              <strong>{matchPointLabel}</strong>
-              <small>{matchPointMessage ?? (bracketCompleted ? "Bracket finalizado" : "Estado competitivo abierto")}</small>
-            </article>
-            <article className="bf-caster-stat">
-              <span>Partidas / serie</span>
-              <strong>{reportedLabel}</strong>
-              <small>{activeMatchLabel ? `${reportedDescription} · ${activeMatchLabel}` : reportedDescription}</small>
-            </article>
-            <article className="bf-caster-stat">
-              <span>Equipos</span>
-              <strong>{totalTeams}</strong>
-              <small>{totalTeams > 0 ? "Equipos cargados en torneo" : "Setup de equipos pendiente"}</small>
-            </article>
-          </section>
+          <CasterContextInspector
+            key={selectedTournament.id}
+            tournament={selectedTournament}
+            teams={teams}
+            rawTeams={rawTeams}
+            standings={standings}
+            matches={matches}
+            results={tournamentResults}
+            identityCatalog={identityCatalog}
+            matchPointStatus={matchPointStatus}
+            matchPointThreshold={engine?.matchPointThreshold}
+            isBracket={isBracket}
+            bracketCompleted={bracketCompleted}
+            bracketChampionLabel={bracketChampion?.displayName ?? null}
+            activeMatch={activeMatch}
+            loading={loading}
+            backendOnline={backendOnline}
+          />
 
           <div className="bf-caster-grid">
             <section className="bf-caster-panel bf-caster-overlays">

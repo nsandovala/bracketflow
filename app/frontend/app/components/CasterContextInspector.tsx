@@ -1,0 +1,502 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import type {
+  LeaderboardEntry,
+  Match,
+  Team,
+  TeamResultDetail,
+  Tournament,
+} from "../../lib/api";
+import {
+  getMvpPlayerRanking,
+  getMvpState,
+  type MvpState,
+} from "../../lib/mvp";
+import type { MatchPointStatus } from "../../lib/tournamentStatus";
+import { getTeamDisplayName, getTeamRosterText } from "../../lib/tournamentStatus";
+import type { IdentityCatalog } from "../../lib/identityResolver";
+import { getResolvedTeamProfile } from "../../lib/identityResolver";
+
+type ContextKey = "leader" | "kills" | "mvp" | "definition" | "matches";
+
+type Props = {
+  tournament: Tournament;
+  teams: Team[];
+  rawTeams: Team[];
+  standings: LeaderboardEntry[];
+  matches: Match[];
+  results: TeamResultDetail[];
+  identityCatalog: IdentityCatalog;
+  matchPointStatus: MatchPointStatus;
+  matchPointThreshold?: number;
+  isBracket: boolean;
+  bracketCompleted: boolean;
+  bracketChampionLabel: string | null;
+  activeMatch: Match | null;
+  loading: boolean;
+  backendOnline: boolean;
+};
+
+function formatPoints(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function rankWithTies<T>(rows: T[], value: (row: T) => number) {
+  return rows.map((row, index) => ({
+    row,
+    rank: index > 0 && value(rows[index - 1]) === value(row)
+      ? null
+      : index + 1,
+  }));
+}
+
+export default function CasterContextInspector({
+  tournament,
+  teams,
+  rawTeams,
+  standings,
+  matches,
+  results,
+  identityCatalog,
+  matchPointStatus,
+  matchPointThreshold,
+  isBracket,
+  bracketCompleted,
+  bracketChampionLabel,
+  activeMatch,
+  loading,
+  backendOnline,
+}: Props) {
+  const [selected, setSelected] = useState<ContextKey | null>(
+    standings.length > 0 ? "leader" : results.length > 0 ? "matches" : "definition"
+  );
+
+  const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
+  const rawTeamById = useMemo(
+    () => new Map(rawTeams.map((team) => [team.id, team])),
+    [rawTeams]
+  );
+  const leader = standings[0] ?? null;
+  const mvp = getMvpState(results, standings);
+  const players = getMvpPlayerRanking(results);
+  const resultsWithPlayerStats = results.filter((result) => (result.player_stats?.length ?? 0) > 0);
+  const teamsWithPlayerStats = new Set(resultsWithPlayerStats.map((result) => result.team_id));
+  const standingsByKills = [...standings].sort(
+    (left, right) =>
+      right.kills - left.kills ||
+      right.total_points - left.total_points ||
+      left.team_name.localeCompare(right.team_name)
+  );
+  const killLeaderValue = standingsByKills[0]?.kills ?? 0;
+  const officialMatches = matches
+    .filter((match) => isBracket || (match.team_a_id === null && match.team_b_id === null))
+    .sort((left, right) => left.round - right.round || left.id - right.id);
+  const reportsByMatch = new Map<number, TeamResultDetail[]>();
+  for (const result of results) {
+    const current = reportsByMatch.get(result.match_id) ?? [];
+    current.push(result);
+    reportsByMatch.set(result.match_id, current);
+  }
+  const latestReportedMatch = officialMatches
+    .filter((match) =>
+      isBracket
+        ? match.status === "completed" || match.winner_id !== null || match.maps.length > 0
+        : (reportsByMatch.get(match.id)?.length ?? 0) > 0
+    )
+    .at(-1) ?? null;
+  const activeReports = activeMatch
+    ? isBracket
+      ? Number(activeMatch.status === "completed" || activeMatch.winner_id !== null)
+      : reportsByMatch.get(activeMatch.id)?.length ?? 0
+    : 0;
+  const expectedActiveReports = isBracket
+    ? activeMatch ? 1 : 0
+    : teams.length;
+  const pendingActiveReports =
+    !isBracket && activeMatch?.status === "completed"
+      ? 0
+      : Math.max(expectedActiveReports - activeReports, 0);
+  const completedOfficialMatches = officialMatches.filter((match) => match.status === "completed").length;
+
+  const cards: Array<{ key: ContextKey; label: string; value: string; detail: string; gold?: boolean }> = [
+    {
+      key: "leader",
+      label: "Líder actual",
+      value: bracketChampionLabel ?? (leader ? leader.team_name : "Sin líder"),
+      detail: leader ? `${formatPoints(leader.total_points)} pts · ${leader.kills} K` : "Leaderboard pendiente",
+    },
+    {
+      key: "kills",
+      label: "Top kills / equipo",
+      value: standingsByKills[0]
+        ? `${standingsByKills[0].team_name} · ${standingsByKills[0].kills} K`
+        : "Datos pendientes",
+      detail: standingsByKills[1]?.kills === killLeaderValue ? "Liderato empatado" : "Ranking por kills reportadas",
+    },
+    {
+      key: "mvp",
+      label: "MVP / jugadores",
+      value: getMvpLabel(mvp),
+      detail: players.length > 0 ? `${players.length} jugadores con stats` : "Player stats pendientes",
+    },
+    {
+      key: "definition",
+      label: "Definición / Match Point",
+      value: getDefinitionLabel(matchPointStatus, tournament, isBracket, bracketChampionLabel),
+      detail: matchPointThreshold ? `Umbral configurado: ${matchPointThreshold} pts` : "Sin umbral Match Point",
+      gold: true,
+    },
+    {
+      key: "matches",
+      label: "Partidas / serie",
+      value: activeMatch ? `Partida ${activeMatch.round}` : "Sin partida activa",
+      detail: latestReportedMatch ? `Último reporte: Partida ${latestReportedMatch.round}` : "Sin reportes oficiales",
+    },
+  ];
+
+  return (
+    <>
+      <section className="bf-caster-snapshot" aria-label="Contextos del torneo">
+        {cards.map((card) => {
+          const active = selected === card.key;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              className={`bf-caster-stat${card.gold ? " is-gold" : ""}${active ? " is-active" : ""}`}
+              aria-expanded={active}
+              aria-controls="caster-context-inspector"
+              onClick={() => setSelected((current) => current === card.key ? null : card.key)}
+            >
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <small>{card.detail}</small>
+            </button>
+          );
+        })}
+      </section>
+
+      <section
+        id="caster-context-inspector"
+        className="bf-caster-inspector"
+        aria-live="polite"
+        hidden={selected === null}
+      >
+        {loading ? (
+          <p className="bf-caster-inspector-empty">Cargando contexto oficial…</p>
+        ) : !backendOnline ? (
+          <p className="bf-caster-inspector-empty">Backend offline. No se puede actualizar este contexto.</p>
+        ) : selected === "leader" ? (
+          <LeaderDetail
+            leader={leader}
+            second={standings[1] ?? null}
+            team={leader ? teamById.get(leader.team_id) ?? null : null}
+            rawTeam={leader ? rawTeamById.get(leader.team_id) ?? null : null}
+            results={leader ? results.filter((result) => result.team_id === leader.team_id) : []}
+            identityCatalog={identityCatalog}
+          />
+        ) : selected === "kills" ? (
+          <KillsDetail rows={standingsByKills} />
+        ) : selected === "mvp" ? (
+          <MvpDetail
+            mvp={mvp}
+            players={players}
+            reportCount={resultsWithPlayerStats.length}
+            coveredTeams={teamsWithPlayerStats.size}
+            totalTeams={teams.length}
+          />
+        ) : selected === "definition" ? (
+          <DefinitionDetail
+            tournament={tournament}
+            status={matchPointStatus}
+            threshold={matchPointThreshold}
+            standings={standings}
+            activeMatch={activeMatch}
+            isBracket={isBracket}
+            bracketCompleted={bracketCompleted}
+            bracketChampionLabel={bracketChampionLabel}
+          />
+        ) : selected === "matches" ? (
+          <MatchesDetail
+            activeMatch={activeMatch}
+            latestReportedMatch={latestReportedMatch}
+            activeReports={activeReports}
+            pendingActiveReports={pendingActiveReports}
+            completedOfficialMatches={completedOfficialMatches}
+            officialMatches={officialMatches}
+            reportsByMatch={reportsByMatch}
+            teamCount={teams.length}
+            isBracket={isBracket}
+          />
+        ) : null}
+      </section>
+    </>
+  );
+}
+
+function getMvpLabel(mvp: MvpState) {
+  if (mvp.kind !== "player") return "Player stats pendientes";
+  return mvp.tiedWith.length > 0 ? `MVP empatado · ${mvp.kills} K` : `MVP actual · ${mvp.kills} K`;
+}
+
+function getDefinitionLabel(
+  status: MatchPointStatus,
+  tournament: Tournament,
+  isBracket: boolean,
+  bracketChampionLabel: string | null
+) {
+  if (status.state === "champion") return `Campeón: ${status.championLabel}`;
+  if (bracketChampionLabel) return `Campeón: ${bracketChampionLabel}`;
+  if (tournament.status === "completed") return "Finalizado";
+  if (status.state === "threshold_reached") {
+    return status.reason === "tie" ? "Empate sin resolver" : "Umbral alcanzado";
+  }
+  return isBracket ? "Serie abierta" : "Competencia abierta";
+}
+
+function LeaderDetail({
+  leader,
+  second,
+  team,
+  rawTeam,
+  results,
+  identityCatalog,
+}: {
+  leader: LeaderboardEntry | null;
+  second: LeaderboardEntry | null;
+  team: Team | null;
+  rawTeam: Team | null;
+  results: TeamResultDetail[];
+  identityCatalog: IdentityCatalog;
+}) {
+  if (!leader) return <p className="bf-caster-inspector-empty">Aún no hay standings oficiales.</p>;
+  const identity = rawTeam ? getResolvedTeamProfile(rawTeam, identityCatalog) : null;
+  const name = team ? getTeamDisplayName(team) : leader.team_name;
+  const roster = team ? getTeamRosterText(team) : "";
+  const sortedResults = [...results].sort((left, right) => left.round - right.round);
+  return (
+    <>
+      <header className="bf-caster-inspector-head">
+        <div>
+          <span>Líder actual</span>
+          <h2>{name}{identity?.short_name ? <small>{identity.short_name}</small> : null}</h2>
+          <p>{roster || "Roster pendiente"}</p>
+        </div>
+        <div className="bf-caster-inspector-metrics">
+          <span><b>{formatPoints(leader.total_points)}</b> puntos</span>
+          <span><b>{leader.kills}</b> kills</span>
+          <span><b>{leader.best_placement ?? "—"}</b> mejor puesto</span>
+          <span><b>{leader.matches_played}</b> partidas</span>
+          {second ? <span><b>{formatPoints(leader.total_points - second.total_points)}</b> ventaja</span> : null}
+        </div>
+      </header>
+      <CompactRows
+        labels={["Partida", "Kills", "Puesto", "Puntos"]}
+        rows={sortedResults.map((result) => [
+          String(result.round),
+          String(result.kills),
+          String(result.placement),
+          formatPoints(result.total_points),
+        ])}
+        empty="Sin reportes por partida para el líder."
+      />
+    </>
+  );
+}
+
+function KillsDetail({ rows }: { rows: LeaderboardEntry[] }) {
+  const top = rows.slice(0, 5);
+  const leaderKills = top[0]?.kills ?? 0;
+  const ranked = rankWithTies(top, (row) => row.kills);
+  return (
+    <>
+      <InspectorTitle title="Top kills / equipos" note={top[1]?.kills === leaderKills ? "Liderato empatado" : "Kills oficiales acumuladas"} />
+      <CompactRows
+        labels={["#", "Equipo", "Kills", "Puntos", "Dif. líder"]}
+        rows={ranked.map(({ row, rank }, index) => [
+          rank === null ? `=${ranked[index - 1]?.rank ?? 1}` : String(rank),
+          row.team_name,
+          String(row.kills),
+          formatPoints(row.total_points),
+          row.kills === leaderKills ? (top.filter((entry) => entry.kills === leaderKills).length > 1 ? "Empate" : "—") : `-${leaderKills - row.kills}`,
+        ])}
+        empty="Sin standings oficiales."
+      />
+    </>
+  );
+}
+
+function MvpDetail({
+  mvp,
+  players,
+  reportCount,
+  coveredTeams,
+  totalTeams,
+}: {
+  mvp: MvpState;
+  players: ReturnType<typeof getMvpPlayerRanking>;
+  reportCount: number;
+  coveredTeams: number;
+  totalTeams: number;
+}) {
+  const status = mvp.kind === "player"
+    ? mvp.tiedWith.length > 0 ? "MVP empatado" : "MVP actual"
+    : "Player stats pendientes";
+  const partial = coveredTeams > 0 && coveredTeams < totalTeams;
+  const ranked = rankWithTies(players.slice(0, 5), (player) => player.kills);
+  return (
+    <>
+      <InspectorTitle
+        title={status}
+        note={partial ? `Cobertura parcial de player stats · ${reportCount} reportes / ${coveredTeams} de ${totalTeams} equipos` : coveredTeams > 0 ? `${reportCount} reportes · ${coveredTeams} equipos` : "No hay player stats reportadas"}
+      />
+      <CompactRows
+        labels={["#", "Jugador", "Equipo", "Kills", "Reportes", "Promedio"]}
+        rows={ranked.map(({ row, rank }, index) => [
+          rank === null ? `=${ranked[index - 1]?.rank ?? 1}` : String(rank),
+          row.playerName,
+          row.teamName,
+          String(row.kills),
+          String(row.matches),
+          (row.kills / row.matches).toFixed(1),
+        ])}
+        empty="Player stats pendientes."
+      />
+    </>
+  );
+}
+
+function DefinitionDetail({
+  tournament,
+  status,
+  threshold,
+  standings,
+  activeMatch,
+  isBracket,
+  bracketCompleted,
+  bracketChampionLabel,
+}: {
+  tournament: Tournament;
+  status: MatchPointStatus;
+  threshold?: number;
+  standings: LeaderboardEntry[];
+  activeMatch: Match | null;
+  isBracket: boolean;
+  bracketCompleted: boolean;
+  bracketChampionLabel: string | null;
+}) {
+  const above = threshold ? standings.filter((entry) => entry.total_points >= threshold) : [];
+  const activeIncomplete = Boolean(activeMatch && activeMatch.status !== "completed");
+  const state = getDefinitionLabel(status, tournament, isBracket, bracketChampionLabel);
+  let needed = "La competencia sigue abierta; ningún equipo alcanzó el umbral configurado.";
+  if (status.state === "champion" || bracketChampionLabel) needed = "El campeón ya está confirmado por el estado oficial del torneo.";
+  else if (tournament.status === "completed" || bracketCompleted) needed = "La competencia figura finalizada.";
+  else if (status.state === "threshold_reached" && status.reason === "tie") needed = "Falta resolver el empate en los resultados oficiales.";
+  else if (status.state === "threshold_reached" && status.reason === "incomplete_match") needed = "Falta completar la partida activa antes de confirmar la definición.";
+  else if (status.state === "threshold_reached") needed = "El umbral fue alcanzado; falta la confirmación del backend.";
+  else if (!threshold) needed = isBracket ? "La definición depende del cierre de la serie oficial." : "Este torneo no tiene umbral Match Point configurado.";
+  return (
+    <>
+      <InspectorTitle title={state} note={threshold ? `Umbral: ${threshold} puntos` : "Sin umbral Match Point"} />
+      <div className="bf-caster-definition">
+        <p><span>Partida activa</span><strong>{activeMatch ? `Partida ${activeMatch.round} · ${activeIncomplete ? "incompleta" : "completa"}` : "Sin partida activa"}</strong></p>
+        <p><span>Qué falta</span><strong>{needed}</strong></p>
+      </div>
+      <CompactRows
+        labels={["Equipos en/sobre umbral", "Puntos"]}
+        rows={above.map((entry) => [entry.team_name, formatPoints(entry.total_points)])}
+        empty={threshold ? "Ningún equipo alcanzó el umbral." : "No aplica ranking por umbral."}
+      />
+    </>
+  );
+}
+
+function MatchesDetail({
+  activeMatch,
+  latestReportedMatch,
+  activeReports,
+  pendingActiveReports,
+  completedOfficialMatches,
+  officialMatches,
+  reportsByMatch,
+  teamCount,
+  isBracket,
+}: {
+  activeMatch: Match | null;
+  latestReportedMatch: Match | null;
+  activeReports: number;
+  pendingActiveReports: number;
+  completedOfficialMatches: number;
+  officialMatches: Match[];
+  reportsByMatch: Map<number, TeamResultDetail[]>;
+  teamCount: number;
+  isBracket: boolean;
+}) {
+  return (
+    <>
+      <InspectorTitle title={activeMatch ? `Partida actual: ${activeMatch.round}` : "Sin partida actual"} note={latestReportedMatch ? `Última reportada: Partida ${latestReportedMatch.round}` : "Sin reportes oficiales"} />
+      <div className="bf-caster-inspector-metrics is-inline">
+        <span><b>{activeReports}</b> reportes actuales</span>
+        <span><b>{pendingActiveReports}</b> pendientes</span>
+        <span><b>{completedOfficialMatches}</b> partidas completas</span>
+      </div>
+      <CompactRows
+        labels={["Partida", "Reportes", "Pendientes", "Estado"]}
+        rows={officialMatches.map((match) => {
+          const count = isBracket
+            ? Number(match.status === "completed" || match.winner_id !== null)
+            : reportsByMatch.get(match.id)?.length ?? 0;
+          const expected = isBracket ? 1 : teamCount;
+          return [
+            String(match.round),
+            String(count),
+            !isBracket && match.status === "completed"
+              ? "—"
+              : String(Math.max(expected - count, 0)),
+            match.status === "completed" ? "Completa" : "Abierta",
+          ];
+        })}
+        empty="El torneo aún no tiene partidas oficiales."
+      />
+    </>
+  );
+}
+
+function InspectorTitle({ title, note }: { title: string; note: string }) {
+  return <header className="bf-caster-inspector-title"><h2>{title}</h2><span>{note}</span></header>;
+}
+
+function CompactRows({
+  labels,
+  rows,
+  empty,
+}: {
+  labels: string[];
+  rows: string[][];
+  empty: string;
+}) {
+  if (rows.length === 0) return <p className="bf-caster-inspector-empty">{empty}</p>;
+  return (
+    <div className="bf-caster-compact-table" role="table">
+      <div
+        className="bf-caster-compact-row is-head"
+        role="row"
+        style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(80px, 1fr))` }}
+      >
+        {labels.map((label) => <span role="columnheader" key={label}>{label}</span>)}
+      </div>
+      {rows.map((row, rowIndex) => (
+        <div
+          className="bf-caster-compact-row"
+          role="row"
+          key={`${row[0]}-${rowIndex}`}
+          style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(80px, 1fr))` }}
+        >
+          {row.map((value, index) => <span role="cell" key={`${index}-${value}`}>{value}</span>)}
+        </div>
+      ))}
+    </div>
+  );
+}
