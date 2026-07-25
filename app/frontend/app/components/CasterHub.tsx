@@ -421,7 +421,9 @@ export default function CasterHub() {
               <strong>{topKillsLabel}</strong>
               <small>
                 {mvp.kind === "player"
-                  ? `MVP actual: ${mvp.playerName} · ${mvp.kills} K`
+                  ? mvp.tiedWith.length > 0
+                    ? `MVP empatado: ${[mvp.playerName, ...mvp.tiedWith.map((entry) => entry.playerName)].join(" / ")} · ${mvp.kills} K`
+                    : `MVP actual: ${mvp.playerName} · ${mvp.kills} K`
                   : mvp.kind === "team"
                     ? `Team MVP: ${mvp.teamName} · ${mvp.kills} K`
                     : "MVP pendiente: faltan player stats"}
@@ -550,10 +552,30 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-note-block">
-                <span>{mvp.kind === "player" ? "MVP actual" : "MVP pendiente"}</span>
+                <span>
+                  {mvp.kind === "player"
+                    ? mvp.tiedWith.length > 0
+                      ? "MVP empatado"
+                      : "MVP actual"
+                    : "MVP pendiente"}
+                </span>
                 <p>
                   {mvp.kind === "player" ? (
-                    <>MVP actual: <strong>{mvp.playerName}</strong> suma {mvp.kills} kills.{playerMvpIdentity?.notes ? ` Nota Identity: ${playerMvpIdentity.notes}` : ""}</>
+                    mvp.tiedWith.length > 0 ? (
+                      <>
+                        MVP empatado:{" "}
+                        <strong>
+                          {[mvp.playerName, ...mvp.tiedWith.map((entry) => entry.playerName)].join(" / ")}
+                        </strong>{" "}
+                        · {mvp.kills} K
+                        {playerMvpIdentity?.notes ? ` · Nota Identity: ${playerMvpIdentity.notes}` : ""}
+                      </>
+                    ) : (
+                      <>
+                        MVP actual: <strong>{mvp.playerName}</strong> suma {mvp.kills} kills.
+                        {playerMvpIdentity?.notes ? ` Nota Identity: ${playerMvpIdentity.notes}` : ""}
+                      </>
+                    )
                   ) : (
                     "MVP pendiente: faltan player stats reportadas."
                   )}
