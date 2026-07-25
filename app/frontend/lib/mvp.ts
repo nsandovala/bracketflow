@@ -34,10 +34,7 @@ export type MvpState =
   | TeamMvp
   | { kind: "pending" };
 
-export function getMvpState(
-  results: TeamResultDetail[],
-  standings: MvpStanding[]
-): MvpState {
+export function getMvpPlayerRanking(results: TeamResultDetail[]): MvpPlayerEntry[] {
   const byPlayer = new Map<string, MvpPlayerEntry>();
 
   for (const result of results) {
@@ -64,7 +61,19 @@ export function getMvpState(
     }
   }
 
-  const players = Array.from(byPlayer.values());
+  return Array.from(byPlayer.values()).sort(
+    (left, right) =>
+      right.kills - left.kills ||
+      right.matches - left.matches ||
+      left.playerName.localeCompare(right.playerName)
+  );
+}
+
+export function getMvpState(
+  results: TeamResultDetail[],
+  standings: MvpStanding[]
+): MvpState {
+  const players = getMvpPlayerRanking(results);
   if (players.length > 0) {
     const topKills = players.reduce(
       (max, candidate) => (candidate.kills > max ? candidate.kills : max),
