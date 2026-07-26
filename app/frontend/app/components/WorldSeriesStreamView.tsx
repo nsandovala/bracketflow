@@ -12,7 +12,10 @@ import StreamOverlaySidebar from "./StreamOverlaySidebar";
 import StreamStandingsBoard from "./StreamStandingsBoard";
 import { useStreamLeaderboard } from "../lib/useStreamLeaderboard";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
-import { getMatchPointStatus, getMatchPointStatusMessage } from "../../lib/tournamentStatus";
+import {
+  getMatchPointStatusFromPolicy,
+  getMatchPointStatusMessage,
+} from "../../lib/tournamentStatus";
 
 export type StreamLayout =
   | "full"
@@ -41,8 +44,16 @@ export default function WorldSeriesStreamView({
   brand,
   layout,
 }: WorldSeriesStreamViewProps) {
-  const { tournament, teams, matches, standings, results, afterGameNumber, connected } =
-    useStreamLeaderboard(tournamentId);
+  const {
+    tournament,
+    matchCompletionPolicy,
+    teams,
+    matches,
+    standings,
+    results,
+    afterGameNumber,
+    connected,
+  } = useStreamLeaderboard(tournamentId);
   const engine = tournament ? resolveTournamentEngine(tournament) : null;
   const isBracket =
     engine?.scoringProfile === "kill_race" ||
@@ -50,12 +61,9 @@ export default function WorldSeriesStreamView({
     engine?.tournamentStructure === "double_elim";
   const matchPointStatus =
     tournament && engine && !isBracket
-      ? getMatchPointStatus({
-          tournament,
-          threshold: engine.matchPointThreshold,
-          standings,
+      ? getMatchPointStatusFromPolicy({
+          policy: matchCompletionPolicy,
           teams,
-          matches,
         })
       : { state: "idle" as const };
   const matchPointMessage = isBracket ? null : getMatchPointStatusMessage(matchPointStatus);

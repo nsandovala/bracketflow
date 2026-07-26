@@ -27,7 +27,6 @@ function OperatorPageClient() {
     teams,
     matches,
     players,
-    sortedStandings,
     activeMatch,
     activeMatchResults,
     pendingTeams,
@@ -35,6 +34,7 @@ function OperatorPageClient() {
     totalTeams,
     latestReportedRound,
     canCreateNextGame,
+    matchCompletionPolicy,
     selectedEngine,
     nextGameNumber,
     submitting,
@@ -55,6 +55,8 @@ function OperatorPageClient() {
     generateRouletteForSelected,
     generateBracketForSelected,
     createNextGame,
+    configureMatchPoint,
+    removeLatestEmptyMatch,
     saveTeamReport,
     saveOfficialReportFromDraft,
     saveKillRaceMap,
@@ -112,7 +114,6 @@ function OperatorPageClient() {
       teams={teams}
       matches={matches}
       players={players}
-      standings={sortedStandings}
       activeMatch={activeMatch}
       activeMatchResults={activeMatchResults}
       pendingTeams={pendingTeams}
@@ -120,6 +121,7 @@ function OperatorPageClient() {
       totalTeams={totalTeams}
       latestReportedRound={latestReportedRound}
       canCreateNextGame={canCreateNextGame}
+      matchCompletionPolicy={matchCompletionPolicy}
       selectedEngine={selectedEngine}
       nextGameNumber={nextGameNumber}
       submitting={submitting}
@@ -154,6 +156,8 @@ function OperatorPageClient() {
       onCreateNextGame={() => {
         void createNextGame();
       }}
+      onConfigureMatchPoint={configureMatchPoint}
+      onRemoveLatestEmptyMatch={removeLatestEmptyMatch}
       onBulkImportTeams={handleBulkImportTeams}
     />
   );

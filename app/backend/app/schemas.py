@@ -19,6 +19,7 @@ class TournamentConfig(BaseModel):
     bracketMode: Literal["single_elim", "double_elim"] | None = None
     teamSize: Literal[1, 2, 3, 4] | None = None
     bestOf: int | None = Field(default=None, ge=1)
+    matchPointEnabled: bool | None = None
     matchPointThreshold: int | None = Field(default=None, ge=1)
     rouletteGeneratedAt: str | None = None
     rouletteSeed: str | None = None
@@ -104,6 +105,49 @@ class Tournament(TournamentBase):
     bracket_locked_at: str | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MatchPointConfigurationUpdate(BaseModel):
+    matchPointThreshold: int = Field(ge=1)
+
+
+class MatchCompletionPolicy(BaseModel):
+    state: Literal[
+        "unsupported",
+        "disabled",
+        "match_point_not_configured",
+        "active",
+        "threshold_reached",
+        "completed",
+    ]
+    action: Literal[
+        "none",
+        "configure_match_point",
+        "create_match",
+        "complete_current_match",
+        "resolve_tie",
+        "remove_empty_latest_match",
+        "tournament_completed",
+    ]
+    code: str
+    reason: str
+    supportsMatchPoint: bool
+    matchPointEnabled: bool
+    matchPointThreshold: int | None = None
+    championTeamId: int | None = None
+    championTeamName: str | None = None
+    leaderTeamId: int | None = None
+    leaderTeamName: str | None = None
+    leaderPoints: float | None = None
+    latestMatchId: int | None = None
+    latestMatchRound: int | None = None
+    latestMatchReports: int = 0
+    canRemoveLatestEmptyMatch: bool = False
+
+
+class EmptyMatchRemovalResult(BaseModel):
+    removedMatchId: int
+    matchCompletionPolicy: MatchCompletionPolicy
 
 
 def _validate_nickname(value: str) -> str:

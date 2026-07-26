@@ -6,6 +6,7 @@ import {
   ApiError,
   LeaderboardEntry,
   Match,
+  MatchCompletionPolicy,
   Team,
   TeamResultDetail,
   Tournament,
@@ -16,6 +17,7 @@ import {
   createPlayer,
   createTeam,
   createTournament,
+  configureTournamentMatchPoint,
   closeRosterRespin,
   deletePlayer,
   deleteTournament,
@@ -23,6 +25,7 @@ import {
   generateRouletteTeams,
   getHealth,
   getLeaderboard,
+  getMatchCompletionPolicy,
   getMatches,
   getPlayers,
   getTournament,
@@ -34,6 +37,7 @@ import {
   lockRosterRespin,
   openBracketRespin,
   openRosterRespin,
+  removeEmptyLatestMatch as removeEmptyLatestMatchRequest,
   saveMatchMap,
   saveMatchResult,
   updateTournament,
@@ -156,6 +160,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+  const [matchCompletionPolicy, setMatchCompletionPolicy] =
+    useState<MatchCompletionPolicy | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -186,11 +192,19 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
           ? ([getLeaderboard(tournamentId), getTournamentResults(tournamentId)] as const)
           : ([Promise.resolve([]), Promise.resolve([])] as const);
 
-      const [nextTeams, nextMatches, nextLeaderboard, nextResults, nextPlayers] = await Promise.all([
+      const [
+        nextTeams,
+        nextMatches,
+        nextLeaderboard,
+        nextResults,
+        nextPlayers,
+        nextMatchCompletionPolicy,
+      ] = await Promise.all([
         getTeams(tournamentId),
         getMatches(tournamentId),
         ...standingsRequests,
         getPlayers(tournamentId),
+        getMatchCompletionPolicy(tournamentId),
       ]);
 
       const relevantMatches =
@@ -213,6 +227,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       }
 
       setSelectedTournament(tournament);
+      setMatchCompletionPolicy(nextMatchCompletionPolicy);
       setTeams(nextTeams);
       setMatches(nextMatches);
       setLeaderboard(nextLeaderboard);
@@ -241,6 +256,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
       if (resolvedTournamentId === null) {
         setSelectedTournament(null);
+        setMatchCompletionPolicy(null);
         setTeams([]);
         setMatches([]);
         setLeaderboard([]);
@@ -293,6 +309,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   function selectTournament(tournamentId: number) {
     persistTournamentId(tournamentId);
     setSelectedTournamentId(tournamentId);
+    setMatchCompletionPolicy(null);
     setSelectedMatchId(null);
     setResultDrafts({});
     setKillRaceMapDrafts({});
@@ -418,8 +435,81 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   }, [activeMatchResults, selectedEngine, totalTeams]);
   const canCreateNextGame =
     totalTeams > 0 &&
+    (!selectedEngine?.supportsMatchPoint ||
+      (matchCompletionPolicy !== null &&
+        matchCompletionPolicy.state !== "match_point_not_configured" &&
+        matchCompletionPolicy.state !== "completed")) &&
     (activeMatch === null ||
       (reportsLoaded === totalTeams && !hasKillRaceTie));
+
+  async function configureMatchPoint(threshold: number) {
+    if (selectedTournamentId === null) {
+      return null;
+    }
+    if (!Number.isInteger(threshold) || threshold < 1) {
+      setMessage("El umbral debe ser un entero positivo.");
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const policy = await configureTournamentMatchPoint(
+        selectedTournamentId,
+        threshold
+      );
+      await refreshSelectedTournament(selectedTournamentId);
+      setMessage(`Match Point configurado en ${threshold} puntos.`);
+      return policy;
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo configurar Match Point."
+      );
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function removeLatestEmptyMatch() {
+    if (
+      selectedTournamentId === null ||
+      matchCompletionPolicy?.latestMatchId === null ||
+      !matchCompletionPolicy?.canRemoveLatestEmptyMatch
+    ) {
+      setMessage("La ultima partida no se puede retirar de forma segura.");
+      return null;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+    try {
+      const result = await removeEmptyLatestMatchRequest(
+        selectedTournamentId,
+        matchCompletionPolicy.latestMatchId
+      );
+      await refreshSelectedTournament(selectedTournamentId, {
+        preferLatestMatch: true,
+      });
+      setMessage(
+        result.matchCompletionPolicy.state === "completed"
+          ? "Partida vacia retirada. Campeon confirmado y torneo finalizado."
+          : "Partida vacia retirada de forma segura."
+      );
+      return result;
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo retirar la partida vacia."
+      );
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function createEngineTournament(payload: {
     name: string;
@@ -1231,6 +1321,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     tournaments,
     selectedTournamentId,
     selectedTournament,
+    matchCompletionPolicy,
     teams,
     players,
     matches,
@@ -1274,6 +1365,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     archiveSelectedTournament,
     deleteSelectedTournament,
     createNextGame,
+    configureMatchPoint,
+    removeLatestEmptyMatch,
     saveTeamReport,
     saveOfficialReportFromDraft,
     saveKillRaceMap,

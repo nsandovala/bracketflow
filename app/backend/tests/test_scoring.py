@@ -677,7 +677,8 @@ def test_finalized_tournament_rejects_new_match(db_session):
         create_match(tournament.id, schemas.MatchCreate(round=2), db_session)
 
     assert exc.value.status_code == 409
-    assert exc.value.detail == FINALIZED_DETAIL
+    assert exc.value.detail["code"] == "TOURNAMENT_COMPLETED"
+    assert exc.value.detail["action"] == "tournament_completed"
     assert len(get_matches_by_tournament(db_session, tournament.id)) == before
 
 

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type {
   LeaderboardEntry,
   Match,
+  MatchCompletionPolicy,
   Team,
   TeamResultDetail,
   Tournament,
@@ -18,6 +19,12 @@ import type { MatchPointStatus } from "../../lib/tournamentStatus";
 import { getTeamDisplayName, getTeamRosterText } from "../../lib/tournamentStatus";
 import type { IdentityCatalog } from "../../lib/identityResolver";
 import { getResolvedTeamProfile } from "../../lib/identityResolver";
+import {
+  createCasterInspectorSelection,
+  getMatchPointDefinitionSummary,
+  reconcileCasterInspectorSelection,
+  toggleCasterInspectorContext,
+} from "../../lib/casterInspectorState.mjs";
 
 type ContextKey = "leader" | "kills" | "mvp" | "definition" | "matches";
 
@@ -30,7 +37,7 @@ type Props = {
   results: TeamResultDetail[];
   identityCatalog: IdentityCatalog;
   matchPointStatus: MatchPointStatus;
-  matchPointThreshold?: number;
+  matchCompletionPolicy: MatchCompletionPolicy | null;
   isBracket: boolean;
   bracketCompleted: boolean;
   bracketChampionLabel: string | null;
@@ -61,7 +68,7 @@ export default function CasterContextInspector({
   results,
   identityCatalog,
   matchPointStatus,
-  matchPointThreshold,
+  matchCompletionPolicy,
   isBracket,
   bracketCompleted,
   bracketChampionLabel,
@@ -69,9 +76,29 @@ export default function CasterContextInspector({
   loading,
   backendOnline,
 }: Props) {
-  const [selected, setSelected] = useState<ContextKey | null>(
-    standings.length > 0 ? "leader" : results.length > 0 ? "matches" : "definition"
+  const matchPointThreshold =
+    matchCompletionPolicy?.matchPointThreshold ?? undefined;
+  const [selection, setSelection] = useState<{
+    tournamentId: number;
+    selected: ContextKey | null;
+  }>(
+    () =>
+      createCasterInspectorSelection(
+        tournament.id,
+        standings.length,
+        results.length
+      ) as { tournamentId: number; selected: ContextKey | null }
   );
+  const reconciledSelection = reconcileCasterInspectorSelection(
+    selection,
+    tournament.id,
+    standings.length,
+    results.length
+  ) as { tournamentId: number; selected: ContextKey | null };
+  if (reconciledSelection !== selection) {
+    setSelection(reconciledSelection);
+  }
+  const selected = reconciledSelection.selected;
 
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
   const rawTeamById = useMemo(
@@ -119,6 +146,13 @@ export default function CasterContextInspector({
       ? 0
       : Math.max(expectedActiveReports - activeReports, 0);
   const completedOfficialMatches = officialMatches.filter((match) => match.status === "completed").length;
+  const definitionSummary = getMatchPointDefinitionSummary({
+    policy: matchCompletionPolicy,
+    status: matchPointStatus,
+    isBracket,
+    bracketChampionLabel,
+    tournamentCompleted: tournament.status === "completed",
+  });
 
   const cards: Array<{ key: ContextKey; label: string; value: string; detail: string; gold?: boolean }> = [
     {
@@ -144,8 +178,8 @@ export default function CasterContextInspector({
     {
       key: "definition",
       label: "Definición / Match Point",
-      value: getDefinitionLabel(matchPointStatus, tournament, isBracket, bracketChampionLabel),
-      detail: matchPointThreshold ? `Umbral configurado: ${matchPointThreshold} pts` : "Sin umbral Match Point",
+      value: definitionSummary.label,
+      detail: definitionSummary.detail,
       gold: true,
     },
     {
@@ -168,7 +202,15 @@ export default function CasterContextInspector({
               className={`bf-caster-stat${card.gold ? " is-gold" : ""}${active ? " is-active" : ""}`}
               aria-expanded={active}
               aria-controls="caster-context-inspector"
-              onClick={() => setSelected((current) => current === card.key ? null : card.key)}
+              onClick={() =>
+                setSelection(
+                  (current) =>
+                    toggleCasterInspectorContext(current, card.key) as {
+                      tournamentId: number;
+                      selected: ContextKey | null;
+                    }
+                )
+              }
             >
               <span>{card.label}</span>
               <strong>{card.value}</strong>
@@ -211,6 +253,7 @@ export default function CasterContextInspector({
           <DefinitionDetail
             tournament={tournament}
             status={matchPointStatus}
+            policy={matchCompletionPolicy}
             threshold={matchPointThreshold}
             standings={standings}
             activeMatch={activeMatch}
@@ -253,6 +296,9 @@ function getDefinitionLabel(
   if (status.state === "threshold_reached") {
     return status.reason === "tie" ? "Empate sin resolver" : "Umbral alcanzado";
   }
+  if (status.state === "not_configured") return "Match Point no configurado";
+  if (status.state === "disabled") return "Match Point desactivado";
+  if (status.state === "unsupported") return "Motor sin Match Point";
   return isBracket ? "Serie abierta" : "Competencia abierta";
 }
 
@@ -371,6 +417,7 @@ function MvpDetail({
 function DefinitionDetail({
   tournament,
   status,
+  policy,
   threshold,
   standings,
   activeMatch,
@@ -380,6 +427,7 @@ function DefinitionDetail({
 }: {
   tournament: Tournament;
   status: MatchPointStatus;
+  policy: MatchCompletionPolicy | null;
   threshold?: number;
   standings: LeaderboardEntry[];
   activeMatch: Match | null;
@@ -396,10 +444,21 @@ function DefinitionDetail({
   else if (status.state === "threshold_reached" && status.reason === "tie") needed = "Falta resolver el empate en los resultados oficiales.";
   else if (status.state === "threshold_reached" && status.reason === "incomplete_match") needed = "Falta completar la partida activa antes de confirmar la definición.";
   else if (status.state === "threshold_reached") needed = "El umbral fue alcanzado; falta la confirmación del backend.";
-  else if (!threshold) needed = isBracket ? "La definición depende del cierre de la serie oficial." : "Este torneo no tiene umbral Match Point configurado.";
+  else if (status.state === "not_configured") needed = status.reason;
+  else if (status.state === "disabled" || status.state === "unsupported") needed = status.reason;
+  else if (!threshold) needed = isBracket ? "La definición depende del cierre de la serie oficial." : (policy?.reason ?? "Política de cierre pendiente.");
   return (
     <>
-      <InspectorTitle title={state} note={threshold ? `Umbral: ${threshold} puntos` : "Sin umbral Match Point"} />
+      <InspectorTitle
+        title={state}
+        note={
+          threshold
+            ? `Umbral: ${threshold} puntos`
+            : status.state === "not_configured"
+              ? "Configuración requerida"
+              : policy?.reason ?? "Sin política aplicable"
+        }
+      />
       <div className="bf-caster-definition">
         <p><span>Partida activa</span><strong>{activeMatch ? `Partida ${activeMatch.round} · ${activeIncomplete ? "incompleta" : "completa"}` : "Sin partida activa"}</strong></p>
         <p><span>Qué falta</span><strong>{needed}</strong></p>

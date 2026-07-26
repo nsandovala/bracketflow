@@ -196,6 +196,7 @@ function readConfig(tournament: Tournament): TournamentConfig {
   const lobbySize = config.lobbySize;
   const teamSize = config.teamSize;
   const bestOf = config.bestOf;
+  const matchPointEnabled = config.matchPointEnabled;
   const matchPointThreshold = config.matchPointThreshold;
   const rouletteTeamSize = config.rouletteTeamSize;
   const rouletteBench = config.rouletteBench;
@@ -237,6 +238,8 @@ function readConfig(tournament: Tournament): TournamentConfig {
       typeof bestOf === "number" && Number.isFinite(bestOf) && bestOf > 0
         ? bestOf
         : undefined,
+    matchPointEnabled:
+      typeof matchPointEnabled === "boolean" ? matchPointEnabled : undefined,
     matchPointThreshold:
       typeof matchPointThreshold === "number" &&
       Number.isFinite(matchPointThreshold) &&
@@ -307,7 +310,7 @@ function resolveFromPreset(
     config,
     primaryView: preset.primaryView,
     supportsMatchPoint: preset.supportsMatchPoint,
-    matchPointThreshold: config.matchPointThreshold ?? preset.defaultMatchPoint,
+    matchPointThreshold: config.matchPointThreshold,
     bestOf: config.bestOf ?? preset.bestOf,
   };
 }
@@ -340,7 +343,7 @@ export function resolveTournamentEngine(
       config,
       primaryView: "standings",
       supportsMatchPoint: true,
-      matchPointThreshold: config.matchPointThreshold ?? ENGINE_PRESETS.wsow_br.defaultMatchPoint,
+      matchPointThreshold: config.matchPointThreshold,
     };
   }
 

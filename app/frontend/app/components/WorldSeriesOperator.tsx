@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 
 import {
   Match,
+  MatchCompletionPolicy,
   ParticipantImportResult,
   Player,
   Team,
@@ -38,11 +39,11 @@ import {
   getTeamShortDisplayName,
   isTournamentCompleted,
   findChampion,
-  getMatchPointStatus,
+  getMatchPointStatusFromPolicy,
   getMatchPointStatusMessage,
   getTeamRosterText,
 } from "../../lib/tournamentStatus";
-import { KillRaceMapDraft, ResultDraft, WorldSeriesStanding } from "../lib/useWorldSeriesPractice";
+import { KillRaceMapDraft, ResultDraft } from "../lib/useWorldSeriesPractice";
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
@@ -56,7 +57,6 @@ type WorldSeriesOperatorProps = {
   teams: Team[];
   matches: Match[];
   players: Player[];
-  standings: WorldSeriesStanding[];
   activeMatch: Match | null;
   activeMatchResults: TeamResultDetail[];
   pendingTeams: Team[];
@@ -64,6 +64,7 @@ type WorldSeriesOperatorProps = {
   totalTeams: number;
   latestReportedRound: number;
   canCreateNextGame: boolean;
+  matchCompletionPolicy: MatchCompletionPolicy | null;
   selectedEngine: ResolvedTournamentEngine | null;
   nextGameNumber: number;
   submitting: boolean;
@@ -91,6 +92,8 @@ type WorldSeriesOperatorProps = {
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onSaveKillRaceMap: (matchId: number) => void;
   onCreateNextGame: () => void;
+  onConfigureMatchPoint: (threshold: number) => Promise<unknown>;
+  onRemoveLatestEmptyMatch: () => Promise<unknown>;
   onBulkImportTeams?: (teams: Array<{ name: string; roster: string }>) => Promise<unknown>;
   onSubmitOfficialReport?: (
     matchId: number,
@@ -843,7 +846,6 @@ export default function WorldSeriesOperator({
   teams,
   matches,
   players,
-  standings,
   activeMatch,
   activeMatchResults,
   pendingTeams,
@@ -851,6 +853,7 @@ export default function WorldSeriesOperator({
   totalTeams,
   latestReportedRound,
   canCreateNextGame,
+  matchCompletionPolicy,
   selectedEngine,
   nextGameNumber,
   submitting,
@@ -878,6 +881,8 @@ export default function WorldSeriesOperator({
   onSaveTeamReport,
   onSaveKillRaceMap,
   onCreateNextGame,
+  onConfigureMatchPoint,
+  onRemoveLatestEmptyMatch,
   onBulkImportTeams,
   onSubmitOfficialReport,
 }: WorldSeriesOperatorProps) {
@@ -923,6 +928,7 @@ export default function WorldSeriesOperator({
   }
   const [filter, setFilter] = useState<ResultFilter>("all");
   const [teamImportMessage, setTeamImportMessage] = useState<string | null>(null);
+  const [matchPointThresholdDraft, setMatchPointThresholdDraft] = useState("");
   const teamFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentGame = activeMatch ? activeMatch.round : nextGameNumber;
@@ -938,12 +944,9 @@ export default function WorldSeriesOperator({
     : totalTeams;
   const matchPointStatus =
     selectedTournament && selectedEngine && !isKillRace
-      ? getMatchPointStatus({
-          tournament: selectedTournament,
-          threshold: selectedEngine.matchPointThreshold,
-          standings,
+      ? getMatchPointStatusFromPolicy({
+          policy: matchCompletionPolicy,
           teams,
-          matches,
         })
       : { state: "idle" as const };
   const matchPointMessage = isKillRace ? null : getMatchPointStatusMessage(matchPointStatus);
@@ -969,6 +972,7 @@ export default function WorldSeriesOperator({
     reportsLoaded,
     totalTeams,
     matchPointStatus,
+    matchCompletionPolicy,
     canCreateNextMatch: canCreateNextGame,
   });
   const importFormatExample = useMemo(() => {
@@ -1160,18 +1164,79 @@ export default function WorldSeriesOperator({
       {!isKillRace && matchPointStatus.state !== "idle" ? (
         <section className={`bf-status-banner ${matchPointStatus.state === "champion" ? "is-success" : "is-warning"}`}>
           <span className="bf-status-banner-kicker">
-            {matchPointStatus.state === "champion" ? "Campeon por Match Point" : "Estado Match Point"}
+            {matchPointStatus.state === "champion"
+              ? "Campeon por Match Point"
+              : matchPointStatus.state === "not_configured"
+                ? "Configuración requerida"
+                : "Estado Match Point"}
           </span>
           <strong className="bf-status-banner-title">
             {matchPointStatus.state === "champion"
               ? matchPointStatus.championLabel
-              : "Match Point alcanzado"}
+              : matchPointStatus.state === "not_configured"
+                ? "Match Point no configurado"
+                : matchPointStatus.state === "threshold_reached"
+                  ? "Match Point alcanzado"
+                  : matchPointStatus.state === "disabled"
+                    ? "Match Point desactivado"
+                    : "Motor sin Match Point"}
           </strong>
           <span className="bf-status-banner-sub">
             {matchPointStatus.state === "champion"
               ? `${matchPointRoster}${selectedTournament?.status === "completed" ? " - Torneo finalizado." : ""}`
               : matchPointMessage}
           </span>
+        </section>
+      ) : null}
+
+      {matchCompletionPolicy?.state === "match_point_not_configured" ? (
+        <section className="opr-panel bf-match-point-repair" aria-labelledby="match-point-repair-title">
+          <div className="opr-eyebrow">Reparación de configuración</div>
+          <h2 id="match-point-repair-title">Configurar Match Point</h2>
+          <p className="sub">{matchCompletionPolicy.reason}</p>
+          <div className="bf-hub-form-actions">
+            <label className="bf-field">
+              <span>Umbral de puntos</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                placeholder="Ej. 125"
+                value={matchPointThresholdDraft}
+                onChange={(event) => setMatchPointThresholdDraft(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="opr-save"
+              disabled={
+                submitting ||
+                !Number.isInteger(Number(matchPointThresholdDraft)) ||
+                Number(matchPointThresholdDraft) < 1
+              }
+              onClick={() => void onConfigureMatchPoint(Number(matchPointThresholdDraft))}
+            >
+              Guardar umbral
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {matchCompletionPolicy?.action === "remove_empty_latest_match" &&
+      matchCompletionPolicy.canRemoveLatestEmptyMatch ? (
+        <section className="opr-panel bf-match-point-repair" aria-label="Resolver partida vacía">
+          <div className="opr-eyebrow">Resolución segura</div>
+          <h2>Retirar Partida {matchCompletionPolicy.latestMatchRound} vacía</h2>
+          <p className="sub">{matchCompletionPolicy.reason}</p>
+          <button
+            type="button"
+            className="opr-save"
+            disabled={submitting}
+            onClick={() => void onRemoveLatestEmptyMatch()}
+          >
+            Retirar partida vacía y reevaluar
+          </button>
         </section>
       ) : null}
 
@@ -1674,14 +1739,29 @@ export default function WorldSeriesOperator({
                   <Link href={`/stream?tournamentId=${selectedTournament.id}`}>Stream</Link>
                   <Link href="/dashboard">Dashboard</Link>
                 </nav>
-                <button
-                  type="button"
-                  className={`opr-next${canCreateNextGame ? " is-ready" : ""}`}
-                  disabled={!canCreateNextGame || submitting}
-                  onClick={onCreateNextGame}
-                >
-                  Crear Partida {nextGameNumber} <span className="arrow">→</span>
-                </button>
+                {matchCompletionPolicy?.state === "match_point_not_configured" ? (
+                  <span className="bf-inline-note">
+                    Configura Match Point antes de crear otra partida.
+                  </span>
+                ) : matchCompletionPolicy?.action === "remove_empty_latest_match" ? (
+                  <button
+                    type="button"
+                    className="opr-next is-ready"
+                    disabled={submitting}
+                    onClick={() => void onRemoveLatestEmptyMatch()}
+                  >
+                    Retirar Partida {matchCompletionPolicy.latestMatchRound} vacía
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`opr-next${canCreateNextGame ? " is-ready" : ""}`}
+                    disabled={!canCreateNextGame || submitting}
+                    onClick={onCreateNextGame}
+                  >
+                    Crear Partida {nextGameNumber} <span className="arrow">→</span>
+                  </button>
+                )}
               </div>
             )}
           </section>

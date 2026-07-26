@@ -85,6 +85,38 @@ def update_tournament(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@app.get(
+    "/tournaments/{tournament_id}/match-completion-policy",
+    response_model=schemas.MatchCompletionPolicy,
+)
+def get_match_completion_policy(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.MatchCompletionPolicy:
+    tournament = get_tournament_or_404(db, tournament_id)
+    return crud.get_match_completion_policy(db, tournament)
+
+
+@app.patch(
+    "/tournaments/{tournament_id}/match-completion-policy",
+    response_model=schemas.MatchCompletionPolicy,
+)
+def configure_match_point(
+    tournament_id: int,
+    payload: schemas.MatchPointConfigurationUpdate,
+    db: Session = Depends(get_db),
+) -> schemas.MatchCompletionPolicy:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.configure_match_point(
+            db,
+            tournament,
+            payload.matchPointThreshold,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.post("/tournaments/{tournament_id}/archive", response_model=schemas.Tournament)
 def archive_tournament(
     tournament_id: int,
@@ -415,6 +447,25 @@ def create_match(
 ) -> schemas.Match:
     tournament = get_tournament_or_404(db, tournament_id)
     ensure_battle_royale_tournament(tournament)
+    completion_policy = crud.get_match_completion_policy(db, tournament)
+    if completion_policy.state == "completed":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": completion_policy.code,
+                "action": completion_policy.action,
+                "reason": completion_policy.reason,
+            },
+        )
+    if completion_policy.state == "match_point_not_configured":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": completion_policy.code,
+                "action": completion_policy.action,
+                "reason": completion_policy.reason,
+            },
+        )
     ensure_tournament_is_mutable(tournament)
     if crud.requires_roulette(tournament) and not crud.get_teams_by_tournament(db, tournament_id):
         raise HTTPException(
@@ -422,6 +473,32 @@ def create_match(
             detail="Ruleta requerida: carga participantes para generar equipos antes de operar.",
         )
     return crud.build_match_schema(crud.create_battle_royale_match(db, tournament, match))
+
+
+@app.delete(
+    "/tournaments/{tournament_id}/matches/{match_id}",
+    response_model=schemas.EmptyMatchRemovalResult,
+)
+def delete_empty_latest_match(
+    tournament_id: int,
+    match_id: int,
+    db: Session = Depends(get_db),
+) -> schemas.EmptyMatchRemovalResult:
+    tournament = get_tournament_or_404(db, tournament_id)
+    match = crud.get_match(db, match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    try:
+        return crud.remove_empty_latest_match(db, tournament, match)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EMPTY_MATCH_REMOVAL_REJECTED",
+                "action": "none",
+                "reason": str(error),
+            },
+        ) from error
 
 
 @app.post("/matches/{match_id}/results", response_model=schemas.TeamResult)

@@ -29,6 +29,7 @@ function StandingsPageClient() {
     teams,
     matches,
     tournamentResults,
+    matchCompletionPolicy,
     selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
 
@@ -49,6 +50,7 @@ function StandingsPageClient() {
       teams={teams}
       matches={matches}
       results={tournamentResults}
+      matchCompletionPolicy={matchCompletionPolicy}
       onSelectTournament={(tournamentId) => {
         selectTournament(tournamentId);
         router.replace(`/standings?tournamentId=${tournamentId}`);

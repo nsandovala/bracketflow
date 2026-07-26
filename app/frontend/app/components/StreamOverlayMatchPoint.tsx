@@ -32,12 +32,29 @@ export default function StreamOverlayMatchPoint({
   }
 
   const isChampion = status.state === "champion";
-  const kicker = isChampion ? "Campeón por Match Point" : "Match Point alcanzado";
-  const teamLabel = isChampion ? status.championLabel : status.leaderName;
+  const isThresholdReached = status.state === "threshold_reached";
+  const kicker = isChampion
+    ? "Campeón por Match Point"
+    : status.state === "not_configured"
+      ? "Configuración requerida"
+      : isThresholdReached
+        ? "Match Point alcanzado"
+        : "Política Match Point";
+  const teamLabel = isChampion
+    ? status.championLabel
+    : isThresholdReached
+      ? status.leaderName
+      : status.state === "not_configured"
+        ? "Match Point no configurado"
+        : status.state === "disabled"
+          ? "Match Point desactivado"
+          : "Motor sin Match Point";
   const detail = isChampion
     ? `Objetivo ${status.threshold} pts asegurado`
-    : REASON_LABELS[status.reason] ?? "Condición pendiente de resolver";
-  const scoreline = isChampion
+    : isThresholdReached
+      ? REASON_LABELS[status.reason] ?? "Condición pendiente de resolver"
+      : status.reason;
+  const scoreline = isChampion || !isThresholdReached
     ? null
     : `${status.leaderPoints.toFixed(1)} pts · objetivo ${status.threshold}`;
 
