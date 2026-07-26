@@ -2,11 +2,17 @@ import StandingsTable from "./StandingsTable";
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
 
-import { Match, Team, TeamResultDetail, Tournament } from "../../lib/api";
+import {
+  Match,
+  MatchCompletionPolicy,
+  Team,
+  TeamResultDetail,
+  Tournament,
+} from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import {
   findChampion,
-  getMatchPointStatus,
+  getMatchPointStatusFromPolicy,
   getMatchPointStatusMessage,
   getTeamRosterText,
   isTournamentCompleted,
@@ -22,6 +28,7 @@ type WorldSeriesStandingsProps = {
   totalTeams: number;
   teams: Team[];
   matches: Match[];
+  matchCompletionPolicy: MatchCompletionPolicy | null;
   results?: TeamResultDetail[];
   onSelectTournament: (tournamentId: number) => void;
 };
@@ -35,6 +42,7 @@ export default function WorldSeriesStandings({
   totalTeams,
   teams,
   matches,
+  matchCompletionPolicy,
   results,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
@@ -49,12 +57,9 @@ export default function WorldSeriesStandings({
   const isCompleted = isBracket ? isTournamentCompleted(matches) : false;
   const matchPointStatus =
     selectedEngine && !isBracket
-      ? getMatchPointStatus({
-          tournament: selectedTournament,
-          threshold: selectedEngine.matchPointThreshold,
-          standings,
+      ? getMatchPointStatusFromPolicy({
+          policy: matchCompletionPolicy,
           teams,
-          matches,
         })
       : { state: "idle" as const };
   const matchPointMessage = isBracket ? null : getMatchPointStatusMessage(matchPointStatus);
@@ -115,12 +120,22 @@ export default function WorldSeriesStandings({
       {!isBracket && matchPointStatus.state !== "idle" ? (
         <section className={`bf-status-banner ${matchPointStatus.state === "champion" ? "is-success" : "is-warning"}`}>
           <span className="bf-status-banner-kicker">
-            {matchPointStatus.state === "champion" ? "Campeon por Match Point" : "Estado Match Point"}
+            {matchPointStatus.state === "champion"
+              ? "Campeon por Match Point"
+              : matchPointStatus.state === "not_configured"
+                ? "Configuración requerida"
+                : "Estado Match Point"}
           </span>
           <strong className="bf-status-banner-title">
             {matchPointStatus.state === "champion"
               ? matchPointStatus.championLabel
-              : "Match Point alcanzado"}
+              : matchPointStatus.state === "not_configured"
+                ? "Match Point no configurado"
+                : matchPointStatus.state === "threshold_reached"
+                  ? "Match Point alcanzado"
+                  : matchPointStatus.state === "disabled"
+                    ? "Match Point desactivado"
+                    : "Motor sin Match Point"}
           </strong>
           <span className="bf-status-banner-sub">
             {matchPointStatus.state === "champion" ? matchPointRoster : matchPointMessage}

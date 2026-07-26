@@ -6,11 +6,15 @@ type RequestOptions = Omit<RequestInit, "body"> & {
 
 export class ApiError extends Error {
   status: number;
+  code?: string;
+  action?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string, action?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
+    this.action = action;
   }
 }
 
@@ -28,15 +32,23 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!response.ok) {
     let message = "Request failed";
+    let code: string | undefined;
+    let action: string | undefined;
 
     try {
-      const data = (await response.json()) as { detail?: string };
-      if (data.detail) {
+      const data = (await response.json()) as {
+        detail?: string | { code?: string; action?: string; reason?: string };
+      };
+      if (typeof data.detail === "string") {
         message = data.detail;
+      } else if (data.detail) {
+        message = data.detail.reason ?? message;
+        code = data.detail.code;
+        action = data.detail.action;
       }
     } catch {}
 
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, code, action);
   }
 
   if (response.status === 204) {
@@ -69,6 +81,7 @@ export type TournamentConfig = {
   bracketMode?: "single_elim" | "double_elim";
   teamSize?: 1 | 2 | 3 | 4;
   bestOf?: number;
+  matchPointEnabled?: boolean;
   matchPointThreshold?: number;
   rouletteGeneratedAt?: string;
   rouletteSeed?: string;
@@ -95,6 +108,45 @@ export type Tournament = {
   bracket_locked_at: string | null;
   engine_key?: TournamentEngineKey;
   config?: TournamentConfig;
+};
+
+export type MatchCompletionPolicyState =
+  | "unsupported"
+  | "disabled"
+  | "match_point_not_configured"
+  | "active"
+  | "threshold_reached"
+  | "completed";
+
+export type MatchCompletionPolicy = {
+  state: MatchCompletionPolicyState;
+  action:
+    | "none"
+    | "configure_match_point"
+    | "create_match"
+    | "complete_current_match"
+    | "resolve_tie"
+    | "remove_empty_latest_match"
+    | "tournament_completed";
+  code: string;
+  reason: string;
+  supportsMatchPoint: boolean;
+  matchPointEnabled: boolean;
+  matchPointThreshold: number | null;
+  championTeamId: number | null;
+  championTeamName: string | null;
+  leaderTeamId: number | null;
+  leaderTeamName: string | null;
+  leaderPoints: number | null;
+  latestMatchId: number | null;
+  latestMatchRound: number | null;
+  latestMatchReports: number;
+  canRemoveLatestEmptyMatch: boolean;
+};
+
+export type EmptyMatchRemovalResult = {
+  removedMatchId: number;
+  matchCompletionPolicy: MatchCompletionPolicy;
 };
 
 export type Player = {
@@ -323,6 +375,32 @@ export function updateTournament(
     method: "PATCH",
     body: payload,
   });
+}
+
+export function getMatchCompletionPolicy(tournamentId: number) {
+  return request<MatchCompletionPolicy>(
+    `/tournaments/${tournamentId}/match-completion-policy`
+  );
+}
+
+export function configureTournamentMatchPoint(
+  tournamentId: number,
+  matchPointThreshold: number
+) {
+  return request<MatchCompletionPolicy>(
+    `/tournaments/${tournamentId}/match-completion-policy`,
+    {
+      method: "PATCH",
+      body: { matchPointThreshold },
+    }
+  );
+}
+
+export function removeEmptyLatestMatch(tournamentId: number, matchId: number) {
+  return request<EmptyMatchRemovalResult>(
+    `/tournaments/${tournamentId}/matches/${matchId}`,
+    { method: "DELETE" }
+  );
 }
 
 export function archiveTournament(tournamentId: number) {

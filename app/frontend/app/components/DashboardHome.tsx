@@ -8,7 +8,7 @@ import { getMvpState } from "../../lib/mvp";
 import { getOperatorNextAction } from "../../lib/operatorNextAction";
 import {
   findChampion,
-  getMatchPointStatus,
+  getMatchPointStatusFromPolicy,
   getTeamDisplayName,
   isTournamentCompleted,
 } from "../../lib/tournamentStatus";
@@ -83,6 +83,7 @@ export default function DashboardHome() {
     players,
     matches,
     selectedTournament,
+    matchCompletionPolicy,
     selectedTournamentId,
     activeMatch,
     activeMatchResults,
@@ -153,12 +154,9 @@ export default function DashboardHome() {
 
   const matchPointStatus =
     engine && !isKillRace
-      ? getMatchPointStatus({
-          tournament: selectedTournament,
-          threshold: engine.matchPointThreshold,
-          standings: sortedStandings,
+      ? getMatchPointStatusFromPolicy({
+          policy: matchCompletionPolicy,
           teams,
-          matches,
         })
       : { state: "idle" as const };
 
@@ -178,6 +176,14 @@ export default function DashboardHome() {
   const matchPointActive =
     matchPointStatus.state === "threshold_reached" ||
     matchPointStatus.state === "champion";
+  const matchPointReadinessLabel =
+    matchPointStatus.state === "not_configured"
+      ? "CONFIGURAR"
+      : matchPointStatus.state === "disabled"
+        ? "DESACTIVADO"
+        : matchPointActive
+          ? "ACTIVO"
+          : "EN ESPERA";
   const mvpState = getMvpState(tournamentResults, sortedStandings);
   const mvpTied = mvpState.kind === "player" && mvpState.tiedWith.length > 0;
   const mvpReadinessLabel = hasPlayerStats
@@ -196,6 +202,8 @@ export default function DashboardHome() {
       ? `Campeon por Match Point: ${matchPointStatus.championLabel}.`
       : matchPointStatus.state === "threshold_reached"
         ? "Match Point activo: falta cerrar la partida completa o resolver el desempate."
+        : matchPointStatus.state === "not_configured"
+          ? matchPointStatus.reason
         : null;
 
   const phaseLabel = (() => {
@@ -232,6 +240,7 @@ export default function DashboardHome() {
     reportsLoaded,
     totalTeams,
     matchPointStatus,
+    matchCompletionPolicy,
     canCreateNextMatch: canCreateNextGame,
   });
 
@@ -254,6 +263,16 @@ export default function DashboardHome() {
         href: operatorHref,
         tone: "warning" as const,
         kind: "MATCH_POINT",
+      };
+    }
+    if (matchPointStatus.state === "not_configured") {
+      return {
+        label: "Configurar Match Point",
+        description: matchPointStatus.reason,
+        ctaLabel: "Configurar Match Point",
+        href: operatorHref,
+        tone: "warning" as const,
+        kind: "MATCH_POINT_NOT_CONFIGURADO",
       };
     }
     if (activeMatch && pendingReportsCount > 0) {
@@ -364,7 +383,13 @@ export default function DashboardHome() {
               {engine?.primaryView === "bracket" ? `Bracket: ${bracketStatusLabel}` : "Vista: Standings"}
             </span>
             <span className="bf-dash-chip">
-              {engine?.supportsMatchPoint ? `Match Point ${engine.matchPointThreshold ?? DASH}` : "Sin Match Point"}
+              {matchCompletionPolicy?.state === "match_point_not_configured"
+                ? "Match Point no configurado"
+                : matchCompletionPolicy?.state === "disabled"
+                  ? "Match Point desactivado"
+                  : engine?.supportsMatchPoint
+                    ? `Match Point ${matchCompletionPolicy?.matchPointThreshold ?? DASH}`
+                    : "Motor sin Match Point"}
             </span>
           </div>
 
@@ -374,7 +399,11 @@ export default function DashboardHome() {
                 {matchPointStatus.state === "champion" ? "Cierre competitivo" : "Estado Match Point"}
               </span>
               <strong className="bf-status-banner-title">
-                {matchPointStatus.state === "champion" ? matchPointStatus.championLabel : "Match Point alcanzado"}
+                {matchPointStatus.state === "champion"
+                  ? matchPointStatus.championLabel
+                  : matchPointStatus.state === "not_configured"
+                    ? "Match Point no configurado"
+                    : "Match Point alcanzado"}
               </strong>
               <span className="bf-status-banner-sub">{matchPointHeadline}</span>
             </div>
@@ -488,7 +517,9 @@ export default function DashboardHome() {
                     ? DASH
                     : engine?.primaryView === "bracket"
                       ? `Bracket BO${engine.bestOf ?? 3}`
-                      : `${structureLabel ?? "Acumulativo"} · Match Point ${engine?.matchPointThreshold ?? DASH}`}
+                      : matchCompletionPolicy?.state === "match_point_not_configured"
+                        ? `${structureLabel ?? "Acumulativo"} · Match Point no configurado`
+                        : `${structureLabel ?? "Acumulativo"} · Match Point ${matchCompletionPolicy?.matchPointThreshold ?? DASH}`}
                 </span>
               </div>
             </article>
@@ -727,7 +758,7 @@ export default function DashboardHome() {
               <div><span>Standings</span><strong className={standingsReady ? "is-ready" : "is-waiting"}>{standingsReady ? "LISTO" : "EN ESPERA"}</strong></div>
               <div><span>Stream overlay</span><strong className={streamReady ? "is-ready" : "is-waiting"}>{streamReady ? "LISTO" : "EN ESPERA"}</strong></div>
               <div><span>Player stats / MVP</span><strong className={hasPlayerStats ? "is-ready" : "is-waiting"}>{mvpReadinessLabel}</strong></div>
-              <div><span>Match Point</span><strong className={matchPointActive ? "is-ready" : "is-waiting"}>{matchPointActive ? "ACTIVO" : "EN ESPERA"}</strong></div>
+              <div><span>Match Point</span><strong className={matchPointActive ? "is-ready" : "is-waiting"}>{matchPointReadinessLabel}</strong></div>
               <div><span>Caster Hub</span><strong className={selectedTournament ? "is-ready" : "is-waiting"}>{selectedTournament ? "Caster Hub listo" : "Seleccionar torneo"}</strong></div>
             </div>
             <Link href={selectedTournament ? casterHref : "/torneos"} className="bf-dash-inline-link">

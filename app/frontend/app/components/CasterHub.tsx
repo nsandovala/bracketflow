@@ -8,7 +8,7 @@ import { resolveTournamentEngine } from "../../lib/tournamentModel";
 import { getMvpState } from "../../lib/mvp";
 import {
   findChampion,
-  getMatchPointStatus,
+  getMatchPointStatusFromPolicy,
   getMatchPointStatusMessage,
   getTeamDisplayName,
   getTournamentStatusLabel,
@@ -117,6 +117,7 @@ export default function CasterHub() {
     teams: rawTeams,
     matches,
     selectedTournament,
+    matchCompletionPolicy,
     selectedTournamentId,
     activeMatch,
     sortedStandings,
@@ -177,12 +178,9 @@ export default function CasterHub() {
   const bracketCompleted = isBracket ? isTournamentCompleted(matches) : false;
   const matchPointStatus =
     selectedTournament && engine && !isBracket
-      ? getMatchPointStatus({
-          tournament: selectedTournament,
-          threshold: engine.matchPointThreshold,
-          standings,
+      ? getMatchPointStatusFromPolicy({
+          policy: matchCompletionPolicy,
           teams,
-          matches,
         })
       : { state: "idle" as const };
   const matchPointMessage = getMatchPointStatusMessage(matchPointStatus);
@@ -231,6 +229,9 @@ export default function CasterHub() {
     }
     if (matchPointStatus.state === "threshold_reached") {
       return `Sigue a ${matchPointStatus.leaderName}: Match Point activo y la definición sigue abierta.`;
+    }
+    if (matchPointStatus.state === "not_configured") {
+      return "Match Point no está configurado; evita narrar umbral o definición hasta que Operator lo resuelva.";
     }
     if (leader && pointsGap !== null && pointsGap <= 5) {
       return `La punta está cerrada: ${resolvedLeaderLabel} tiene ${formatPoints(pointsGap)} pts de ventaja.`;
@@ -391,7 +392,7 @@ export default function CasterHub() {
             results={tournamentResults}
             identityCatalog={identityCatalog}
             matchPointStatus={matchPointStatus}
-            matchPointThreshold={engine?.matchPointThreshold}
+            matchCompletionPolicy={matchCompletionPolicy}
             isBracket={isBracket}
             bracketCompleted={bracketCompleted}
             bracketChampionLabel={bracketChampion?.displayName ?? null}

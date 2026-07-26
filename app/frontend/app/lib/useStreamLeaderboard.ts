@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   LeaderboardEntry,
   Match,
+  MatchCompletionPolicy,
   Team,
   TeamResultDetail,
   Tournament,
@@ -12,6 +13,7 @@ import {
   getIdentityPlayers,
   getIdentityTeams,
   getMatches,
+  getMatchCompletionPolicy,
   getTeams,
   getTournament,
   getTournamentResults,
@@ -36,6 +38,7 @@ export type StreamStanding = LeaderboardEntry & {
 
 export type StreamLeaderboardState = {
   tournament: Tournament | null;
+  matchCompletionPolicy: MatchCompletionPolicy | null;
   teams: Team[];
   matches: Match[];
   standings: StreamStanding[];
@@ -77,6 +80,7 @@ function buildStandings(leaderboard: LeaderboardEntry[], teams: Team[]): StreamS
 // Firma estable para comparar fetch nuevo vs actual y evitar re-render/parpadeo.
 function buildSignature(
   tournament: Tournament | null,
+  matchCompletionPolicy: MatchCompletionPolicy | null,
   teams: Team[],
   standings: StreamStanding[],
   results: TeamResultDetail[],
@@ -107,7 +111,10 @@ function buildSignature(
           .join(",")}`
     )
     .join("|");
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}`;
+  const policyKey = matchCompletionPolicy
+    ? `${matchCompletionPolicy.state}:${matchCompletionPolicy.code}:${matchCompletionPolicy.matchPointThreshold ?? "-"}:${matchCompletionPolicy.championTeamId ?? "-"}`
+    : "-";
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
@@ -131,6 +138,7 @@ export function useStreamLeaderboard(
 ): StreamLeaderboardState {
   const [state, setState] = useState<StreamLeaderboardState>({
     tournament: null,
+    matchCompletionPolicy: null,
     teams: [],
     matches: [],
     standings: [],
@@ -157,6 +165,7 @@ export function useStreamLeaderboard(
               ? current
               : {
                   tournament: null,
+                  matchCompletionPolicy: null,
                   teams: [],
                   matches: [],
                   standings: [],
@@ -174,13 +183,22 @@ export function useStreamLeaderboard(
         const isBracket =
           engine.scoringProfile === "kill_race" ||
           engine.tournamentStructure !== "cumulative";
-        const [rawTeams, rawResults, matches, identityTeams, identityPlayers, gameIdentities] = await Promise.all([
+        const [
+          rawTeams,
+          rawResults,
+          matches,
+          identityTeams,
+          identityPlayers,
+          gameIdentities,
+          matchCompletionPolicy,
+        ] = await Promise.all([
           getTeams(tournamentId),
           isBracket ? Promise.resolve([]) : getTournamentResults(tournamentId),
           getMatches(tournamentId),
           getIdentityTeams().catch(() => EMPTY_IDENTITY_CATALOG.teams),
           getIdentityPlayers().catch(() => EMPTY_IDENTITY_CATALOG.players),
           getPlayerGameIdentities().catch(() => EMPTY_IDENTITY_CATALOG.gameIdentities),
+          getMatchCompletionPolicy(tournamentId),
         ]);
         const leaderboard = isBracket ? [] : await getLeaderboard(tournamentId);
 
@@ -208,7 +226,14 @@ export function useStreamLeaderboard(
           : results.length === 0
             ? 0
             : Math.max(...results.map((result) => result.round));
-        const nextSignature = buildSignature(tournament, teams, standings, results, afterGameNumber);
+        const nextSignature = buildSignature(
+          tournament,
+          matchCompletionPolicy,
+          teams,
+          standings,
+          results,
+          afterGameNumber
+        );
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.
         setState((current) => {
@@ -222,6 +247,7 @@ export function useStreamLeaderboard(
           signatureRef.current = nextSignature;
           return {
             tournament,
+            matchCompletionPolicy,
             teams,
             matches,
             standings,

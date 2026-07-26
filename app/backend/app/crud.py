@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from math import ceil, log2
 from collections import defaultdict
 
+from sqlalchemy import exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -16,6 +17,12 @@ WORLD_SERIES_FORMATS = {"battle_royale_points"}
 WSOW_ENGINE_KEYS = {"wsow_br", "wsow_classic", "rebirth_ws", "roulette_ws"}
 REBIRTH_ENGINE_KEYS = {"rebirth_ws"}
 KILL_RACE_ENGINE_KEYS = {"kill_race_bracket"}
+DEFAULT_MATCH_POINT_THRESHOLDS = {
+    "wsow_br": 125,
+    "wsow_classic": 125,
+    "rebirth_ws": 125,
+    "roulette_ws": 125,
+}
 STRUCTURAL_CONFIG_FIELDS = {
     "engine_key",
     "scoring_profile",
@@ -185,6 +192,12 @@ def validate_tournament_contract(
     tournament_structure = config.get("tournament_structure")
     has_lobby_size = config.get("lobbySize") is not None
     has_match_point = config.get("matchPointThreshold") is not None
+    match_point_enabled = config.get("matchPointEnabled")
+
+    if match_point_enabled is False and has_match_point:
+        raise ValueError(
+            "matchPointThreshold cannot be set when matchPointEnabled=false"
+        )
 
     if engine_key == "wsow_br":
         if scoring_profile != "wsow_like":
@@ -358,6 +371,26 @@ def is_wsow_like_tournament(tournament: models.Tournament) -> bool:
     return tournament.scoring_profile == "wsow_like" and get_engine_key(tournament) not in KILL_RACE_ENGINE_KEYS
 
 
+def supports_match_point(tournament: models.Tournament) -> bool:
+    return (
+        is_wsow_like_tournament(tournament)
+        and get_effective_format(tournament) in WORLD_SERIES_FORMATS
+    )
+
+
+def payload_supports_match_point(
+    *,
+    engine_key: str | None,
+    scoring_profile: str,
+    format_name: str,
+) -> bool:
+    if engine_key in KILL_RACE_ENGINE_KEYS:
+        return False
+    return engine_key in WSOW_ENGINE_KEYS or (
+        scoring_profile == "wsow_like" and format_name in WORLD_SERIES_FORMATS
+    )
+
+
 def requires_roulette(tournament: models.Tournament) -> bool:
     config = read_tournament_config(tournament)
     return config.get("roster_policy") == "roulette" or get_engine_key(tournament) in {
@@ -370,6 +403,17 @@ def create_tournament(db: Session, tournament: schemas.TournamentCreate) -> mode
     normalized_team_size = normalize_team_size(tournament.format, tournament.team_size)
     config = normalize_config_dict(tournament.config)
     engine_key = get_payload_engine_key(tournament)
+    if payload_supports_match_point(
+        engine_key=engine_key,
+        scoring_profile=tournament.scoring_profile,
+        format_name=tournament.format,
+    ):
+        if config.get("matchPointEnabled") is not False:
+            config.setdefault("matchPointEnabled", True)
+            config.setdefault(
+                "matchPointThreshold",
+                DEFAULT_MATCH_POINT_THRESHOLDS.get(engine_key or "", 125),
+            )
     if uses_roulette_timer(engine_key, config):
         config.setdefault("rouletteRosterTimerState", ROULETTE_TIMER_IDLE)
         config.setdefault("rouletteRosterDurationSeconds", 180)
@@ -1418,13 +1462,28 @@ def get_match_point_threshold(tournament: models.Tournament) -> int | None:
     """Umbral de Match Point solo para motores wsow_like / standings.
 
     Kill Race no usa Match Point (el contrato lo rechaza en create/update)."""
-    if not is_wsow_like_tournament(tournament):
+    if not supports_match_point(tournament):
         return None
     config = read_tournament_config(tournament)
     threshold = config.get("matchPointThreshold")
     if isinstance(threshold, int) and threshold > 0:
         return threshold
     return None
+
+
+def get_latest_standings_match(
+    db: Session, tournament: models.Tournament
+) -> models.Match | None:
+    return (
+        db.query(models.Match)
+        .filter(
+            models.Match.tournament_id == tournament.id,
+            models.Match.team_a_id.is_(None),
+            models.Match.team_b_id.is_(None),
+        )
+        .order_by(models.Match.round.desc(), models.Match.id.desc())
+        .first()
+    )
 
 
 def evaluate_match_point(db: Session, tournament: models.Tournament) -> int | None:
@@ -1438,6 +1497,12 @@ def evaluate_match_point(db: Session, tournament: models.Tournament) -> int | No
       el torneo queda activo para revision manual.
     - El campeon se persiste en config para sobrevivir F5.
     """
+    config = read_tournament_config(tournament)
+    existing_champion = config.get("championTeamId")
+    if isinstance(existing_champion, int) and existing_champion > 0:
+        tournament.status = "completed"
+        return existing_champion
+
     threshold = get_match_point_threshold(tournament)
     if threshold is None:
         return None
@@ -1453,12 +1518,274 @@ def evaluate_match_point(db: Session, tournament: models.Tournament) -> int | No
     if len(leaderboard) > 1 and leaderboard[1].total_points == top.total_points:
         return None
 
-    config = read_tournament_config(tournament)
     config["championTeamId"] = top.team_id
     config["championDecidedAt"] = utc_now_iso()
     write_tournament_config(tournament, config)
     tournament.status = "completed"
     return top.team_id
+
+
+def reevaluate_match_completion_policy(
+    db: Session, tournament: models.Tournament
+) -> int | None:
+    """Reevalua solo tras una partida oficial completa.
+
+    Configurar un umbral mientras existe una partida abierta no corona usando
+    un snapshot anterior. Al retirar de forma explicita una partida vacia, la
+    ultima partida completa vuelve a ser elegible para evaluacion.
+    """
+    latest_match = get_latest_standings_match(db, tournament)
+    if latest_match is None or latest_match.status != "completed":
+        return None
+    return evaluate_match_point(db, tournament)
+
+
+def get_match_completion_policy(
+    db: Session, tournament: models.Tournament
+) -> schemas.MatchCompletionPolicy:
+    supports_match_point_engine = supports_match_point(tournament)
+    config = read_tournament_config(tournament)
+    enabled = config.get("matchPointEnabled") is not False
+    threshold = get_match_point_threshold(tournament)
+    latest_match = (
+        get_latest_standings_match(db, tournament)
+        if supports_match_point_engine
+        else None
+    )
+    latest_reports = (
+        db.query(models.TeamResult.id)
+        .filter(models.TeamResult.match_id == latest_match.id)
+        .count()
+        if latest_match is not None
+        else 0
+    )
+    latest_values = {
+        "latestMatchId": latest_match.id if latest_match else None,
+        "latestMatchRound": latest_match.round if latest_match else None,
+        "latestMatchReports": latest_reports,
+        "canRemoveLatestEmptyMatch": bool(
+            supports_match_point_engine
+            and latest_match is not None
+            and latest_reports == 0
+            and not is_tournament_finalized(tournament)
+        ),
+    }
+
+    if not supports_match_point_engine:
+        return schemas.MatchCompletionPolicy(
+            state="unsupported",
+            action="none",
+            code="MATCH_POINT_UNSUPPORTED",
+            reason="El motor de este torneo no admite Match Point.",
+            supportsMatchPoint=False,
+            matchPointEnabled=False,
+            **latest_values,
+        )
+
+    if not enabled:
+        return schemas.MatchCompletionPolicy(
+            state="disabled",
+            action="create_match",
+            code="MATCH_POINT_DISABLED",
+            reason="Match Point fue desactivado explicitamente para este torneo.",
+            supportsMatchPoint=True,
+            matchPointEnabled=False,
+            **latest_values,
+        )
+
+    if threshold is None:
+        return schemas.MatchCompletionPolicy(
+            state="match_point_not_configured",
+            action="configure_match_point",
+            code="MATCH_POINT_NOT_CONFIGURED",
+            reason="Este torneo admite Match Point, pero no tiene un umbral persistido.",
+            supportsMatchPoint=True,
+            matchPointEnabled=True,
+            **latest_values,
+        )
+
+    champion_team_id = config.get("championTeamId")
+    if (
+        tournament.status == "completed"
+        or isinstance(champion_team_id, int)
+        and champion_team_id > 0
+    ):
+        champion = (
+            get_team(db, champion_team_id)
+            if isinstance(champion_team_id, int)
+            else None
+        )
+        return schemas.MatchCompletionPolicy(
+            state="completed",
+            action="tournament_completed",
+            code="TOURNAMENT_COMPLETED",
+            reason="El backend confirmo un campeon y el torneo esta finalizado.",
+            supportsMatchPoint=True,
+            matchPointEnabled=True,
+            matchPointThreshold=threshold,
+            championTeamId=champion_team_id if isinstance(champion_team_id, int) else None,
+            championTeamName=champion.name if champion else None,
+            **latest_values,
+        )
+
+    leaderboard = get_leaderboard(db, tournament)
+    leader = leaderboard[0] if leaderboard else None
+    leader_values = {
+        "leaderTeamId": leader.team_id if leader else None,
+        "leaderTeamName": leader.team_name if leader else None,
+        "leaderPoints": leader.total_points if leader else None,
+    }
+    if leader is not None and leader.total_points >= threshold:
+        tied = (
+            len(leaderboard) > 1
+            and leaderboard[1].total_points == leader.total_points
+        )
+        if tied:
+            return schemas.MatchCompletionPolicy(
+                state="threshold_reached",
+                action="resolve_tie",
+                code="MATCH_POINT_TIE",
+                reason="El umbral fue alcanzado, pero hay un empate en el primer lugar.",
+                supportsMatchPoint=True,
+                matchPointEnabled=True,
+                matchPointThreshold=threshold,
+                **leader_values,
+                **latest_values,
+            )
+        if latest_match is not None and latest_match.status != "completed":
+            empty_latest = latest_reports == 0
+            return schemas.MatchCompletionPolicy(
+                state="threshold_reached",
+                action=(
+                    "remove_empty_latest_match"
+                    if empty_latest
+                    else "complete_current_match"
+                ),
+                code=(
+                    "EMPTY_LATEST_MATCH_BLOCKS_COMPLETION"
+                    if empty_latest
+                    else "MATCH_POINT_PENDING_MATCH_COMPLETION"
+                ),
+                reason=(
+                    "El lider supero el umbral, pero la ultima partida esta vacia y abierta."
+                    if empty_latest
+                    else "El lider supero el umbral, pero la partida actual debe completarse."
+                ),
+                supportsMatchPoint=True,
+                matchPointEnabled=True,
+                matchPointThreshold=threshold,
+                **leader_values,
+                **latest_values,
+            )
+        return schemas.MatchCompletionPolicy(
+            state="threshold_reached",
+            action="none",
+            code="MATCH_POINT_PENDING_CONFIRMATION",
+            reason="El umbral fue alcanzado y requiere una reevaluacion explicita del backend.",
+            supportsMatchPoint=True,
+            matchPointEnabled=True,
+            matchPointThreshold=threshold,
+            **leader_values,
+            **latest_values,
+        )
+
+    action = (
+        "complete_current_match"
+        if latest_match is not None and latest_match.status != "completed"
+        else "create_match"
+    )
+    return schemas.MatchCompletionPolicy(
+        state="active",
+        action=action,
+        code="MATCH_POINT_ACTIVE",
+        reason="Match Point esta configurado y el torneo sigue abierto.",
+        supportsMatchPoint=True,
+        matchPointEnabled=True,
+        matchPointThreshold=threshold,
+        **leader_values,
+        **latest_values,
+    )
+
+
+def configure_match_point(
+    db: Session,
+    tournament: models.Tournament,
+    threshold: int,
+) -> schemas.MatchCompletionPolicy:
+    if not supports_match_point(tournament):
+        raise ValueError("El motor de este torneo no admite Match Point.")
+    if is_tournament_finalized(tournament):
+        raise ValueError("Torneo finalizado: no se puede reconfigurar Match Point.")
+    if not isinstance(threshold, int) or isinstance(threshold, bool) or threshold < 1:
+        raise ValueError("matchPointThreshold debe ser un entero positivo.")
+
+    config = read_tournament_config(tournament)
+    config["matchPointEnabled"] = True
+    config["matchPointThreshold"] = threshold
+    write_tournament_config(tournament, config)
+    reevaluate_match_completion_policy(db, tournament)
+    db.commit()
+    db.refresh(tournament)
+    return get_match_completion_policy(db, tournament)
+
+
+def remove_empty_latest_match(
+    db: Session,
+    tournament: models.Tournament,
+    match: models.Match,
+) -> schemas.EmptyMatchRemovalResult:
+    if match.tournament_id != tournament.id:
+        raise ValueError("La partida no pertenece al torneo indicado.")
+    if is_tournament_finalized(tournament):
+        raise ValueError("Torneo finalizado: no se pueden retirar partidas.")
+
+    latest_match = get_latest_standings_match(db, tournament)
+    if latest_match is None or latest_match.id != match.id:
+        raise ValueError("Solo se puede retirar la ultima partida del torneo.")
+
+    report_count = (
+        db.query(models.TeamResult.id)
+        .filter(models.TeamResult.match_id == match.id)
+        .count()
+    )
+    if report_count > 0:
+        raise ValueError("No se puede retirar una partida con reportes oficiales.")
+
+    latest_match_id = (
+        select(models.Match.id)
+        .where(
+            models.Match.tournament_id == tournament.id,
+            models.Match.team_a_id.is_(None),
+            models.Match.team_b_id.is_(None),
+        )
+        .order_by(models.Match.round.desc(), models.Match.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    removed_match_id = match.id
+    deleted = (
+        db.query(models.Match)
+        .filter(
+            models.Match.id == match.id,
+            models.Match.tournament_id == tournament.id,
+            models.Match.id == latest_match_id,
+            ~exists().where(models.TeamResult.match_id == models.Match.id),
+        )
+        .delete(synchronize_session=False)
+    )
+    if deleted != 1:
+        db.rollback()
+        raise ValueError(
+            "La partida cambio mientras se validaba; actualiza y vuelve a intentar."
+        )
+    db.flush()
+    reevaluate_match_completion_policy(db, tournament)
+    db.commit()
+    db.refresh(tournament)
+    return schemas.EmptyMatchRemovalResult(
+        removedMatchId=removed_match_id,
+        matchCompletionPolicy=get_match_completion_policy(db, tournament),
+    )
 
 
 class TeamResultAlreadyReportedError(Exception):

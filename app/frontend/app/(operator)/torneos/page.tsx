@@ -15,7 +15,11 @@ import {
   type TournamentStructure,
   type TeamSize,
 } from "../../../lib/tournamentModel";
-import { findChampion, getMatchPointStatus, getTournamentStatusLabel } from "../../../lib/tournamentStatus";
+import {
+  findChampion,
+  getMatchPointStatusFromPolicy,
+  getTournamentStatusLabel,
+} from "../../../lib/tournamentStatus";
 
 const TOURNAMENT_MOTORS = [
   {
@@ -89,6 +93,7 @@ export default function TorneosPage() {
     totalTeams,
     sortedStandings,
     canCreateNextGame,
+    matchCompletionPolicy,
     createEngineTournament,
     updateEngineTournament,
     archiveSelectedTournament,
@@ -218,7 +223,7 @@ export default function TorneosPage() {
     setTeamSize(engine.teamSize);
     setLobbySize(engine.config.lobbySize ? String(engine.config.lobbySize) : preset.defaultLobbySize ? String(preset.defaultLobbySize) : "");
     setRouletteGameMode(engine.gameMode === "br" ? "br" : "rebirth");
-    const matchPoint = engine.matchPointThreshold ?? preset.defaultMatchPoint;
+    const matchPoint = engine.matchPointThreshold;
     setMatchPointThreshold(matchPoint ? String(matchPoint) : "");
     setMatchPointPreset(matchPoint === 150 ? "150" : matchPoint === 125 ? "125" : "custom");
     setBestOf(engine.bestOf ? String(engine.bestOf) : preset.bestOf ? String(preset.bestOf) : "3");
@@ -517,12 +522,9 @@ export default function TorneosPage() {
             const isSelected = tournament.id === selectedTournamentId;
             const engine = resolveTournamentEngine(tournament);
             const selectedMatchPointStatus = isSelected && engine.primaryView !== "bracket"
-              ? getMatchPointStatus({
-                  tournament,
-                  threshold: engine.matchPointThreshold,
-                  standings: sortedStandings,
+              ? getMatchPointStatusFromPolicy({
+                  policy: matchCompletionPolicy,
                   teams,
-                  matches,
                 })
               : undefined;
             const pushModeAction = getOperatorNextAction({
@@ -536,6 +538,7 @@ export default function TorneosPage() {
               reportsLoaded: isSelected ? reportsLoaded : undefined,
               totalTeams: isSelected ? totalTeams : undefined,
               matchPointStatus: selectedMatchPointStatus,
+              matchCompletionPolicy: isSelected ? matchCompletionPolicy : undefined,
               canCreateNextMatch: isSelected ? canCreateNextGame : undefined,
             });
             const isChecked = selectedIds.has(tournament.id);

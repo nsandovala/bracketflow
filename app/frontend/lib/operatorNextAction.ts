@@ -1,4 +1,4 @@
-import type { Match, Tournament } from "./api";
+import type { Match, MatchCompletionPolicy, Tournament } from "./api";
 import type { ResolvedTournamentEngine } from "./tournamentModel";
 import type { MatchPointStatus } from "./tournamentStatus";
 import { isTournamentCompleted } from "./tournamentStatus";
@@ -12,6 +12,7 @@ export type PushModeActionKind =
   | "LOAD_REPORTS"
   | "CLOSE_MATCH"
   | "MATCH_POINT_REACHED"
+  | "MATCH_POINT_NOT_CONFIGURED"
   | "RESOLVE_TIE"
   | "CREATE_NEXT_MATCH"
   | "BRACKET_READY"
@@ -42,6 +43,7 @@ export type PushModeContext = {
   reportsLoaded?: number;
   totalTeams?: number;
   matchPointStatus?: MatchPointStatus;
+  matchCompletionPolicy?: MatchCompletionPolicy | null;
   canCreateNextMatch?: boolean;
 };
 
@@ -107,6 +109,19 @@ export function getOperatorNextAction(context: PushModeContext): PushModeAction 
       href: engine?.primaryView === "bracket" ? bracketHref : standingsHref,
       tone: "done",
       priority: 80,
+    }, tournamentId);
+  }
+
+  if (context.matchCompletionPolicy?.state === "match_point_not_configured") {
+    return action({
+      kind: "MATCH_POINT_NOT_CONFIGURED",
+      label: "Configurar Match Point",
+      description: context.matchCompletionPolicy.reason,
+      reason: context.matchCompletionPolicy.reason,
+      ctaLabel: "Configurar Match Point",
+      href: operatorHref,
+      tone: "warning",
+      priority: 78,
     }, tournamentId);
   }
 
