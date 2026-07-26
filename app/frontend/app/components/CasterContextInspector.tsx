@@ -18,7 +18,15 @@ import {
 import type { MatchPointStatus } from "../../lib/tournamentStatus";
 import { getTeamDisplayName, getTeamRosterText } from "../../lib/tournamentStatus";
 import type { IdentityCatalog } from "../../lib/identityResolver";
-import { getResolvedTeamProfile } from "../../lib/identityResolver";
+import {
+  getResolvedTeamProfile,
+  matchPlayerProfile,
+  normalizeIdentityName,
+} from "../../lib/identityResolver";
+import {
+  createPlayerBroadcastProfileView,
+  getStableMvpRanks,
+} from "../../lib/playerBroadcastProfile.mjs";
 import {
   createCasterInspectorSelection,
   getMatchPointDefinitionSummary,
@@ -243,8 +251,12 @@ export default function CasterContextInspector({
           <KillsDetail rows={standingsByKills} />
         ) : selected === "mvp" ? (
           <MvpDetail
+            key={`mvp-${tournament.id}`}
             mvp={mvp}
             players={players}
+            teams={teams}
+            results={results}
+            identityCatalog={identityCatalog}
             reportCount={resultsWithPlayerStats.length}
             coveredTeams={teamsWithPlayerStats.size}
             totalTeams={teams.length}
@@ -377,40 +389,220 @@ function KillsDetail({ rows }: { rows: LeaderboardEntry[] }) {
 function MvpDetail({
   mvp,
   players,
+  teams,
+  results,
+  identityCatalog,
   reportCount,
   coveredTeams,
   totalTeams,
 }: {
   mvp: MvpState;
   players: ReturnType<typeof getMvpPlayerRanking>;
+  teams: Team[];
+  results: TeamResultDetail[];
+  identityCatalog: IdentityCatalog;
   reportCount: number;
   coveredTeams: number;
   totalTeams: number;
 }) {
+  const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
   const status = mvp.kind === "player"
     ? mvp.tiedWith.length > 0 ? "MVP empatado" : "MVP actual"
     : "Player stats pendientes";
   const partial = coveredTeams > 0 && coveredTeams < totalTeams;
-  const ranked = rankWithTies(players.slice(0, 5), (player) => player.kills);
+  const officialRanks = new Map(
+    getStableMvpRanks(players.filter((player) => player.kills > 0)).map((player) => [
+      `${player.teamId}::${normalizeIdentityName(player.playerName)}`,
+      player.rank,
+    ])
+  );
+  const playerRows = new Map(
+    players.map((player) => [
+      `${player.teamId}::${normalizeIdentityName(player.playerName)}`,
+      player,
+    ])
+  );
+  for (const team of teams) {
+    for (const member of team.members) {
+      const playerName = member.player.nickname;
+      const key = `${team.id}::${normalizeIdentityName(playerName)}`;
+      if (!playerRows.has(key)) {
+        playerRows.set(key, {
+          playerName,
+          teamId: team.id,
+          teamName: team.name,
+          kills: 0,
+          matches: 0,
+        });
+      }
+    }
+  }
+  const rows = [...playerRows.entries()].sort(
+    ([leftKey, left], [rightKey, right]) =>
+      (officialRanks.get(leftKey) ?? Number.MAX_SAFE_INTEGER) -
+        (officialRanks.get(rightKey) ?? Number.MAX_SAFE_INTEGER) ||
+      right.kills - left.kills ||
+      left.teamName.localeCompare(right.teamName) ||
+      left.playerName.localeCompare(right.playerName)
+  );
+  const selectedEntry =
+    rows.find(([key]) => key === selectedPlayerKey) ?? null;
+  const selectedPlayer = selectedEntry?.[1] ?? null;
+  const selectedProfile = selectedPlayer
+    ? matchPlayerProfile(
+        selectedPlayer.playerName,
+        identityCatalog.players,
+        identityCatalog.gameIdentities
+      )
+    : null;
+  const selectedView = selectedPlayer
+    ? createPlayerBroadcastProfileView({
+        playerName: selectedPlayer.playerName,
+        teamId: selectedPlayer.teamId,
+        teamName: selectedPlayer.teamName,
+        profile: selectedProfile,
+        gameIdentities: identityCatalog.gameIdentities,
+        results,
+        mvpRank:
+          officialRanks.get(
+            `${selectedPlayer.teamId}::${normalizeIdentityName(selectedPlayer.playerName)}`
+          ) ?? null,
+      })
+    : null;
+
   return (
     <>
       <InspectorTitle
         title={status}
         note={partial ? `Cobertura parcial de player stats · ${reportCount} reportes / ${coveredTeams} de ${totalTeams} equipos` : coveredTeams > 0 ? `${reportCount} reportes · ${coveredTeams} equipos` : "No hay player stats reportadas"}
       />
-      <CompactRows
-        labels={["#", "Jugador", "Equipo", "Kills", "Reportes", "Promedio"]}
-        rows={ranked.map(({ row, rank }, index) => [
-          rank === null ? `=${ranked[index - 1]?.rank ?? 1}` : String(rank),
-          row.playerName,
-          row.teamName,
-          String(row.kills),
-          String(row.matches),
-          (row.kills / row.matches).toFixed(1),
-        ])}
-        empty="Player stats pendientes."
-      />
+      {rows.length === 0 ? (
+        <p className="bf-caster-inspector-empty">
+          No hay jugadores en roster ni player stats oficiales.
+        </p>
+      ) : (
+        <div className="bf-caster-player-table" role="table" aria-label="Jugadores del torneo">
+          <div className="bf-caster-player-row is-head" role="row">
+            {["#", "Jugador", "Equipo", "Kills", "Reportes", "Promedio"].map(
+              (label) => <span role="columnheader" key={label}>{label}</span>
+            )}
+          </div>
+          {rows.map(([key, player]) => {
+            const rank = officialRanks.get(key);
+            const active = selectedPlayerKey === key;
+            return (
+              <button
+                type="button"
+                className={`bf-caster-player-row${active ? " is-active" : ""}`}
+                aria-pressed={active}
+                onClick={() =>
+                  setSelectedPlayerKey((current) => current === key ? null : key)
+                }
+                key={key}
+              >
+                <span>{rank ?? "—"}</span>
+                <span>{player.playerName}</span>
+                <span>{player.teamName}</span>
+                <span>{player.matches > 0 ? player.kills : "—"}</span>
+                <span>{player.matches || "—"}</span>
+                <span>{player.matches > 0 ? (player.kills / player.matches).toFixed(1) : "—"}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {selectedPlayer && selectedView ? (
+        <PlayerBroadcastDetail
+          playerName={selectedPlayer.playerName}
+          view={selectedView}
+        />
+      ) : (
+        <p className="bf-caster-player-prompt">
+          Selecciona un jugador para abrir su perfil de broadcast.
+        </p>
+      )}
     </>
+  );
+}
+
+function PlayerBroadcastDetail({
+  playerName,
+  view,
+}: {
+  playerName: string;
+  view: ReturnType<typeof createPlayerBroadcastProfileView>;
+}) {
+  return (
+    <section className="bf-player-broadcast-detail" aria-label={`Perfil de ${playerName}`}>
+      <header>
+        <div>
+          <span>Player Broadcast Profile</span>
+          <h3>{view.declared.displayName}</h3>
+        </div>
+        <div className="bf-player-profile-status">
+          <span>{view.identityStatus}</span>
+          <span>{view.profileStatus}</span>
+        </div>
+      </header>
+      <div className="bf-player-profile-sections">
+        <section>
+          <div className="bf-player-profile-heading">
+            <span>Perfil declarado</span>
+            <small>No verificado · no afecta scoring</small>
+          </div>
+          <dl>
+            <div><dt>Game handle</dt><dd>{view.declared.gameHandle}</dd></div>
+            <div><dt>Aliases</dt><dd>{view.declared.aliases.join(" · ") || "Sin dato"}</dd></div>
+            <div><dt>K/D informado por el jugador</dt><dd>{view.declared.declaredKdLabel}</dd></div>
+            <div><dt>Rol</dt><dd>{view.declared.role}</dd></div>
+            <div><dt>Plataforma</dt><dd>{view.declared.platform}</dd></div>
+            <div><dt>Input</dt><dd>{view.declared.input}</dd></div>
+            <div><dt>País</dt><dd>{view.declared.country}</dd></div>
+            <div className="is-wide"><dt>Bio corta</dt><dd>{view.declared.shortBio}</dd></div>
+            <div className="is-wide"><dt>Nota para caster</dt><dd>{view.declared.casterNote}</dd></div>
+            <div><dt>Social</dt><dd>{view.declared.socialHandle}</dd></div>
+            <div>
+              <dt>Avatar</dt>
+              <dd>
+                {view.declared.avatarUrl ? (
+                  <a href={view.declared.avatarUrl} target="_blank" rel="noreferrer">
+                    URL configurada
+                  </a>
+                ) : "Sin dato"}
+              </dd>
+            </div>
+          </dl>
+        </section>
+        <section>
+          <div className="bf-player-profile-heading">
+            <span>Rendimiento oficial del torneo</span>
+            <small>{view.official.status}</small>
+          </div>
+          <dl>
+            <div><dt>Equipo</dt><dd>{view.official.team}</dd></div>
+            <div><dt>Kills acumuladas</dt><dd>{view.official.reportedMatches > 0 ? view.official.kills : "Sin dato"}</dd></div>
+            <div><dt>Partidas con stats</dt><dd>{view.official.reportedMatches}</dd></div>
+            <div><dt>Promedio por partida reportada</dt><dd>{view.official.averageKills === null ? "Sin dato" : view.official.averageKills.toFixed(1)}</dd></div>
+            <div><dt>Ranking MVP actual</dt><dd>{view.official.mvpRank ? `#${view.official.mvpRank}` : "Sin dato"}</dd></div>
+          </dl>
+          {view.official.perMatch.length > 0 ? (
+            <div className="bf-player-match-stats">
+              <span>Player stats por partida</span>
+              <div>
+                {view.official.perMatch.map((match) => (
+                  <p key={match.matchId}>
+                    <span>Partida {match.round}</span>
+                    <strong>{match.kills} K</strong>
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="bf-player-profile-empty">Sin player stats oficiales.</p>
+          )}
+        </section>
+      </div>
+    </section>
   );
 }
 

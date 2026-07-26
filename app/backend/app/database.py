@@ -105,6 +105,28 @@ def ensure_sqlite_schema(db_engine: Engine | None = None) -> None:
                     "ALTER TABLE players ADD COLUMN activision_id TEXT NULL"
                 )
 
+        player_profile_columns = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(player_profiles)"
+            ).all()
+        }
+        if player_profile_columns:
+            broadcast_profile_columns = {
+                "role": "TEXT NULL",
+                "declared_kd": "REAL NULL",
+                "declared_platform": "TEXT NULL",
+                "preferred_input": "TEXT NULL",
+                "short_bio": "TEXT NULL",
+                "social_handle": "TEXT NULL",
+                "broadcast_notes": "TEXT NULL",
+            }
+            for column_name, column_type in broadcast_profile_columns.items():
+                if column_name not in player_profile_columns:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE player_profiles ADD COLUMN {column_name} {column_type}"
+                    )
+
         match_columns = {
             row[1]
             for row in connection.exec_driver_sql("PRAGMA table_info(matches)").all()

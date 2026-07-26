@@ -10,6 +10,7 @@ import {
   getIdentityPlayers,
   getIdentityTeams,
   getPlayerGameIdentities,
+  updateIdentityPlayer,
   type PlayerGameIdentity,
   type PlayerProfile,
   type TeamProfile,
@@ -30,7 +31,7 @@ export default function IdentityRegistry() {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [identities, setIdentities] = useState<PlayerGameIdentity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<"team" | "player" | "identity" | null>(null);
+  const [saving, setSaving] = useState<"team" | "player" | "identity" | "broadcast" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -44,6 +45,17 @@ export default function IdentityRegistry() {
   const [playerShortName, setPlayerShortName] = useState("");
   const [playerCountry, setPlayerCountry] = useState("");
   const [playerNotes, setPlayerNotes] = useState("");
+
+  const [broadcastPlayerId, setBroadcastPlayerId] = useState("");
+  const [declaredKd, setDeclaredKd] = useState("");
+  const [broadcastRole, setBroadcastRole] = useState("");
+  const [declaredPlatform, setDeclaredPlatform] = useState("");
+  const [preferredInput, setPreferredInput] = useState("");
+  const [broadcastCountry, setBroadcastCountry] = useState("");
+  const [shortBio, setShortBio] = useState("");
+  const [broadcastNotes, setBroadcastNotes] = useState("");
+  const [socialHandle, setSocialHandle] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   const [identityPlayerId, setIdentityPlayerId] = useState("");
   const [game, setGame] = useState("");
@@ -61,9 +73,13 @@ export default function IdentityRegistry() {
       ])
       .then(([nextPlayers, nextTeams, nextIdentities]) => {
         if (!active) return;
-      setPlayers(nextPlayers);
-      setTeams(nextTeams);
-      setIdentities(nextIdentities);
+        setPlayers(nextPlayers);
+        setTeams(nextTeams);
+        setIdentities(nextIdentities);
+        if (nextPlayers[0]) {
+          setBroadcastPlayerId(String(nextPlayers[0].id));
+          loadBroadcastDraft(nextPlayers[0]);
+        }
       })
       .catch((loadError) => {
         if (active) setError(errorMessage(loadError));
@@ -77,6 +93,28 @@ export default function IdentityRegistry() {
   }, []);
 
   const selectedIdentityPlayerId = identityPlayerId || (players[0] ? String(players[0].id) : "");
+  const selectedBroadcastPlayerId =
+    broadcastPlayerId || (players[0] ? String(players[0].id) : "");
+
+  function loadBroadcastDraft(profile: PlayerProfile) {
+    setDeclaredKd(
+      profile.declared_kd === null ? "" : String(profile.declared_kd)
+    );
+    setBroadcastRole(profile.role ?? "");
+    setDeclaredPlatform(profile.declared_platform ?? "");
+    setPreferredInput(profile.preferred_input ?? "");
+    setBroadcastCountry(profile.country ?? "");
+    setShortBio(profile.short_bio ?? "");
+    setBroadcastNotes(profile.broadcast_notes ?? "");
+    setSocialHandle(profile.social_handle ?? "");
+    setAvatarUrl(profile.avatar_url ?? "");
+  }
+
+  function selectBroadcastPlayer(playerId: string) {
+    setBroadcastPlayerId(playerId);
+    const profile = players.find((player) => player.id === Number(playerId));
+    if (profile) loadBroadcastDraft(profile);
+  }
 
   const playerNames = useMemo(
     () => new Map(players.map((player) => [player.id, player.display_name])),
@@ -126,11 +164,53 @@ export default function IdentityRegistry() {
       });
       setPlayers((current) => [...current, created].sort((a, b) => a.display_name.localeCompare(b.display_name)));
       setIdentityPlayerId(String(created.id));
+      setBroadcastPlayerId(String(created.id));
+      loadBroadcastDraft(created);
       setPlayerName("");
       setPlayerShortName("");
       setPlayerCountry("");
       setPlayerNotes("");
       setNotice("Jugador agregado al registro de identidad.");
+    } catch (saveError) {
+      setError(errorMessage(saveError));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function saveBroadcastProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedBroadcastPlayerId) return;
+    setSaving("broadcast");
+    setError("");
+    setNotice("");
+    try {
+      const updated = await updateIdentityPlayer(
+        Number(selectedBroadcastPlayerId),
+        {
+          declared_kd: declaredKd.trim() ? Number(declaredKd) : null,
+          role: optional(broadcastRole) as PlayerProfile["role"],
+          declared_platform: optional(
+            declaredPlatform
+          ) as PlayerProfile["declared_platform"],
+          preferred_input: optional(
+            preferredInput
+          ) as PlayerProfile["preferred_input"],
+          country: optional(broadcastCountry),
+          short_bio: optional(shortBio),
+          broadcast_notes: optional(broadcastNotes),
+          social_handle: optional(socialHandle),
+          avatar_url: optional(avatarUrl),
+        }
+      );
+      setPlayers((current) =>
+        current
+          .map((player) => (player.id === updated.id ? updated : player))
+          .sort((left, right) =>
+            left.display_name.localeCompare(right.display_name)
+          )
+      );
+      setNotice("Perfil para broadcast actualizado.");
     } catch (saveError) {
       setError(errorMessage(saveError));
     } finally {
@@ -218,6 +298,106 @@ export default function IdentityRegistry() {
                 </article>
               ))}
             </div>
+            <details className="identity-broadcast">
+              <summary>
+                <span>Perfil para broadcast</span>
+                <small>Opcional · contexto para caster</small>
+              </summary>
+              {players.length === 0 ? (
+                <p className="identity-empty">
+                  Crea un jugador antes de configurar su perfil para broadcast.
+                </p>
+              ) : (
+                <form className="identity-broadcast-form" onSubmit={saveBroadcastProfile}>
+                  <p className="identity-helper">
+                    Información declarada para contexto de transmisión. No modifica scoring ni estadísticas oficiales.
+                  </p>
+                  <label className="opr-field identity-broadcast-player">
+                    <span>Jugador</span>
+                    <select
+                      value={selectedBroadcastPlayerId}
+                      onChange={(event) => selectBroadcastPlayer(event.target.value)}
+                    >
+                      {players.map((player) => (
+                        <option key={player.id} value={player.id}>
+                          {player.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="identity-form-row is-two">
+                    <label className="opr-field">
+                      <span>K/D declarado · opcional</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={declaredKd}
+                        onChange={(event) => setDeclaredKd(event.target.value)}
+                        placeholder="2.45"
+                      />
+                    </label>
+                    <label className="opr-field">
+                      <span>Rol · opcional</span>
+                      <select value={broadcastRole} onChange={(event) => setBroadcastRole(event.target.value)}>
+                        <option value="">Sin dato</option>
+                        <option value="slayer">Slayer</option>
+                        <option value="support">Support</option>
+                        <option value="flex">Flex</option>
+                        <option value="igl">IGL</option>
+                        <option value="unknown">Desconocido</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="identity-form-row">
+                    <label className="opr-field">
+                      <span>Plataforma · opcional</span>
+                      <select value={declaredPlatform} onChange={(event) => setDeclaredPlatform(event.target.value)}>
+                        <option value="">Sin dato</option>
+                        <option value="pc">PC</option>
+                        <option value="console">Consola</option>
+                        <option value="unknown">Desconocida</option>
+                      </select>
+                    </label>
+                    <label className="opr-field">
+                      <span>Input preferido · opcional</span>
+                      <select value={preferredInput} onChange={(event) => setPreferredInput(event.target.value)}>
+                        <option value="">Sin dato</option>
+                        <option value="controller">Controller</option>
+                        <option value="keyboard_mouse">Teclado y mouse</option>
+                        <option value="unknown">Desconocido</option>
+                      </select>
+                    </label>
+                    <label className="opr-field">
+                      <span>País · opcional</span>
+                      <input maxLength={48} value={broadcastCountry} onChange={(event) => setBroadcastCountry(event.target.value)} placeholder="CL" />
+                    </label>
+                  </div>
+                  <div className="identity-form-row is-two">
+                    <label className="opr-field">
+                      <span>Social · opcional</span>
+                      <input maxLength={120} value={socialHandle} onChange={(event) => setSocialHandle(event.target.value)} placeholder="@jugador" />
+                    </label>
+                    <label className="opr-field">
+                      <span>Avatar URL · opcional</span>
+                      <input type="url" maxLength={500} value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://…" />
+                    </label>
+                  </div>
+                  <label className="opr-field">
+                    <span>Bio corta · opcional</span>
+                    <textarea maxLength={280} value={shortBio} onChange={(event) => setShortBio(event.target.value)} placeholder="Contexto breve y declarado por el jugador." />
+                  </label>
+                  <label className="opr-field">
+                    <span>Nota para caster · opcional</span>
+                    <textarea maxLength={500} value={broadcastNotes} onChange={(event) => setBroadcastNotes(event.target.value)} placeholder="Pronunciación, historia o contexto útil para transmisión." />
+                  </label>
+                  <button className="bf-button bf-button-primary" disabled={saving !== null}>
+                    {saving === "broadcast" ? "Guardando…" : "Guardar perfil broadcast"}
+                  </button>
+                </form>
+              )}
+            </details>
           </section>
 
           <section className="opr-panel identity-section">

@@ -279,6 +279,13 @@ export type PlayerProfile = {
   country: string | null;
   avatar_url: string | null;
   notes: string | null;
+  role: "slayer" | "support" | "flex" | "igl" | "unknown" | null;
+  declared_kd: number | null;
+  declared_platform: "pc" | "console" | "unknown" | null;
+  preferred_input: "controller" | "keyboard_mouse" | "unknown" | null;
+  short_bio: string | null;
+  social_handle: string | null;
+  broadcast_notes: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -311,7 +318,21 @@ export type PlayerGameIdentity = {
 export type PlayerProfileCreate = Pick<
   PlayerProfile,
   "display_name" | "short_name" | "country" | "avatar_url" | "notes"
->;
+> &
+  Partial<
+    Pick<
+      PlayerProfile,
+      | "role"
+      | "declared_kd"
+      | "declared_platform"
+      | "preferred_input"
+      | "short_bio"
+      | "social_handle"
+      | "broadcast_notes"
+    >
+  >;
+
+export type PlayerProfileUpdate = Partial<PlayerProfileCreate>;
 
 export type TeamProfileCreate = Pick<
   TeamProfile,
@@ -587,6 +608,16 @@ export function getIdentityPlayers() {
 
 export function createIdentityPlayer(payload: PlayerProfileCreate) {
   return request<PlayerProfile>("/identity/players", { method: "POST", body: payload });
+}
+
+export function updateIdentityPlayer(
+  playerProfileId: number,
+  payload: PlayerProfileUpdate
+) {
+  return request<PlayerProfile>(`/identity/players/${playerProfileId}`, {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 export function getIdentityTeams() {

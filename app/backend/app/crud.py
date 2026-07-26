@@ -2165,10 +2165,31 @@ def create_player_profile(
         country=payload.country,
         avatar_url=payload.avatar_url,
         notes=payload.notes,
+        role=payload.role,
+        declared_kd=payload.declared_kd,
+        declared_platform=payload.declared_platform,
+        preferred_input=payload.preferred_input,
+        short_bio=payload.short_bio,
+        social_handle=payload.social_handle,
+        broadcast_notes=payload.broadcast_notes,
         created_at=now,
         updated_at=now,
     )
     db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def update_player_profile(
+    db: Session,
+    profile: models.PlayerProfile,
+    payload: schemas.PlayerProfileUpdate,
+) -> models.PlayerProfile:
+    updates = payload.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(profile, field, value)
+    profile.updated_at = _identity_now_iso()
     db.commit()
     db.refresh(profile)
     return profile

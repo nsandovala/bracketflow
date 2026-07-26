@@ -32,6 +32,24 @@ def create_legacy_team_results_table(engine):
         )
 
 
+def create_legacy_player_profiles_table(engine):
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE player_profiles (
+                id INTEGER PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                short_name TEXT NULL,
+                country TEXT NULL,
+                avatar_url TEXT NULL,
+                notes TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+
 def unique_indexes_for_match_team(engine) -> list[str]:
     with engine.begin() as connection:
         indexes = connection.exec_driver_sql("PRAGMA index_list(team_results)").all()
@@ -85,3 +103,27 @@ def test_ensure_sqlite_schema_keeps_existing_match_team_unique_index():
     ensure_sqlite_schema(engine)
 
     assert len(unique_indexes_for_match_team(engine)) == 1
+
+
+def test_ensure_sqlite_schema_adds_broadcast_fields_to_legacy_player_profiles():
+    engine = create_sqlite_engine()
+    create_legacy_player_profiles_table(engine)
+
+    ensure_sqlite_schema(engine)
+
+    with engine.begin() as connection:
+        columns = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(player_profiles)"
+            ).all()
+        }
+    assert {
+        "role",
+        "declared_kd",
+        "declared_platform",
+        "preferred_input",
+        "short_bio",
+        "social_handle",
+        "broadcast_notes",
+    }.issubset(columns)
