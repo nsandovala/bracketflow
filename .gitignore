@@ -1,3 +1,10 @@
 .venv/
 requirements.txt
 node_modules/
+.env
+.env.local
+__pycache__/
+.pytest_cache/
+*.pyc
+bracketflow.db
+bracketflow.db.*
