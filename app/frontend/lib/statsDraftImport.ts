@@ -1,4 +1,16 @@
 import type { OcrDraftReport } from "./ocrDraftIntake";
+import {
+  buildTeamResolutionIndex,
+  normalizeTeamName,
+  resolveTeamCandidate,
+} from "./teamResolution.mjs";
+import type { TeamResolutionIndex, TeamResolutionOutcome } from "./teamResolution.d.mts";
+
+export { buildTeamResolutionIndex, resolveTeamCandidate };
+export type { TeamResolutionIndex, TeamResolutionOutcome };
+// Alias historico: el resto del archivo (y consumidores existentes) usan este
+// nombre para la normalizacion de nombre de equipo.
+export const normalizeStatsDraftTeamName = normalizeTeamName;
 
 export type StatsDraftImportStatus =
   | "valid"
@@ -98,22 +110,6 @@ function normalizeHeader(value: string) {
     .trim()
     .toLocaleLowerCase("es")
     .replace(/[\s-]+/g, "_");
-}
-
-export function normalizeStatsDraftTeamName(value: string) {
-  return value.normalize("NFKC").trim().toLocaleLowerCase("es").replace(/\s+/g, " ");
-}
-
-const ROSTER_SEPARATOR = /[/,;]/;
-
-function buildRosterKey(names: string[]) {
-  const normalized = names
-    .map(normalizeStatsDraftTeamName)
-    .filter((name) => name.length > 0);
-  if (normalized.length === 0) {
-    return null;
-  }
-  return normalized.sort().join("|");
 }
 
 function countUnquotedDelimiter(line: string, delimiter: "," | ";" | "\t") {
@@ -264,59 +260,14 @@ export function parseStatsDraftImport(
     missingColumns.push("placement");
   }
 
-  const teamsByNormalizedName = new Map<string, StatsDraftImportTeam[]>();
-  const teamsByRosterKey = new Map<string, StatsDraftImportTeam[]>();
-  const teamsByPlayer = new Map<string, StatsDraftImportTeam[]>();
-  for (const team of options.teams) {
-    const normalizedName = normalizeStatsDraftTeamName(team.name);
-    const nameMatches = teamsByNormalizedName.get(normalizedName) ?? [];
-    nameMatches.push(team);
-    teamsByNormalizedName.set(normalizedName, nameMatches);
+  const resolutionIndex = buildTeamResolutionIndex(options.teams);
 
-    const memberNames = (team.members ?? []).map((member) => member.player.nickname);
-    const rosterKey = buildRosterKey(memberNames);
-    if (rosterKey) {
-      const rosterMatches = teamsByRosterKey.get(rosterKey) ?? [];
-      rosterMatches.push(team);
-      teamsByRosterKey.set(rosterKey, rosterMatches);
-    }
-    for (const memberName of memberNames) {
-      const normalizedMember = normalizeStatsDraftTeamName(memberName);
-      if (normalizedMember.length === 0) {
-        continue;
-      }
-      const playerMatches = teamsByPlayer.get(normalizedMember) ?? [];
-      if (!playerMatches.includes(team)) {
-        playerMatches.push(team);
-      }
-      teamsByPlayer.set(normalizedMember, playerMatches);
-    }
-  }
-
-  // Matching exacto sin fuzzy: nombre de equipo, roster completo, o un solo
-  // player/captain. Cualquier ambiguedad (2+ equipos posibles) no se infiere.
+  // CSV historicamente colapsa "no existe" y "ambiguo" al mismo estado
+  // (invalid_unknown_team): mantenemos ese comportamiento aqui y dejamos que
+  // OCR (resolveTeamCandidate directo) distinga ambos casos en su propia UI.
   function resolveTeam(teamInput: string): StatsDraftImportTeam | null {
-    const nameMatches = teamsByNormalizedName.get(
-      normalizeStatsDraftTeamName(teamInput)
-    );
-    if (nameMatches) {
-      return nameMatches.length === 1 ? nameMatches[0] : null;
-    }
-
-    if (ROSTER_SEPARATOR.test(teamInput)) {
-      const rosterKey = buildRosterKey(teamInput.split(ROSTER_SEPARATOR));
-      const rosterMatches = rosterKey ? teamsByRosterKey.get(rosterKey) : undefined;
-      if (rosterMatches) {
-        return rosterMatches.length === 1 ? rosterMatches[0] : null;
-      }
-      return null;
-    }
-
-    const playerMatches = teamsByPlayer.get(normalizeStatsDraftTeamName(teamInput));
-    if (playerMatches) {
-      return playerMatches.length === 1 ? playerMatches[0] : null;
-    }
-    return null;
+    const outcome = resolveTeamCandidate(teamInput, resolutionIndex);
+    return outcome.kind === "found" ? outcome.team : null;
   }
 
   // Clave unica de reporte: tournamentId + matchNumber + teamId.
