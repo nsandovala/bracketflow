@@ -38,23 +38,34 @@ export function getMvpPlayerRanking(results: TeamResultDetail[]): MvpPlayerEntry
   const byPlayer = new Map<string, MvpPlayerEntry>();
 
   for (const result of results) {
+    const resultPlayers = new Map<string, { playerName: string; kills: number }>();
     for (const stat of result.player_stats ?? []) {
       const playerName = stat.player_name.trim();
       if (!playerName) {
         continue;
       }
 
-      const key = `${result.team_id}::${playerName.toLocaleLowerCase()}`;
+      const normalizedName = playerName.toLocaleLowerCase();
+      const reportEntry = resultPlayers.get(normalizedName);
+      if (reportEntry) {
+        reportEntry.kills += stat.kills;
+      } else {
+        resultPlayers.set(normalizedName, { playerName, kills: stat.kills });
+      }
+    }
+
+    for (const reportEntry of resultPlayers.values()) {
+      const key = `${result.team_id}::${reportEntry.playerName.toLocaleLowerCase()}`;
       const current = byPlayer.get(key);
       if (current) {
-        current.kills += stat.kills;
+        current.kills += reportEntry.kills;
         current.matches += 1;
       } else {
         byPlayer.set(key, {
-          playerName,
+          playerName: reportEntry.playerName,
           teamId: result.team_id,
           teamName: result.team_name,
-          kills: stat.kills,
+          kills: reportEntry.kills,
           matches: 1,
         });
       }

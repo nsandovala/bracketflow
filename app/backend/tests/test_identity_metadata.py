@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -24,6 +25,7 @@ from app.main import (
     list_identity_game_identities,
     list_identity_players,
     list_identity_teams,
+    update_identity_player,
 )
 
 
@@ -68,6 +70,123 @@ def test_create_and_list_player_profile(db_session):
 
     listing = crud.list_player_profiles(db_session)
     assert [p.id for p in listing] == [profile.id]
+
+
+def test_player_without_broadcast_profile_remains_valid(db_session):
+    profile = crud.create_player_profile(
+        db_session,
+        schemas.PlayerProfileCreate(display_name="LegacyPlayer"),
+    )
+
+    serialized = schemas.PlayerProfile.model_validate(profile)
+    assert serialized.display_name == "LegacyPlayer"
+    assert serialized.declared_kd is None
+    assert serialized.role is None
+    assert serialized.short_bio is None
+    assert serialized.broadcast_notes is None
+
+
+def test_create_and_update_broadcast_profile(db_session):
+    profile = crud.create_player_profile(
+        db_session,
+        schemas.PlayerProfileCreate(
+            display_name="NeonWolf",
+            country="CL",
+            role="flex",
+            declared_kd=2.45,
+            declared_platform="pc",
+            preferred_input="controller",
+            short_bio="Jugador competitivo de Warzone.",
+            social_handle="@neonwolf",
+            avatar_url="https://example.com/neonwolf.png",
+            broadcast_notes="Suele liderar las rotaciones.",
+        ),
+    )
+
+    assert profile.declared_kd == pytest.approx(2.45)
+    assert profile.role == "flex"
+    assert profile.preferred_input == "controller"
+
+    updated = crud.update_player_profile(
+        db_session,
+        profile,
+        schemas.PlayerProfileUpdate(
+            declared_kd=2.6,
+            role="igl",
+            broadcast_notes="Capitán y principal shot caller.",
+        ),
+    )
+    assert updated.declared_kd == pytest.approx(2.6)
+    assert updated.role == "igl"
+    assert updated.broadcast_notes == "Capitán y principal shot caller."
+
+
+def test_partial_broadcast_profile_update_preserves_omitted_fields(db_session):
+    profile = crud.create_player_profile(
+        db_session,
+        schemas.PlayerProfileCreate(
+            display_name="PartialPlayer",
+            role="slayer",
+            declared_kd=1.9,
+            declared_platform="console",
+            preferred_input="controller",
+        ),
+    )
+
+    updated = crud.update_player_profile(
+        db_session,
+        profile,
+        schemas.PlayerProfileUpdate(short_bio="Perfil actualizado parcialmente."),
+    )
+    assert updated.short_bio == "Perfil actualizado parcialmente."
+    assert updated.role == "slayer"
+    assert updated.declared_kd == pytest.approx(1.9)
+    assert updated.declared_platform == "console"
+    assert updated.preferred_input == "controller"
+
+
+def test_negative_declared_kd_is_rejected():
+    with pytest.raises(ValidationError):
+        schemas.PlayerProfileUpdate(declared_kd=-0.01)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("role", "sniper"),
+        ("declared_platform", "mobile"),
+        ("preferred_input", "touch"),
+    ],
+)
+def test_invalid_broadcast_profile_enum_is_rejected(field, value):
+    with pytest.raises(ValidationError):
+        schemas.PlayerProfileUpdate(**{field: value})
+
+
+def test_broadcast_profile_fields_serialize_correctly(db_session):
+    profile = crud.create_player_profile(
+        db_session,
+        schemas.PlayerProfileCreate(
+            display_name="SerializedPlayer",
+            country="AR",
+            role="support",
+            declared_kd=1.25,
+            declared_platform="console",
+            preferred_input="keyboard_mouse",
+            short_bio="Bio breve.",
+            social_handle="@serialized",
+            broadcast_notes="Contexto exclusivo para caster.",
+        ),
+    )
+
+    payload = schemas.PlayerProfile.model_validate(profile).model_dump()
+    assert payload["declared_kd"] == pytest.approx(1.25)
+    assert payload["role"] == "support"
+    assert payload["declared_platform"] == "console"
+    assert payload["preferred_input"] == "keyboard_mouse"
+    assert payload["short_bio"] == "Bio breve."
+    assert payload["social_handle"] == "@serialized"
+    assert payload["broadcast_notes"] == "Contexto exclusivo para caster."
 
 
 def test_create_and_list_team_profile(db_session):
@@ -177,6 +296,28 @@ def test_route_handlers_create_and_list_player_and_team(db_session):
     assert [t.display_name for t in list_identity_teams(db=db_session)] == ["Route Squad"]
 
 
+def test_route_updates_broadcast_profile_and_returns_404(db_session):
+    profile = create_identity_player(
+        payload=schemas.PlayerProfileCreate(display_name="RouteProfile"),
+        db=db_session,
+    )
+    updated = update_identity_player(
+        profile_id=profile.id,
+        payload=schemas.PlayerProfileUpdate(declared_kd=2.1, role="flex"),
+        db=db_session,
+    )
+    assert updated.declared_kd == pytest.approx(2.1)
+    assert updated.role == "flex"
+
+    with pytest.raises(HTTPException) as excinfo:
+        update_identity_player(
+            profile_id=9999,
+            payload=schemas.PlayerProfileUpdate(short_bio="Missing"),
+            db=db_session,
+        )
+    assert excinfo.value.status_code == 404
+
+
 def test_route_game_identity_returns_404_for_missing_profile(db_session):
     with pytest.raises(HTTPException) as excinfo:
         create_identity_game_identity(
@@ -222,8 +363,15 @@ def test_route_game_identity_created_and_filterable(db_session):
 
 def test_identity_metadata_does_not_affect_scoring(db_session):
     # Setup identidad
-    crud.create_player_profile(
-        db_session, schemas.PlayerProfileCreate(display_name="NeonWolf")
+    identity_profile = crud.create_player_profile(
+        db_session,
+        schemas.PlayerProfileCreate(
+            display_name="NeonWolf",
+            role="igl",
+            declared_kd=3.2,
+            preferred_input="controller",
+            broadcast_notes="Metadata declarada, ajena al scoring.",
+        ),
     )
     crud.create_team_profile(
         db_session, schemas.TeamProfileCreate(display_name="Neon Team")
@@ -266,3 +414,13 @@ def test_identity_metadata_does_not_affect_scoring(db_session):
     assert leaderboard[0].total_points == pytest.approx(20.0)
     assert leaderboard[1].kills == 6
     assert leaderboard[1].total_points == pytest.approx(10.8)
+
+    crud.update_player_profile(
+        db_session,
+        identity_profile,
+        schemas.PlayerProfileUpdate(declared_kd=9.9, role="support"),
+    )
+    leaderboard_after_profile_update = crud.get_leaderboard(db_session, tournament)
+    assert [entry.total_points for entry in leaderboard_after_profile_update] == pytest.approx(
+        [20.0, 10.8]
+    )

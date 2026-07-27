@@ -203,6 +203,13 @@ class PlayerProfile(Base):
     country: Mapped[str | None] = mapped_column(String, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    role: Mapped[str | None] = mapped_column(String, nullable=True)
+    declared_kd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    declared_platform: Mapped[str | None] = mapped_column(String, nullable=True)
+    preferred_input: Mapped[str | None] = mapped_column(String, nullable=True)
+    short_bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    social_handle: Mapped[str | None] = mapped_column(String, nullable=True)
+    broadcast_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
 

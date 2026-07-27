@@ -638,6 +638,21 @@ def create_identity_player(
     return crud.create_player_profile(db, payload)
 
 
+@app.patch(
+    "/identity/players/{profile_id}",
+    response_model=schemas.PlayerProfile,
+)
+def update_identity_player(
+    profile_id: int,
+    payload: schemas.PlayerProfileUpdate,
+    db: Session = Depends(get_db),
+) -> schemas.PlayerProfile:
+    profile = crud.get_player_profile(db, profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Player profile not found")
+    return crud.update_player_profile(db, profile, payload)
+
+
 @app.get("/identity/teams", response_model=list[schemas.TeamProfile])
 def list_identity_teams(db: Session = Depends(get_db)) -> list[schemas.TeamProfile]:
     return crud.list_team_profiles(db)

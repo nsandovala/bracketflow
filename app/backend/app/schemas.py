@@ -386,6 +386,9 @@ def _validate_optional_str(value: str | None, *, max_length: int | None = None) 
 
 
 VERIFIED_STATUSES = ("unverified", "self_reported", "verified")
+PLAYER_ROLES = ("slayer", "support", "flex", "igl", "unknown")
+DECLARED_PLATFORMS = ("pc", "console", "unknown")
+PREFERRED_INPUTS = ("controller", "keyboard_mouse", "unknown")
 
 
 class PlayerProfileCreate(BaseModel):
@@ -394,6 +397,13 @@ class PlayerProfileCreate(BaseModel):
     country: str | None = None
     avatar_url: str | None = None
     notes: str | None = None
+    role: Literal["slayer", "support", "flex", "igl", "unknown"] | None = None
+    declared_kd: float | None = Field(default=None, ge=0)
+    declared_platform: Literal["pc", "console", "unknown"] | None = None
+    preferred_input: Literal["controller", "keyboard_mouse", "unknown"] | None = None
+    short_bio: str | None = None
+    social_handle: str | None = None
+    broadcast_notes: str | None = None
 
     @field_validator("display_name")
     @classmethod
@@ -420,6 +430,78 @@ class PlayerProfileCreate(BaseModel):
     def check_notes(cls, value: str | None) -> str | None:
         return _validate_optional_str(value)
 
+    @field_validator("short_bio")
+    @classmethod
+    def check_short_bio(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=280)
+
+    @field_validator("social_handle")
+    @classmethod
+    def check_social_handle(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=120)
+
+    @field_validator("broadcast_notes")
+    @classmethod
+    def check_broadcast_notes(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=500)
+
+
+class PlayerProfileUpdate(BaseModel):
+    display_name: str | None = None
+    short_name: str | None = None
+    country: str | None = None
+    avatar_url: str | None = None
+    notes: str | None = None
+    role: Literal["slayer", "support", "flex", "igl", "unknown"] | None = None
+    declared_kd: float | None = Field(default=None, ge=0)
+    declared_platform: Literal["pc", "console", "unknown"] | None = None
+    preferred_input: Literal["controller", "keyboard_mouse", "unknown"] | None = None
+    short_bio: str | None = None
+    social_handle: str | None = None
+    broadcast_notes: str | None = None
+
+    @field_validator("display_name")
+    @classmethod
+    def check_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("display_name no puede ser null.")
+        return _validate_identity_display_name(value)
+
+    @field_validator("short_name")
+    @classmethod
+    def check_short_name(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=24)
+
+    @field_validator("country")
+    @classmethod
+    def check_country(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=48)
+
+    @field_validator("avatar_url")
+    @classmethod
+    def check_avatar_url(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=500)
+
+    @field_validator("notes")
+    @classmethod
+    def check_notes(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value)
+
+    @field_validator("short_bio")
+    @classmethod
+    def check_short_bio(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=280)
+
+    @field_validator("social_handle")
+    @classmethod
+    def check_social_handle(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=120)
+
+    @field_validator("broadcast_notes")
+    @classmethod
+    def check_broadcast_notes(cls, value: str | None) -> str | None:
+        return _validate_optional_str(value, max_length=500)
+
 
 class PlayerProfile(BaseModel):
     id: int
@@ -428,6 +510,13 @@ class PlayerProfile(BaseModel):
     country: str | None
     avatar_url: str | None
     notes: str | None
+    role: str | None
+    declared_kd: float | None
+    declared_platform: str | None
+    preferred_input: str | None
+    short_bio: str | None
+    social_handle: str | None
+    broadcast_notes: str | None
     created_at: str
     updated_at: str
 
