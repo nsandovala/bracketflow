@@ -49,6 +49,27 @@ import ContextBar from "./ContextBar";
 import RouletteArena from "./RouletteArena";
 import { detectDelimiter, parseDelimitedTable } from "../../lib/statsDraftImport";
 import { parsePlayerStatsPaste, validateManualPlayerStats } from "../../lib/manualPlayerStats";
+import {
+  OCR_IMAGE_ACCEPTED_TYPES,
+  unavailableOcrProvider,
+  validateOcrImageFile,
+} from "../../lib/ocrImageExtraction.mjs";
+import type {
+  OcrExtractionOutcome,
+  OcrExtractionProvider,
+} from "../../lib/ocrImageExtraction.d.mts";
+import {
+  buildOcrDraftReports,
+  createOcrCandidateRow,
+  evaluateOcrBatch,
+  getOcrLowConfidenceThreshold,
+  OCR_REVIEW_STATUS_LABELS,
+} from "../../lib/ocrImageDraftReview.mjs";
+import type {
+  OcrCandidateRow,
+  OcrReviewedRow,
+  OcrReviewStatus,
+} from "../../lib/ocrImageDraftReview.d.mts";
 
 type WorldSeriesOperatorProps = {
   backendOnline: boolean;
@@ -107,8 +128,9 @@ type WorldSeriesOperatorProps = {
 type OperatorMode = "op" | "setup" | "bracket";
 type ResultFilter = "all" | "pending";
 // Fuente de entrada de reportes dentro de la única sección "Reportes de partida".
-// No son sistemas paralelos: manual opera las cards oficiales, import crea drafts
-// revisables y ocr queda declarado como futuro no funcional.
+// No son sistemas paralelos: manual opera las cards oficiales; import y ocr
+// crean drafts revisables en la MISMA cola (OcrDraftIntake), solo cambia la
+// entrada (tabla pegada/CSV vs imagen).
 type ReportSource = "manual" | "import" | "ocr";
 type OcrDraftPersistenceState = "loading" | "local" | "memory";
 
@@ -141,7 +163,9 @@ function formatPlayerStatsLine(
 }
 
 function OcrDraftIntake({
+  source,
   tournamentId,
+  tournamentName,
   matchNumber,
   activeMatchKey,
   activeMatchId,
@@ -153,7 +177,9 @@ function OcrDraftIntake({
   submitting,
   onSubmitOfficialReport,
 }: {
+  source: "import" | "ocr";
   tournamentId: number;
+  tournamentName: string;
   matchNumber: number;
   activeMatchKey: string | null;
   activeMatchId: number | null;
@@ -474,6 +500,7 @@ function OcrDraftIntake({
         </span>
       </div>
 
+      {source === "import" ? (
       <section className="opr-stats-import" aria-labelledby="opr-stats-import-title">
         <div className="opr-stats-import-head">
           <div>
@@ -605,6 +632,35 @@ function OcrDraftIntake({
           </div>
         ) : null}
       </section>
+      ) : null}
+
+      {source === "ocr" ? (
+        <OcrImageIntake
+          tournamentId={tournamentId}
+          tournamentName={tournamentName}
+          matchNumber={matchNumber}
+          activeMatchKey={activeMatchKey}
+          activeMatchId={activeMatchId}
+          teams={teams}
+          usesPlacement={usesPlacement}
+          effectiveLobbySize={effectiveLobbySize}
+          officialResults={officialResults}
+          existingDraftTeamIds={
+            new Set(
+              drafts
+                .filter(
+                  (draft) =>
+                    draft.tournamentId === tournamentId && draft.matchNumber === matchNumber
+                )
+                .map((draft) => draft.teamId)
+            )
+          }
+          disabled={persistenceState === "loading"}
+          onCreateDrafts={(newDrafts) => {
+            applyDrafts((previous) => [...newDrafts, ...previous]);
+          }}
+        />
+      ) : null}
 
       <div className="opr-ocr-queue">
         <div className="opr-ocr-queue-head">
@@ -613,7 +669,11 @@ function OcrDraftIntake({
             <strong>{drafts.length}</strong>
           </div>
           <small>
-            Guardados localmente. Solo cuentan como reporte al usar “Guardar reporte oficial”.
+            Guardados localmente
+            {source === "ocr"
+              ? " (de cualquier fuente: manual import, CSV/TXT u OCR imagen)."
+              : "."}{" "}
+            Solo cuentan como reporte al usar “Guardar reporte oficial”.
           </small>
         </div>
 
@@ -718,6 +778,503 @@ function OcrDraftIntake({
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+// Fases de la captura OCR (§2 del spec: Sin imagen / Imagen seleccionada /
+// Procesando / Extracción completada / Extracción parcial / No se
+// detectaron filas / Error de lectura). "revisando" cubre completada/parcial
+// a la vez; el label exacto se decide en render segun reviewedRows.
+type OcrImagePhase =
+  | "sin-imagen"
+  | "imagen-seleccionada"
+  | "procesando"
+  | "revisando"
+  | "sin-filas"
+  | "error-lectura";
+
+const OCR_IMAGE_PHASE_LABELS: Record<OcrImagePhase, string> = {
+  "sin-imagen": "Sin imagen",
+  "imagen-seleccionada": "Imagen seleccionada",
+  procesando: "Procesando",
+  revisando: "Extracción completada",
+  "sin-filas": "No se detectaron filas",
+  "error-lectura": "Error de lectura",
+};
+
+function OcrImageIntake({
+  tournamentId,
+  tournamentName,
+  matchNumber,
+  activeMatchKey,
+  teams,
+  usesPlacement,
+  effectiveLobbySize,
+  officialResults,
+  existingDraftTeamIds,
+  disabled,
+  onCreateDrafts,
+}: {
+  tournamentId: number;
+  tournamentName: string;
+  matchNumber: number;
+  activeMatchKey: string | null;
+  activeMatchId: number | null;
+  teams: Team[];
+  usesPlacement: boolean;
+  effectiveLobbySize: number;
+  officialResults: Array<{ team_id: number; kills: number; placement: number }>;
+  existingDraftTeamIds: Set<number>;
+  disabled: boolean;
+  onCreateDrafts: (drafts: OcrDraftReport[]) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [phase, setPhase] = useState<OcrImagePhase>("sin-imagen");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [extractionMessage, setExtractionMessage] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<OcrCandidateRow[]>([]);
+  const [createMessage, setCreateMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Punto de reemplazo unico para un motor OCR real (tesseract.js, endpoint de
+  // backend, etc.). Hoy no hay motor disponible en este build: ver reporte
+  // del sprint / PARKING_LOT. El resto del componente no cambia al cambiar esto.
+  const providerRef = useRef<OcrExtractionProvider>(unavailableOcrProvider);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const reviewContext = useMemo(
+    () => ({
+      teams,
+      usesPlacement,
+      effectiveLobbySize,
+      officialResults,
+      existingDraftTeamIds,
+      lowConfidenceThreshold: getOcrLowConfidenceThreshold(),
+    }),
+    [teams, usesPlacement, effectiveLobbySize, officialResults, existingDraftTeamIds]
+  );
+
+  const reviewedRows: OcrReviewedRow<Team>[] = useMemo(
+    () => evaluateOcrBatch(candidates, reviewContext),
+    [candidates, reviewContext]
+  );
+  const includedValidCount = reviewedRows.filter(
+    (row) => row.candidate.included && row.evaluation.status === "valida"
+  ).length;
+  const allRowsValid =
+    reviewedRows.length > 0 && reviewedRows.every((row) => row.evaluation.status === "valida");
+  const phaseLabel =
+    phase === "revisando"
+      ? allRowsValid
+        ? "Extracción completada"
+        : "Extracción parcial"
+      : OCR_IMAGE_PHASE_LABELS[phase];
+
+  function resetExtraction() {
+    setCandidates([]);
+    setExtractionMessage(null);
+    setCreateMessage(null);
+  }
+
+  function handleSelectFile(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    setFileError(null);
+    resetExtraction();
+
+    if (!selected) {
+      return;
+    }
+
+    const validation = validateOcrImageFile(selected);
+    if (!validation.ok) {
+      setFile(null);
+      setPreviewUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        return null;
+      });
+      setPhase("sin-imagen");
+      setFileError(validation.message);
+      return;
+    }
+
+    setFile(selected);
+    setPreviewUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return URL.createObjectURL(selected);
+    });
+    setPhase("imagen-seleccionada");
+  }
+
+  function handleRemoveImage() {
+    setFile(null);
+    setPreviewUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return null;
+    });
+    setFileError(null);
+    setPhase("sin-imagen");
+    resetExtraction();
+  }
+
+  async function handleProcessImage() {
+    if (!file || phase === "procesando") {
+      return;
+    }
+    setPhase("procesando");
+    setExtractionMessage(null);
+    setCreateMessage(null);
+
+    const outcome: OcrExtractionOutcome = await providerRef.current(file);
+
+    if (!outcome.ok) {
+      setPhase("error-lectura");
+      setExtractionMessage(outcome.message);
+      setCandidates([]);
+      return;
+    }
+
+    if (outcome.result.rows.length === 0) {
+      setPhase("sin-filas");
+      setExtractionMessage(
+        outcome.result.warnings.length > 0
+          ? outcome.result.warnings.join(" ")
+          : "No se detectaron filas en la imagen. Prueba con otra captura o usa Manual/CSV."
+      );
+      setCandidates([]);
+      return;
+    }
+
+    setCandidates(outcome.result.rows.map((row) => createOcrCandidateRow(row)));
+    setExtractionMessage(
+      outcome.result.warnings.length > 0 ? outcome.result.warnings.join(" ") : null
+    );
+    setPhase("revisando");
+  }
+
+  function handleDiscardExtraction() {
+    resetExtraction();
+    setPhase(file ? "imagen-seleccionada" : "sin-imagen");
+  }
+
+  function updateCandidate(key: string, patch: Partial<OcrCandidateRow>) {
+    setCandidates((previous) =>
+      previous.map((candidate) => (candidate.key === key ? { ...candidate, ...patch } : candidate))
+    );
+  }
+
+  function updateCandidatePlayerKills(key: string, playerIndex: number, value: string) {
+    setCandidates((previous) =>
+      previous.map((candidate) => {
+        if (candidate.key !== key || !candidate.playerStats) {
+          return candidate;
+        }
+        return {
+          ...candidate,
+          playerStats: candidate.playerStats.map((player, index) =>
+            index === playerIndex ? { ...player, killsInput: value } : player
+          ),
+          edited: { ...candidate.edited, players: true },
+        };
+      })
+    );
+  }
+
+  function handleCreateDrafts() {
+    if (!activeMatchKey) {
+      setCreateMessage("Necesitas una partida activa para crear drafts desde una imagen.");
+      return;
+    }
+
+    const creatableRows = reviewedRows.filter(
+      (row) => row.candidate.included && row.evaluation.status === "valida"
+    );
+    if (creatableRows.length === 0) {
+      setCreateMessage("No hay filas válidas incluidas para crear drafts.");
+      return;
+    }
+
+    const newDrafts = buildOcrDraftReports(creatableRows, {
+      tournamentId,
+      matchNumber,
+      activeMatchKey,
+      imageFileName: file?.name ?? null,
+    });
+    onCreateDrafts(newDrafts);
+
+    const createdKeys = new Set(creatableRows.map((row) => row.candidate.key));
+    setCandidates((previous) => previous.filter((candidate) => !createdKeys.has(candidate.key)));
+    setCreateMessage(
+      `${newDrafts.length} draft${newDrafts.length === 1 ? "" : "s"} local${
+        newDrafts.length === 1 ? "" : "es"
+      } creado${newDrafts.length === 1 ? "" : "s"} para revisión humana.`
+    );
+  }
+
+  return (
+    <section className="opr-panel opr-image-intake" aria-labelledby="opr-image-intake-title">
+      <div className="opr-stats-import-head">
+        <div>
+          <h3 id="opr-image-intake-title">OCR imagen</h3>
+          <p>
+            Sube una captura de los resultados de UNA partida de torneo. BracketFlow
+            extrae filas candidatas para revisión humana antes de crear borradores.
+            Nunca guarda un resultado oficial automáticamente.
+          </p>
+        </div>
+        <span className={`opr-image-intake-state is-${phase}`}>{phaseLabel}</span>
+      </div>
+
+      <div className="opr-image-intake-context">
+        <span>
+          <strong>{tournamentName}</strong>
+        </span>
+        <span>Partida {matchNumber}</span>
+        <span>{teams.length} equipos esperados</span>
+        <span>{officialResults.length} reportes oficiales guardados</span>
+      </div>
+
+      {!activeMatchKey ? (
+        <p className="bf-inline-note" role="status">
+          Sin partida activa: puedes revisar la imagen, pero no crear drafts.
+        </p>
+      ) : null}
+
+      <div className="opr-image-intake-inputs">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={OCR_IMAGE_ACCEPTED_TYPES.join(",")}
+          onChange={handleSelectFile}
+          disabled={disabled || phase === "procesando"}
+        />
+        <div className="opr-image-intake-picker">
+          <button
+            type="button"
+            className="bf-button bf-button-ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || phase === "procesando"}
+          >
+            {file ? "Reemplazar imagen" : "Seleccionar imagen"}
+          </button>
+          {file ? (
+            <button
+              type="button"
+              className="bf-button bf-button-ghost"
+              onClick={handleRemoveImage}
+              disabled={phase === "procesando"}
+            >
+              Quitar imagen
+            </button>
+          ) : null}
+          <small>PNG, JPG/JPEG o WEBP · máx. 8 MB · una imagen a la vez</small>
+        </div>
+        {previewUrl ? (
+          <div className="opr-image-intake-preview">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt={file ? `Vista previa de ${file.name}` : "Vista previa"} />
+            <span>{file?.name}</span>
+          </div>
+        ) : null}
+      </div>
+
+      {fileError ? (
+        <p className="bf-inline-error" role="alert">
+          {fileError}
+        </p>
+      ) : null}
+
+      {candidates.length === 0 ? (
+        <div className="opr-stats-import-actions">
+          <button
+            type="button"
+            className="opr-save"
+            disabled={!file || phase === "procesando" || disabled}
+            onClick={() => void handleProcessImage()}
+          >
+            {phase === "procesando" ? "Procesando…" : "Procesar imagen"}
+          </button>
+        </div>
+      ) : null}
+
+      {extractionMessage ? (
+        <p
+          className={phase === "error-lectura" ? "bf-inline-error" : "bf-inline-note"}
+          role={phase === "error-lectura" ? "alert" : "status"}
+        >
+          {extractionMessage}
+        </p>
+      ) : null}
+      {createMessage ? (
+        <p className="bf-inline-note" role="status">
+          {createMessage}
+        </p>
+      ) : null}
+
+      {reviewedRows.length > 0 ? (
+        <div className="opr-stats-import-table-wrap opr-image-review-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Incluir</th>
+                <th>Texto detectado</th>
+                <th>Equipo</th>
+                <th>Kills</th>
+                {usesPlacement ? <th>Placement</th> : null}
+                <th>Players</th>
+                <th>Estado</th>
+                <th>Avisos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviewedRows.map(({ candidate, evaluation }) => (
+                <tr key={candidate.key} className={`is-${evaluation.status}`}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={candidate.included}
+                      aria-label="Incluir fila"
+                      onChange={() =>
+                        updateCandidate(candidate.key, { included: !candidate.included })
+                      }
+                    />
+                  </td>
+                  <td>{candidate.rawTeamName || "—"}</td>
+                  <td>
+                    <select
+                      value={evaluation.teamId ?? ""}
+                      onChange={(event) =>
+                        updateCandidate(candidate.key, {
+                          teamOverrideId:
+                            event.target.value === "" ? null : Number(event.target.value),
+                          edited: { ...candidate.edited, team: true },
+                        })
+                      }
+                    >
+                      <option value="">
+                        {evaluation.status === "equipo_ambiguo" ? "Elegir equipo…" : "Sin resolver"}
+                      </option>
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {getTeamDisplayName(team)}
+                        </option>
+                      ))}
+                    </select>
+                    {evaluation.status === "equipo_ambiguo" &&
+                    evaluation.ambiguousCandidates.length > 0 ? (
+                      <small>
+                        Coincide con: {evaluation.ambiguousCandidates.map((c) => c.name).join(", ")}
+                      </small>
+                    ) : null}
+                  </td>
+                  <td>
+                    <input
+                      className="opr-image-review-input"
+                      value={candidate.killsInput}
+                      inputMode="numeric"
+                      onChange={(event) =>
+                        updateCandidate(candidate.key, {
+                          killsInput: event.target.value,
+                          edited: { ...candidate.edited, kills: true },
+                        })
+                      }
+                    />
+                  </td>
+                  {usesPlacement ? (
+                    <td>
+                      <input
+                        className="opr-image-review-input"
+                        value={candidate.placementInput}
+                        inputMode="numeric"
+                        onChange={(event) =>
+                          updateCandidate(candidate.key, {
+                            placementInput: event.target.value,
+                            edited: { ...candidate.edited, placement: true },
+                          })
+                        }
+                      />
+                    </td>
+                  ) : null}
+                  <td>
+                    {candidate.playerStats && candidate.playerStats.length > 0 ? (
+                      <div className="opr-image-review-players">
+                        {candidate.playerStats.map((player, index) => (
+                          <label key={`${candidate.key}-${index}`}>
+                            <span>{player.playerName}</span>
+                            <input
+                              className="opr-image-review-input"
+                              value={player.killsInput}
+                              inputMode="numeric"
+                              onChange={(event) =>
+                                updateCandidatePlayerKills(candidate.key, index, event.target.value)
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    <span className={`opr-image-review-status is-${evaluation.status}`}>
+                      {OCR_REVIEW_STATUS_LABELS[evaluation.status as OcrReviewStatus]}
+                    </span>
+                  </td>
+                  <td>
+                    {evaluation.warnings.length > 0 ? (
+                      <ul className="opr-image-review-warnings">
+                        {evaluation.warnings.map((warning, index) => (
+                          <li key={index}>{warning}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {reviewedRows.length > 0 ? (
+        <div className="opr-stats-import-actions">
+          <button
+            type="button"
+            className="opr-save"
+            disabled={!activeMatchKey || disabled || includedValidCount === 0}
+            onClick={handleCreateDrafts}
+          >
+            Crear drafts válidos ({includedValidCount})
+          </button>
+          <button
+            type="button"
+            className="bf-button bf-button-ghost"
+            onClick={() => void handleProcessImage()}
+            disabled={phase === "procesando"}
+          >
+            Reprocesar imagen
+          </button>
+          <button
+            type="button"
+            className="bf-button bf-button-ghost"
+            onClick={handleDiscardExtraction}
+            disabled={phase === "procesando"}
+          >
+            Descartar extracción
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -901,9 +1458,9 @@ export default function WorldSeriesOperator({
         ? "bracket"
         : "op"
   );
-  // ?tab=ocr sigue siendo un enlace valido: abre Reportes con la fuente CSV/TXT.
+  // ?tab=ocr abre Reportes con la fuente OCR imagen (ya funcional).
   const [reportSource, setReportSource] = useState<ReportSource>(
-    searchParams.get("tab") === "ocr" ? "import" : "manual"
+    searchParams.get("tab") === "ocr" ? "ocr" : "manual"
   );
 
   const rouletteParam = searchParams.get("roulette");
@@ -921,7 +1478,7 @@ export default function WorldSeriesOperator({
       setMode("setup");
     } else if (tabParam === "ocr") {
       setMode("op");
-      setReportSource("import");
+      setReportSource("ocr");
     } else if (tabParam === "bracket") {
       setMode("bracket");
     }
@@ -1904,7 +2461,7 @@ export default function WorldSeriesOperator({
                   className={reportSource === "ocr" ? "is-on" : ""}
                   onClick={() => setReportSource("ocr")}
                 >
-                  OCR imagen · futuro
+                  OCR imagen
                 </button>
               </div>
             </div>
@@ -1929,10 +2486,12 @@ export default function WorldSeriesOperator({
           ) : null}
 
           {/* ---- Entradas no manuales: drafts revisables dentro de la misma sección ---- */}
-          {mode === "op" && reportSource === "import" ? (
+          {mode === "op" && (reportSource === "import" || reportSource === "ocr") ? (
             <OcrDraftIntake
-              key={`${selectedTournament.id}:${currentGame}`}
+              key={`${selectedTournament.id}:${currentGame}:${reportSource}`}
+              source={reportSource}
               tournamentId={selectedTournament.id}
+              tournamentName={selectedTournament.name}
               matchNumber={currentGame}
               activeMatchKey={activeMatch ? `match:${activeMatch.id}` : null}
               activeMatchId={activeMatch?.id ?? null}
@@ -1944,18 +2503,6 @@ export default function WorldSeriesOperator({
               submitting={submitting}
               onSubmitOfficialReport={onSubmitOfficialReport}
             />
-          ) : null}
-
-          {mode === "op" && reportSource === "ocr" ? (
-            <section className="opr-panel">
-              <div className="opr-eyebrow">OCR imagen · Futuro</div>
-              <h2>Lectura de capturas aún no disponible</h2>
-              <p className="sub">
-                Cuando exista, creará borradores revisables aquí mismo, con la misma
-                revisión humana y el mismo botón de reporte oficial. Mientras tanto usa
-                Manual o CSV/TXT.
-              </p>
-            </section>
           ) : null}
 
           {/* ---- OPERACIÓN: grilla de reportes oficiales ---- */}

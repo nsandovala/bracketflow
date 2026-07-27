@@ -41,6 +41,45 @@
   MVP con empate y overflow de overlays) es el prerequisito antes de
   automatizar la ingesta por imagen.
 
+## OCR Image Draft Intake v0 - shipped (2026-07-27)
+
+- Reemplaza el placeholder "OCR imagen · futuro" dentro de Reportes de
+  partida · Fuente. Reusa el mismo draft local (`OcrDraftIntake`), el mismo
+  resolver de equipo (`teamResolution.mjs`, ahora compartido con CSV/TXT) y
+  el mismo endpoint de reporte oficial que Manual/CSV.
+- Sin motor OCR real todavia: el proveedor por defecto
+  (`lib/ocrImageExtraction.mjs`) reporta honestamente "OCR provider
+  unavailable" en vez de fingir una extraccion. El limite/contrato queda
+  listo para enchufar un motor real (tesseract.js, endpoint de backend, etc.)
+  sin tocar la UI de revision ni el pipeline de drafts.
+- Clasificacion de fila (`lib/ocrImageDraftReview.mjs`): VALIDA / EQUIPO NO
+  RECONOCIDO / EQUIPO AMBIGUO / DATOS INCOMPLETOS / CONFLICTO / REPORTE
+  OFICIAL EXISTENTE / DRAFT DUPLICADO / BAJA CONFIANZA. Nunca auto-mapea un
+  equipo ambiguo ni normaliza un digito incierto en silencio.
+- Sigue pendiente (ver seccion siguiente, fuera de scope de este sprint):
+  ingesta de evidencia de desempeño de player vía screenshots de perfil.
+
+## Player Performance Evidence Intake
+
+Future concept:
+Players may upload screenshots of their latest BR/Rebirth matches from the
+registration/profile flow to provide declared performance context.
+
+Potential future outputs:
+- recent-match baseline;
+- high/low trend;
+- consistency;
+- declared K/D corroboration;
+- caster context.
+
+Rules:
+- separate from tournament official scoring;
+- separate from Operator OCR Match Intake;
+- never automatically verified;
+- requires its own trust and evidence policy.
+
+Do not implement it now.
+
 ## Report Intake - diferido (2026-07-18)
 
 - Flujo de reemplazo/edicion de reporte oficial por partida/equipo

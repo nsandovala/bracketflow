@@ -81,6 +81,11 @@ try {
       npm run lint
     }
 
+    Invoke-CommandStep -Step "Frontend tests" -Detail "app/frontend -> npm test" -Action {
+      Set-Location $frontendDir
+      npm test
+    }
+
     if (-not $SkipBuild) {
       Invoke-CommandStep -Step "Frontend build" -Detail "app/frontend -> npm run build" -Action {
         Set-Location $frontendDir
