@@ -6,6 +6,11 @@ import {
   getOfficialPlayerPerformance,
   getStableMvpRanks,
 } from "../lib/playerBroadcastProfile.mjs";
+import {
+  getInlinePlayerRenderOrder,
+  getTournamentScopedPlayerSelection,
+  togglePlayerAccordionSelection,
+} from "../lib/playerAccordion.mjs";
 
 const fullProfile = {
   id: 7,
@@ -132,4 +137,75 @@ test("unresolved identity still produces a safe inspector view", () => {
   assert.equal(view.profileStatus, "Perfil broadcast no configurado");
   assert.equal(view.declared.displayName, "RosterOnly");
   assert.equal(view.official.status, "Sin player stats oficiales");
+});
+
+test("selecting a player opens its detail immediately before the next row", () => {
+  const selected = togglePlayerAccordionSelection(null, "team-1::alpha");
+  const order = getInlinePlayerRenderOrder(
+    ["team-1::alpha", "team-2::bravo"],
+    selected
+  );
+
+  assert.equal(selected, "team-1::alpha");
+  assert.deepEqual(order, [
+    { type: "row", key: "team-1::alpha" },
+    { type: "detail", key: "team-1::alpha" },
+    { type: "row", key: "team-2::bravo" },
+  ]);
+});
+
+test("clicking the selected player closes its detail", () => {
+  assert.equal(
+    togglePlayerAccordionSelection("team-1::alpha", "team-1::alpha"),
+    null
+  );
+});
+
+test("opening another player closes the previous detail", () => {
+  const selected = togglePlayerAccordionSelection(
+    "team-1::alpha",
+    "team-2::bravo"
+  );
+  const details = getInlinePlayerRenderOrder(
+    ["team-1::alpha", "team-2::bravo"],
+    selected
+  ).filter((item) => item.type === "detail");
+
+  assert.equal(selected, "team-2::bravo");
+  assert.deepEqual(details, [{ type: "detail", key: "team-2::bravo" }]);
+});
+
+test("switching tournaments clears the player selection", () => {
+  assert.equal(
+    getTournamentScopedPlayerSelection("team-1::alpha", 10, 11),
+    null
+  );
+  assert.equal(
+    getTournamentScopedPlayerSelection("team-1::alpha", 10, 10),
+    "team-1::alpha"
+  );
+});
+
+test("stats-only player keeps official performance without a declared identity", () => {
+  const view = createPlayerBroadcastProfileView({
+    playerName: "StatsOnly",
+    teamId: 3,
+    teamName: "Neon Team",
+    profile: null,
+    results: [
+      {
+        match_id: 21,
+        round: 1,
+        team_id: 3,
+        team_name: "Neon Team",
+        player_stats: [{ player_name: "StatsOnly", kills: 9 }],
+      },
+    ],
+    mvpRank: 2,
+  });
+
+  assert.equal(view.identityStatus, "Identidad no vinculada");
+  assert.equal(view.official.kills, 9);
+  assert.equal(view.official.reportedMatches, 1);
+  assert.equal(view.official.mvpRank, 2);
 });

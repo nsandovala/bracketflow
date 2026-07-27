@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import type {
   LeaderboardEntry,
@@ -27,6 +27,7 @@ import {
   createPlayerBroadcastProfileView,
   getStableMvpRanks,
 } from "../../lib/playerBroadcastProfile.mjs";
+import { togglePlayerAccordionSelection } from "../../lib/playerAccordion.mjs";
 import {
   createCasterInspectorSelection,
   getMatchPointDefinitionSummary,
@@ -445,31 +446,6 @@ function MvpDetail({
       left.teamName.localeCompare(right.teamName) ||
       left.playerName.localeCompare(right.playerName)
   );
-  const selectedEntry =
-    rows.find(([key]) => key === selectedPlayerKey) ?? null;
-  const selectedPlayer = selectedEntry?.[1] ?? null;
-  const selectedProfile = selectedPlayer
-    ? matchPlayerProfile(
-        selectedPlayer.playerName,
-        identityCatalog.players,
-        identityCatalog.gameIdentities
-      )
-    : null;
-  const selectedView = selectedPlayer
-    ? createPlayerBroadcastProfileView({
-        playerName: selectedPlayer.playerName,
-        teamId: selectedPlayer.teamId,
-        teamName: selectedPlayer.teamName,
-        profile: selectedProfile,
-        gameIdentities: identityCatalog.gameIdentities,
-        results,
-        mvpRank:
-          officialRanks.get(
-            `${selectedPlayer.teamId}::${normalizeIdentityName(selectedPlayer.playerName)}`
-          ) ?? null,
-      })
-    : null;
-
   return (
     <>
       <InspectorTitle
@@ -481,59 +457,101 @@ function MvpDetail({
           No hay jugadores en roster ni player stats oficiales.
         </p>
       ) : (
-        <div className="bf-caster-player-table" role="table" aria-label="Jugadores del torneo">
-          <div className="bf-caster-player-row is-head" role="row">
-            {["#", "Jugador", "Equipo", "Kills", "Reportes", "Promedio"].map(
-              (label) => <span role="columnheader" key={label}>{label}</span>
-            )}
+        <>
+          <p className="bf-caster-player-prompt">
+            Selecciona un jugador para ver su perfil de broadcast.
+          </p>
+          <div className="bf-caster-player-table" role="table" aria-label="Jugadores del torneo">
+            <div className="bf-caster-player-row is-head" role="row">
+              {["#", "Jugador", "Equipo", "Kills", "Reportes", "Promedio"].map(
+                (label) => <span role="columnheader" key={label}>{label}</span>
+              )}
+              <span role="columnheader" aria-label="Perfil" />
+            </div>
+            {rows.map(([key, player], index) => {
+              const rank = officialRanks.get(key);
+              const active = selectedPlayerKey === key;
+              const rowId = `caster-player-${index}`;
+              const panelId = `${rowId}-profile`;
+              const selectedProfile = active
+                ? matchPlayerProfile(
+                    player.playerName,
+                    identityCatalog.players,
+                    identityCatalog.gameIdentities
+                  )
+                : null;
+              const selectedView = active
+                ? createPlayerBroadcastProfileView({
+                    playerName: player.playerName,
+                    teamId: player.teamId,
+                    teamName: player.teamName,
+                    profile: selectedProfile,
+                    gameIdentities: identityCatalog.gameIdentities,
+                    results,
+                    mvpRank: rank ?? null,
+                  })
+                : null;
+              return (
+                <Fragment key={key}>
+                  <button
+                    id={rowId}
+                    type="button"
+                    className={`bf-caster-player-row${active ? " is-active" : ""}`}
+                    aria-expanded={active}
+                    aria-controls={panelId}
+                    onClick={() =>
+                      setSelectedPlayerKey((current) =>
+                        togglePlayerAccordionSelection(current, key)
+                      )
+                    }
+                  >
+                    <span>{rank ?? "—"}</span>
+                    <span>{player.playerName}</span>
+                    <span>{player.teamName}</span>
+                    <span>{player.matches > 0 ? player.kills : "—"}</span>
+                    <span>{player.matches || "—"}</span>
+                    <span>{player.matches > 0 ? (player.kills / player.matches).toFixed(1) : "—"}</span>
+                    <span className="bf-caster-player-disclosure" aria-hidden="true">
+                      {active ? "⌄" : "›"}
+                    </span>
+                  </button>
+                  {active && selectedView ? (
+                    <PlayerBroadcastDetail
+                      id={panelId}
+                      labelledBy={rowId}
+                      playerName={player.playerName}
+                      view={selectedView}
+                    />
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </div>
-          {rows.map(([key, player]) => {
-            const rank = officialRanks.get(key);
-            const active = selectedPlayerKey === key;
-            return (
-              <button
-                type="button"
-                className={`bf-caster-player-row${active ? " is-active" : ""}`}
-                aria-pressed={active}
-                onClick={() =>
-                  setSelectedPlayerKey((current) => current === key ? null : key)
-                }
-                key={key}
-              >
-                <span>{rank ?? "—"}</span>
-                <span>{player.playerName}</span>
-                <span>{player.teamName}</span>
-                <span>{player.matches > 0 ? player.kills : "—"}</span>
-                <span>{player.matches || "—"}</span>
-                <span>{player.matches > 0 ? (player.kills / player.matches).toFixed(1) : "—"}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {selectedPlayer && selectedView ? (
-        <PlayerBroadcastDetail
-          playerName={selectedPlayer.playerName}
-          view={selectedView}
-        />
-      ) : (
-        <p className="bf-caster-player-prompt">
-          Selecciona un jugador para abrir su perfil de broadcast.
-        </p>
+        </>
       )}
     </>
   );
 }
 
 function PlayerBroadcastDetail({
+  id,
+  labelledBy,
   playerName,
   view,
 }: {
+  id: string;
+  labelledBy: string;
   playerName: string;
   view: ReturnType<typeof createPlayerBroadcastProfileView>;
 }) {
   return (
-    <section className="bf-player-broadcast-detail" aria-label={`Perfil de ${playerName}`}>
+    <section
+      id={id}
+      className="bf-player-broadcast-detail"
+      role="region"
+      aria-labelledby={labelledBy}
+      aria-label={`Perfil de ${playerName}`}
+    >
       <header>
         <div>
           <span>Player Broadcast Profile</span>
