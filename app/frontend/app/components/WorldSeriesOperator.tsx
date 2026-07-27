@@ -50,13 +50,15 @@ import RouletteArena from "./RouletteArena";
 import { detectDelimiter, parseDelimitedTable } from "../../lib/statsDraftImport";
 import { parsePlayerStatsPaste, validateManualPlayerStats } from "../../lib/manualPlayerStats";
 import {
+  createBackendOcrProvider,
+  getBackendOcrProviderStatus,
   OCR_IMAGE_ACCEPTED_TYPES,
-  unavailableOcrProvider,
   validateOcrImageFile,
 } from "../../lib/ocrImageExtraction.mjs";
 import type {
   OcrExtractionOutcome,
   OcrExtractionProvider,
+  OcrProviderStatus,
 } from "../../lib/ocrImageExtraction.d.mts";
 import {
   buildOcrDraftReports,
@@ -808,6 +810,7 @@ function OcrImageIntake({
   tournamentName,
   matchNumber,
   activeMatchKey,
+  activeMatchId,
   teams,
   usesPlacement,
   effectiveLobbySize,
@@ -834,13 +837,29 @@ function OcrImageIntake({
   const [phase, setPhase] = useState<OcrImagePhase>("sin-imagen");
   const [fileError, setFileError] = useState<string | null>(null);
   const [extractionMessage, setExtractionMessage] = useState<string | null>(null);
+  const [extractionMetadata, setExtractionMetadata] = useState<{
+    provider: string;
+    model: string;
+    confidence: number | null;
+  } | null>(null);
+  const [providerStatus, setProviderStatus] = useState<OcrProviderStatus | null>(null);
   const [candidates, setCandidates] = useState<OcrCandidateRow[]>([]);
   const [createMessage, setCreateMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Punto de reemplazo unico para un motor OCR real (tesseract.js, endpoint de
-  // backend, etc.). Hoy no hay motor disponible en este build: ver reporte
-  // del sprint / PARKING_LOT. El resto del componente no cambia al cambiar esto.
-  const providerRef = useRef<OcrExtractionProvider>(unavailableOcrProvider);
+  const provider = useMemo<OcrExtractionProvider>(
+    () => createBackendOcrProvider({ tournamentId, matchId: activeMatchId }),
+    [tournamentId, activeMatchId]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void getBackendOcrProviderStatus().then((status) => {
+      if (!cancelled) setProviderStatus(status);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -881,6 +900,7 @@ function OcrImageIntake({
   function resetExtraction() {
     setCandidates([]);
     setExtractionMessage(null);
+    setExtractionMetadata(null);
     setCreateMessage(null);
   }
 
@@ -933,7 +953,7 @@ function OcrImageIntake({
     setExtractionMessage(null);
     setCreateMessage(null);
 
-    const outcome: OcrExtractionOutcome = await providerRef.current(file);
+    const outcome: OcrExtractionOutcome = await provider(file);
 
     if (!outcome.ok) {
       setPhase("error-lectura");
@@ -941,6 +961,12 @@ function OcrImageIntake({
       setCandidates([]);
       return;
     }
+
+    setExtractionMetadata({
+      provider: outcome.result.provider ?? "ocr",
+      model: outcome.result.model ?? "no informado",
+      confidence: outcome.result.confidence ?? null,
+    });
 
     if (outcome.result.rows.length === 0) {
       setPhase("sin-filas");
@@ -1040,6 +1066,11 @@ function OcrImageIntake({
         <span>Partida {matchNumber}</span>
         <span>{teams.length} equipos esperados</span>
         <span>{officialResults.length} reportes oficiales guardados</span>
+        {providerStatus?.configured ? (
+          <span>
+            OCR configurado: {providerStatus.provider} · {providerStatus.model}
+          </span>
+        ) : null}
       </div>
 
       {!activeMatchKey ? (
@@ -1111,6 +1142,14 @@ function OcrImageIntake({
           role={phase === "error-lectura" ? "alert" : "status"}
         >
           {extractionMessage}
+        </p>
+      ) : null}
+      {extractionMetadata ? (
+        <p className="bf-inline-note" role="status">
+          {extractionMetadata.provider} · {extractionMetadata.model}
+          {extractionMetadata.confidence === null
+            ? ""
+            : ` · confianza ${Math.round(extractionMetadata.confidence * 100)}%`}
         </p>
       ) : null}
       {createMessage ? (
@@ -1208,7 +1247,12 @@ function OcrImageIntake({
                       <div className="opr-image-review-players">
                         {candidate.playerStats.map((player, index) => (
                           <label key={`${candidate.key}-${index}`}>
-                            <span>{player.playerName}</span>
+                            <span>
+                              {player.playerName}
+                              {player.damage === null ? "" : ` · ${player.damage} dmg`}
+                              {player.assists === null ? "" : ` · ${player.assists} ast`}
+                              {player.redeploys === null ? "" : ` · ${player.redeploys} red`}
+                            </span>
                             <input
                               className="opr-image-review-input"
                               value={player.killsInput}

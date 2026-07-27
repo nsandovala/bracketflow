@@ -42,6 +42,9 @@ export function createOcrCandidateRow(row) {
       ? row.playerStats.map((stat) => ({
           playerName: stat.playerName,
           killsInput: stat.kills === null ? "" : String(stat.kills),
+          damage: stat.damage ?? null,
+          assists: stat.assists ?? null,
+          redeploys: stat.redeploys ?? null,
         }))
       : null,
     confidence: row.confidence,

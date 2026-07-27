@@ -53,3 +53,101 @@ export const unavailableOcrProvider = async () => ({
   message:
     "El motor de OCR todavía no está disponible en este build. Usa Manual o CSV/TXT mientras tanto.",
 });
+
+function getApiBaseUrl() {
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+}
+
+async function readErrorMessage(response) {
+  try {
+    const payload = await response.json();
+    return typeof payload.detail === "string" ? payload.detail : "No se pudo procesar la imagen.";
+  } catch {
+    return "No se pudo procesar la imagen.";
+  }
+}
+
+export async function getBackendOcrProviderStatus(fetchImpl = fetch) {
+  try {
+    const response = await fetchImpl(`${getApiBaseUrl()}/ocr/provider`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return {
+        provider: "unavailable",
+        model: "none",
+        configured: false,
+        remote_verified: false,
+      };
+    }
+    return response.json();
+  } catch {
+    return {
+      provider: "unavailable",
+      model: "none",
+      configured: false,
+      remote_verified: false,
+    };
+  }
+}
+
+export function createBackendOcrProvider({
+  tournamentId,
+  matchId,
+  fetchImpl = fetch,
+}) {
+  return async (file) => {
+    if (!matchId) {
+      return unavailableOcrProvider(file);
+    }
+    try {
+      const endpoint =
+        `${getApiBaseUrl()}/tournaments/${tournamentId}/matches/${matchId}` +
+        `/ocr/extract?filename=${encodeURIComponent(file.name)}`;
+      const response = await fetchImpl(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!response.ok) {
+        return {
+          ok: false,
+          reason: response.status === 503 ? "provider_unavailable" : "unreadable_image",
+          message: await readErrorMessage(response),
+        };
+      }
+      const payload = await response.json();
+      return {
+        ok: true,
+        result: {
+          source: "ocr-image",
+          provider: payload.provider,
+          model: payload.model,
+          confidence: payload.confidence,
+          warnings: payload.warnings ?? [],
+          rawText: payload.raw_text ?? null,
+          rows: (payload.rows ?? []).map((row) => ({
+            rawTeamName: row.raw_team_name ?? "",
+            kills: row.kills ?? null,
+            placement: row.placement ?? null,
+            playerStats: row.player_stats?.map((stat) => ({
+              playerName: stat.player_name,
+              kills: stat.kills ?? null,
+              damage: stat.damage ?? null,
+              assists: stat.assists ?? null,
+              redeploys: stat.redeploys ?? null,
+            })),
+            confidence: row.confidence ?? null,
+            warnings: row.warnings ?? [],
+          })),
+        },
+      };
+    } catch {
+      return {
+        ok: false,
+        reason: "unreadable_image",
+        message: "No se pudo conectar con el proveedor OCR. Intenta nuevamente.",
+      };
+    }
+  };
+}

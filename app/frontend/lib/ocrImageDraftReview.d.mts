@@ -20,6 +20,9 @@ export type OcrReviewTeam = TeamResolutionTeam;
 export type OcrReviewPlayerRow = {
   playerName: string;
   killsInput: string;
+  damage: number | null;
+  assists: number | null;
+  redeploys: number | null;
 };
 
 export type OcrCandidateRow = {

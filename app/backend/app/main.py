@@ -1,9 +1,24 @@
-from fastapi import Depends, FastAPI, HTTPException, status
+import logging
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import crud, schemas
 from .database import Base, engine, ensure_sqlite_schema, get_db
+from .ocr_provider import (
+    OCR_IMAGE_MAX_BYTES,
+    OcrExtractionContext,
+    OcrExtractionProvider,
+    OcrExtractionResult,
+    OcrProviderResponseError,
+    OcrProviderTimeoutError,
+    OcrProviderUnavailableError,
+    get_ocr_provider,
+    validate_image_upload,
+)
+
+logger = logging.getLogger(__name__)
 
 
 Base.metadata.create_all(bind=engine)
@@ -46,6 +61,95 @@ def ensure_tournament_is_mutable(tournament) -> None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/ocr/provider")
+def get_ocr_provider_status(
+    provider: OcrExtractionProvider = Depends(get_ocr_provider),
+) -> dict[str, str | bool]:
+    return {
+        "provider": provider.name,
+        "model": provider.model,
+        "configured": provider.configured,
+        "remote_verified": False,
+    }
+
+
+@app.post(
+    "/tournaments/{tournament_id}/matches/{match_id}/ocr/extract",
+    response_model=OcrExtractionResult,
+)
+async def extract_match_ocr(
+    tournament_id: int,
+    match_id: int,
+    request: Request,
+    filename: str = Query(min_length=1, max_length=255),
+    db: Session = Depends(get_db),
+    provider: OcrExtractionProvider = Depends(get_ocr_provider),
+) -> OcrExtractionResult:
+    tournament = get_tournament_or_404(db, tournament_id)
+    match = crud.get_match(db, match_id)
+    if match is None or match.tournament_id != tournament_id:
+        raise HTTPException(
+            status_code=409,
+            detail="El contexto de torneo/partida cambió. Selecciona la imagen nuevamente.",
+        )
+    content_length = request.headers.get("content-length")
+    try:
+        declared_length = int(content_length) if content_length else None
+    except ValueError:
+        declared_length = None
+    if declared_length is not None and declared_length > OCR_IMAGE_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="La imagen supera el máximo permitido (8 MB).")
+    chunks: list[bytes] = []
+    received_bytes = 0
+    async for chunk in request.stream():
+        received_bytes += len(chunk)
+        if received_bytes > OCR_IMAGE_MAX_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="La imagen supera el máximo permitido (8 MB).",
+            )
+        chunks.append(chunk)
+    image_bytes = b"".join(chunks)
+    mime_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    try:
+        validate_image_upload(filename, mime_type, image_bytes)
+    except OverflowError as error:
+        raise HTTPException(status_code=413, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    if not provider.configured:
+        raise HTTPException(
+            status_code=503,
+            detail="El motor de OCR todavía no está disponible. Usa Manual o CSV/TXT mientras tanto.",
+        )
+
+    logger.info(
+        "ocr extraction requested provider=%s model=%s tournament_id=%s match_id=%s "
+        "mime_type=%s bytes=%s",
+        provider.name,
+        provider.model,
+        tournament_id,
+        match_id,
+        mime_type,
+        len(image_bytes),
+    )
+    context = OcrExtractionContext(
+        tournament_id=tournament_id,
+        tournament_name=tournament.name,
+        match_id=match.id,
+        match_round=match.round,
+    )
+    try:
+        return await provider.extract(image_bytes, mime_type, context)
+    except OcrProviderUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except OcrProviderTimeoutError as error:
+        raise HTTPException(status_code=504, detail=str(error)) from error
+    except OcrProviderResponseError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 @app.post("/tournaments", response_model=schemas.Tournament, status_code=status.HTTP_201_CREATED)
