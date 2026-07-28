@@ -1,6 +1,9 @@
 export type OcrExtractionPlayerStat = {
   playerName: string;
   kills: number | null;
+  damage?: number | null;
+  assists?: number | null;
+  redeploys?: number | null;
 };
 
 export type OcrExtractionRow = {
@@ -18,8 +21,12 @@ export type OcrExtractionRow = {
 
 export type OcrExtractionResult = {
   source: "ocr-image";
+  provider?: string;
+  model?: string;
+  confidence?: number | null;
   rows: OcrExtractionRow[];
   warnings: string[];
+  rawText?: string | null;
 };
 
 export type OcrExtractionFailureReason = "provider_unavailable" | "unreadable_image";
@@ -40,3 +47,20 @@ export type OcrImageFileValidation =
 export function validateOcrImageFile(file: File): OcrImageFileValidation;
 
 export const unavailableOcrProvider: OcrExtractionProvider;
+
+export type OcrProviderStatus = {
+  provider: string;
+  model: string;
+  configured: boolean;
+  remote_verified: false;
+};
+
+export function getBackendOcrProviderStatus(
+  fetchImpl?: typeof fetch
+): Promise<OcrProviderStatus>;
+
+export function createBackendOcrProvider(params: {
+  tournamentId: number;
+  matchId: number | null;
+  fetchImpl?: typeof fetch;
+}): OcrExtractionProvider;

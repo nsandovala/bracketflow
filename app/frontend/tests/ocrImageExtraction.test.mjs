@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  createBackendOcrProvider,
+  getBackendOcrProviderStatus,
   OCR_IMAGE_MAX_BYTES,
   unavailableOcrProvider,
   validateOcrImageFile,
@@ -44,4 +46,89 @@ test("default provider honestly reports it is unavailable instead of faking succ
   assert.equal(outcome.reason, "provider_unavailable");
   assert.equal(typeof outcome.message, "string");
   assert.ok(outcome.message.length > 0);
+});
+
+test("backend provider maps normalized structured rows into the existing review contract", async () => {
+  const provider = createBackendOcrProvider({
+    tournamentId: 4,
+    matchId: 9,
+    fetchImpl: async (url, init) => {
+      assert.match(url, /tournaments\/4\/matches\/9\/ocr\/extract/);
+      assert.equal(init.method, "POST");
+      assert.equal(init.headers["Content-Type"], "image/png");
+      return {
+        ok: true,
+        json: async () => ({
+          provider: "openai",
+          model: "fixture-model",
+          confidence: 0.87,
+          warnings: ["review_crop"],
+          raw_text: null,
+          rows: [
+            {
+              raw_team_name: "Amon Reapers",
+              kills: 10,
+              placement: null,
+              confidence: 0.7,
+              warnings: ["missing_placement"],
+              player_stats: [
+                {
+                  player_name: "VITO",
+                  kills: 10,
+                  damage: 2500,
+                  assists: 1,
+                  redeploys: 0,
+                },
+              ],
+            },
+          ],
+        }),
+      };
+    },
+  });
+
+  const outcome = await provider(
+    fakeFile({ name: "shot.png", type: "image/png", size: 1024 })
+  );
+  assert.equal(outcome.ok, true);
+  assert.equal(outcome.result.provider, "openai");
+  assert.equal(outcome.result.confidence, 0.87);
+  assert.equal(outcome.result.rows[0].placement, null);
+  assert.equal(outcome.result.rows[0].playerStats[0].damage, 2500);
+});
+
+test("backend unavailable response preserves the honest fallback state", async () => {
+  const provider = createBackendOcrProvider({
+    tournamentId: 4,
+    matchId: 9,
+    fetchImpl: async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({ detail: "Proveedor no configurado." }),
+    }),
+  });
+  const outcome = await provider(
+    fakeFile({ name: "shot.png", type: "image/png", size: 1024 })
+  );
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.reason, "provider_unavailable");
+  assert.equal(outcome.message, "Proveedor no configurado.");
+});
+
+test("provider configuration is reported without claiming remote verification", async () => {
+  const status = await getBackendOcrProviderStatus(async () => ({
+    ok: true,
+    json: async () => ({
+      provider: "openai",
+      model: "fixture-model",
+      configured: true,
+      remote_verified: false,
+    }),
+  }));
+  assert.deepEqual(status, {
+    provider: "openai",
+    model: "fixture-model",
+    configured: true,
+    remote_verified: false,
+  });
 });
