@@ -113,6 +113,8 @@ type WorldSeriesOperatorProps = {
   onUpdateDraft: (matchId: number, teamId: number, patch: Partial<ResultDraft>) => void;
   onUpdateKillRaceMapDraft: (matchId: number, patch: Partial<KillRaceMapDraft>) => void;
   onSelectKillRaceMatch: (matchId: number | null) => void;
+  broadcastMatchId: number | null;
+  onSendKillRaceMatchToBroadcast: (matchId: number) => Promise<unknown>;
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onSaveKillRaceMap: (matchId: number) => void;
   onKillRaceResultChanged: () => Promise<unknown>;
@@ -1479,6 +1481,8 @@ export default function WorldSeriesOperator({
   onLockBracketRespin,
   onUpdateDraft,
   onSelectKillRaceMatch,
+  broadcastMatchId,
+  onSendKillRaceMatchToBroadcast,
   onSaveTeamReport,
   onKillRaceResultChanged,
   onCreateNextGame,
@@ -2017,17 +2021,34 @@ export default function WorldSeriesOperator({
                 actions={bracketViewActions}
                 activeMatchId={activeMatch?.id ?? null}
                 onSelectMatch={onSelectKillRaceMatch}
+                density="compact"
               />
             </div>
             <aside className="kr-operator-series">
           {
             activeMatch && activeMatchTeamA && activeMatchTeamB ? (
               <section className="opr-panel">
-                <div className="opr-eyebrow">Serie actual</div>
+                <div className="kr-broadcast-state">
+                  <span><b>SERIE SELECCIONADA</b> Match {activeMatch.id}</span>
+                  <span><b>EN TRANSMISIÓN</b> {broadcastMatchId ? `Match ${broadcastMatchId}` : "Sin match"}</span>
+                </div>
                 <h2>{activeMatchTeamALabel} vs {activeMatchTeamBLabel}</h2>
                 <p className="sub">
                   Match {activeMatch.id} · Round {activeMatch.round} · BO{activeMatch.best_of} · Serie {activeMatch.maps_won_a}-{activeMatch.maps_won_b}
                 </p>
+                <button
+                  type="button"
+                  className="opr-save"
+                  disabled={
+                    submitting ||
+                    broadcastMatchId === activeMatch.id ||
+                    activeMatch.status === "completed" ||
+                    activeMatch.winner_id !== null
+                  }
+                  onClick={() => void onSendKillRaceMatchToBroadcast(activeMatch.id)}
+                >
+                  {broadcastMatchId === activeMatch.id ? "En transmisión" : "Enviar a transmisión"}
+                </button>
 
                 <div className="opr-teamgrid">
                   <div className="opr-teamcard">

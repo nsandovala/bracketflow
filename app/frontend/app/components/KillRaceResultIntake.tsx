@@ -28,7 +28,7 @@ export default function KillRaceResultIntake({ match, leftTeam, rightTeam, onCha
       match.maps.filter((item) => item.result_status === "confirmed").length + 1,
     match.best_of
   );
-  const [mapNumber, setMapNumber] = useState(nextMap);
+  const mapNumber = nextMap;
   const [content, setContent] = useState("");
   const [source, setSource] = useState<Source>("manual");
   const [manualKills, setManualKills] = useState<Record<number, string>>({});

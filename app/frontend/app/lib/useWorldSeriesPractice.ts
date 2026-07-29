@@ -41,6 +41,7 @@ import {
   saveMatchMap,
   saveMatchResult,
   updateTournament,
+  updateTournamentBroadcastMatch,
 } from "../../lib/api";
 import {
   ENGINE_PRESETS,
@@ -337,6 +338,22 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         killsB: patch.killsB ?? current[matchId]?.killsB ?? "",
       },
     }));
+  }
+
+  async function sendMatchToBroadcast(matchId: number) {
+    if (selectedTournamentId === null) return null;
+    setSubmitting(true);
+    try {
+      const updated = await updateTournamentBroadcastMatch(selectedTournamentId, matchId);
+      setSelectedTournament(updated);
+      setMessage(`Match ${matchId} enviado a transmisión.`);
+      return updated;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo actualizar la transmisión.");
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const battleRoyaleMatches = useMemo(
@@ -1332,6 +1349,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     pendingTeams,
     sortedStandings,
     selectedMatchId,
+    broadcastMatchId: selectedTournament?.config?.broadcastMatchId ?? null,
     resultDrafts,
     killRaceMapDrafts,
     reportsLoaded,
@@ -1348,6 +1366,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     selectTournament,
     updateResultDraft,
     updateKillRaceMapDraft,
+    sendMatchToBroadcast,
     createEngineTournament,
     updateEngineTournament,
     createWorldSeriesTournament,

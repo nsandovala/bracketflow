@@ -32,6 +32,7 @@ function parseLayout(value: string | null): StreamLayout {
 function StreamPageClient() {
   const searchParams = useSearchParams();
   const tournamentId = parseTournamentId(searchParams.get("tournamentId"));
+  const matchId = parseTournamentId(searchParams.get("matchId"));
   const obs = searchParams.get("obs") === "1";
   const transparent = searchParams.get("bg") === "transparent";
   const brand = searchParams.get("brand");
@@ -40,6 +41,7 @@ function StreamPageClient() {
   return (
     <WorldSeriesStreamView
       tournamentId={tournamentId}
+      matchId={matchId}
       obs={obs}
       transparent={transparent}
       brand={brand}

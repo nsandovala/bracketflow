@@ -5,7 +5,13 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import models, schemas
-from app.crud import confirm_kill_race_result, get_match, upsert_kill_race_result
+from app.crud import (
+    confirm_kill_race_result,
+    get_match,
+    read_tournament_config,
+    update_tournament_broadcast_match,
+    upsert_kill_race_result,
+)
 from app.database import Base
 from app.kill_race_import import PlayerRef, build_preview
 
@@ -152,3 +158,34 @@ def test_series_score_is_separate_from_current_game_kills(db, kill_race):
     confirmed = confirm_kill_race_result(db, tournament, get_match(db, match.id), 1)
     assert (confirmed.maps_won_a, confirmed.maps_won_b) == (1, 0)
     assert (confirmed.maps[0].kills_a, confirmed.maps[0].kills_b) == (12, 9)
+
+
+def test_broadcast_match_update_preserves_existing_config(db, kill_race):
+    tournament, match, *_ = kill_race
+    updated = update_tournament_broadcast_match(db, tournament, match.id)
+    config = read_tournament_config(updated)
+    assert config["engine_key"] == "kill_race_bracket"
+    assert config["broadcastMatchId"] == match.id
+
+
+def test_broadcast_match_rejects_completed_and_foreign_match(db, kill_race):
+    tournament, match, *_ = kill_race
+    match.status = "completed"
+    db.commit()
+    with pytest.raises(ValueError, match="jugable"):
+        update_tournament_broadcast_match(db, tournament, match.id)
+
+    other = models.Tournament(
+        name="Other", game="Warzone", format="roulette_2v2", team_size=2,
+        scoring_profile="kill_race", status="active", bracket_status="locked",
+    )
+    db.add(other)
+    db.flush()
+    foreign = models.Match(
+        round=1, status="ready", team_a_id=match.team_a_id, team_b_id=match.team_b_id,
+        best_of=3, tournament_id=other.id,
+    )
+    db.add(foreign)
+    db.commit()
+    with pytest.raises(ValueError, match="no pertenece"):
+        update_tournament_broadcast_match(db, tournament, foreign.id)

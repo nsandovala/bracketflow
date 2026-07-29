@@ -31,7 +31,12 @@ type BracketViewProps = {
   actions?: ReactNode;
   activeMatchId?: number | null;
   onSelectMatch?: (matchId: number) => void;
+  density?: "default" | "compact";
 };
+
+function normalizedLabel(value: string | undefined) {
+  return (value ?? "").toLocaleLowerCase("es").replace(/[^a-z0-9]+/g, " ").trim();
+}
 
 function SeedContent({ seed }: { seed: ReactBracketSeed }) {
   return (
@@ -64,7 +69,9 @@ function SeedContent({ seed }: { seed: ReactBracketSeed }) {
                 <span className="bf-rb-team-name">{team.name}</span>
                 {team.badge ? <span className="bf-rb-team-badge">{team.badge}</span> : null}
               </div>
-              <span className="bf-rb-team-roster">{team.roster}</span>
+              {normalizedLabel(team.roster) !== normalizedLabel(team.name) ? (
+                <span className="bf-rb-team-roster">{team.roster}</span>
+              ) : null}
             </div>
 
             <div className="bf-rb-team-side">
@@ -84,6 +91,7 @@ function renderSeed(
     activeMatchId: number | null;
     selectable: boolean;
     onSelect?: (matchId: number) => void;
+    compact: boolean;
   }
 ) {
   const seed = props.seed as ReactBracketSeed;
@@ -97,7 +105,7 @@ function renderSeed(
     <Seed
       className="bf-rb-seed-shell"
       mobileBreakpoint={props.breakpoint}
-      style={{ padding: "14px 18px" }}
+      style={{ padding: options.compact ? "8px 10px" : "14px 18px" }}
     >
       <SeedItem style={{ background: "transparent", boxShadow: "none" }}>
         <div
@@ -118,7 +126,7 @@ function renderSeed(
             }
           }}
         >
-          {isActive ? <span className="bf-rb-current-label">Serie actual</span> : null}
+          {isActive ? <span className="bf-rb-current-label">Serie seleccionada</span> : null}
           <SeedContent seed={seed} />
         </div>
       </SeedItem>
@@ -247,6 +255,7 @@ export default function BracketView({
   actions,
   activeMatchId = null,
   onSelectMatch,
+  density = "default",
 }: BracketViewProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -286,7 +295,7 @@ export default function BracketView({
   }
 
   return (
-    <section className={`bf-bracket-view is-${mode}`}>
+    <section className={`bf-bracket-view is-${mode}${density === "compact" ? " is-compact" : ""}`}>
       <div className="bf-bracket-head">
         <div>
           <span className="opr-eyebrow">{tournament?.name ?? "BracketFlow"}</span>
@@ -353,6 +362,7 @@ export default function BracketView({
                       ? isBracketMatchSelectable(match, mode, Boolean(onSelectMatch))
                       : false,
                     onSelect: onSelectMatch,
+                    compact: density === "compact",
                   });
                 }}
               />

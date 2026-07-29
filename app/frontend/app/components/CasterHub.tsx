@@ -26,6 +26,7 @@ import {
 import BroadcastSetup from "./BroadcastSetup";
 import CasterContextInspector from "./CasterContextInspector";
 import { getCompatibleOverlayLayouts } from "../../lib/streamRouting.mjs";
+import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
@@ -100,7 +101,7 @@ function formatPoints(points: number) {
   return Number.isInteger(points) ? String(points) : points.toFixed(1);
 }
 
-function getOverlayUrl(tournamentId: number, overlay: OverlayDefinition) {
+function getOverlayUrl(tournamentId: number, overlay: OverlayDefinition, matchId?: number) {
   const query = new URLSearchParams({
     tournamentId: String(tournamentId),
     obs: "1",
@@ -110,6 +111,7 @@ function getOverlayUrl(tournamentId: number, overlay: OverlayDefinition) {
     query.set("bg", "transparent");
   }
   query.set("layout", overlay.layout);
+  if (matchId !== undefined) query.set("matchId", String(matchId));
 
   return `${STREAM_ORIGIN}/stream?${query.toString()}`;
 }
@@ -172,6 +174,13 @@ export default function CasterHub() {
   const compatibleOverlays = (isKillRace ? KILL_RACE_OVERLAYS : OVERLAYS).filter((overlay) =>
     compatibleLayouts.includes(overlay.layout)
   );
+  const killRaceState = isKillRace
+    ? buildKillRaceCasterState({
+        matches,
+        teams,
+        broadcastMatchId: selectedTournament?.config?.broadcastMatchId ?? null,
+      })
+    : null;
   const standings = sortedStandings.map((entry) => ({
     ...entry,
     team_name: teams.find((team) => team.id === entry.team_id)?.name ?? entry.team_name,
@@ -423,7 +432,19 @@ export default function CasterHub() {
             activeMatch={activeMatch}
             loading={loading}
             backendOnline={backendOnline}
+            killRaceState={killRaceState}
           />
+
+          {isKillRace ? (
+            <section className="bf-caster-context" aria-label="Match en transmisión">
+              <strong>EN TRANSMISIÓN</strong>
+              <span>
+                {killRaceState?.broadcastMatch
+                  ? `Match ${killRaceState.broadcastMatch.id} · ${getMatchTeamLabel(killRaceState.broadcastMatch.team_a_id!)} vs ${getMatchTeamLabel(killRaceState.broadcastMatch.team_b_id!)}`
+                  : "Sin serie enviada por Operator"}
+              </span>
+            </section>
+          ) : null}
 
           <div className="bf-caster-grid">
             <section className="bf-caster-panel bf-caster-overlays">
@@ -469,6 +490,32 @@ export default function CasterHub() {
                     </article>
                   );
                 })}
+                {isKillRace
+                  ? matches
+                      .filter((match) =>
+                        match.team_a_id !== null &&
+                        match.team_b_id !== null &&
+                        (match.winner_id === null ||
+                          match.maps.some((map) => map.result_status === "provisional"))
+                      )
+                      .map((match) => {
+                        const overlay = KILL_RACE_OVERLAYS[0];
+                        const url = getOverlayUrl(selectedTournament.id, overlay, match.id);
+                        return (
+                          <article className="bf-caster-overlay" key={`fixed-${match.id}`}>
+                            <div className="bf-caster-overlay-copy">
+                              <h3>Scorebug fijo · Match {match.id}</h3>
+                              <p>{getMatchTeamLabel(match.team_a_id!)} vs {getMatchTeamLabel(match.team_b_id!)}</p>
+                              <code>{url}</code>
+                            </div>
+                            <div className="bf-caster-overlay-actions">
+                              <button type="button" onClick={() => void handleCopy(`fixed-${match.id}`, url)}>Copy URL</button>
+                              <button type="button" className="is-open" onClick={() => openOverlay(url)}>Open overlay</button>
+                            </div>
+                          </article>
+                        );
+                      })
+                  : null}
                 {!isKillRace ? <article className="bf-caster-overlay bf-caster-overlay-dark">
                   <div className="bf-caster-overlay-copy">
                     <h3>Leaderboard dark</h3>

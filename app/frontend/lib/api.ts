@@ -90,6 +90,7 @@ export type TournamentConfig = {
   rouletteStatus?: "generated" | "confirmed";
   championTeamId?: number;
   championDecidedAt?: string;
+  broadcastMatchId?: number;
 };
 
 export type Tournament = {
@@ -422,6 +423,16 @@ export function updateTournament(
   return request<Tournament>(`/tournaments/${tournamentId}`, {
     method: "PATCH",
     body: payload,
+  });
+}
+
+export function updateTournamentBroadcastMatch(
+  tournamentId: number,
+  broadcastMatchId: number | null
+) {
+  return request<Tournament>(`/tournaments/${tournamentId}/broadcast-match`, {
+    method: "PATCH",
+    body: { broadcastMatchId },
   });
 }
 

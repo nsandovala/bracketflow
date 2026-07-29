@@ -17,7 +17,7 @@ import {
   getMatchPointStatusFromPolicy,
   getMatchPointStatusMessage,
 } from "../../lib/tournamentStatus";
-import { selectKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
+import { resolveKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
 import { resolveStreamSurface } from "../../lib/streamRouting.mjs";
 
 export type StreamLayout =
@@ -36,6 +36,7 @@ const ANCHORED_LAYOUTS: StreamLayout[] = ["sidebar", "lower", "lower-third", "ma
 
 type WorldSeriesStreamViewProps = {
   tournamentId: number | null;
+  matchId: number | null;
   obs: boolean;
   transparent: boolean;
   brand: string | null;
@@ -44,6 +45,7 @@ type WorldSeriesStreamViewProps = {
 
 export default function WorldSeriesStreamView({
   tournamentId,
+  matchId,
   obs,
   transparent,
   brand,
@@ -103,7 +105,11 @@ export default function WorldSeriesStreamView({
   }, [transparent]);
 
   if (streamSurface === "scorebug") {
-    const scorebugMatch = selectKillRaceScorebugMatch(matches);
+    const scorebugMatch = resolveKillRaceScorebugMatch(
+      matches,
+      matchId,
+      tournament?.config?.broadcastMatchId ?? null
+    );
     return <KillRaceScorebug tournamentId={tournament?.id ?? tournamentId} match={scorebugMatch} teams={teams} connected={connected} />;
   }
 

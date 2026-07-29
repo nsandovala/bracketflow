@@ -9,6 +9,18 @@ export function selectKillRaceScorebugMatch<T extends {
   team_b_id: number | null;
   maps: Array<{ result_status: string }>;
 }>(matches: T[]): T | null;
+export function resolveKillRaceScorebugMatch<T extends {
+  id: number;
+  status: string;
+  winner_id: number | null;
+  team_a_id: number | null;
+  team_b_id: number | null;
+  maps: Array<{ result_status: string }>;
+}>(
+  matches: T[],
+  explicitMatchId?: number | null,
+  broadcastMatchId?: number | null
+): T | null;
 export function killRaceVisualKey(
   tournamentId: number | null,
   match: {

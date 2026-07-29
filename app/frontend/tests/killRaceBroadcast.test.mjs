@@ -6,7 +6,9 @@ import {
   getKillRaceBroadcastStatus,
   killRaceVisualKey,
   selectKillRaceScorebugMatch,
+  resolveKillRaceScorebugMatch,
 } from "../lib/killRaceBroadcast.mjs";
+import { buildKillRaceCasterState } from "../lib/killRaceCasterState.mjs";
 import {
   buildManualKillRacePreview,
   getProjectedSeriesScore,
@@ -26,7 +28,49 @@ const match = (id, status, killsA = 0) => ({
   winner_id: null,
   team_a_id: 1,
   team_b_id: 2,
+  status: "ready",
   maps: status ? [{ map_number: 1, result_status: status, kills_a: killsA, kills_b: 9 }] : [],
+});
+
+test("explicit scorebug match has priority over operator broadcast match", () => {
+  assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, null)], 2, 1).id, 2);
+});
+
+test("invalid explicit match returns an honest empty state", () => {
+  assert.equal(resolveKillRaceScorebugMatch([match(1, null)], 999, 1), null);
+});
+
+test("follow operator uses broadcast then provisional then next playable", () => {
+  assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, "provisional")], null, 1).id, 1);
+  assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, "provisional")], null, null).id, 2);
+});
+
+test("caster analytics use confirmed maps only, deduplicate maps and preserve MVP ties", () => {
+  const confirmed = {
+    ...match(7, "confirmed"),
+    maps: [{
+      id: 77, map_number: 1, result_status: "confirmed",
+      player_stats: [
+        { player_id: 1, player_name: "Vito", side: "left", kills: 7 },
+        { player_id: 2, player_name: "Jasfa", side: "left", kills: 7 },
+      ],
+    }],
+  };
+  const provisional = {
+    ...match(8, "provisional"),
+    maps: [{
+      id: 88, map_number: 1, result_status: "provisional",
+      player_stats: [{ player_id: 3, player_name: "Xavi", side: "right", kills: 99 }],
+    }],
+  };
+  const state = buildKillRaceCasterState({
+    matches: [confirmed, { ...confirmed }, provisional],
+    teams: [],
+    broadcastMatchId: 8,
+  });
+  assert.equal(state.confirmedMapCount, 1);
+  assert.deepEqual(state.mvp.map((player) => player.playerName), ["Jasfa", "Vito"]);
+  assert.equal(state.broadcastMatch.id, 8);
 });
 
 test("preview calculates player total and exposes provisional state", () => {

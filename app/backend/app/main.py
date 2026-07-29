@@ -190,6 +190,24 @@ def update_tournament(
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
+@app.patch(
+    "/tournaments/{tournament_id}/broadcast-match",
+    response_model=schemas.Tournament,
+)
+def update_tournament_broadcast_match(
+    tournament_id: int,
+    payload: schemas.TournamentBroadcastMatchUpdate,
+    db: Session = Depends(get_db),
+) -> schemas.Tournament:
+    tournament = get_tournament_or_404(db, tournament_id)
+    try:
+        return crud.update_tournament_broadcast_match(
+            db, tournament, payload.broadcastMatchId
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.get(
     "/tournaments/{tournament_id}/match-completion-policy",
     response_model=schemas.MatchCompletionPolicy,

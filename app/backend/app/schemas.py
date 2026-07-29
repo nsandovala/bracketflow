@@ -32,6 +32,7 @@ class TournamentConfig(BaseModel):
     rouletteRosterDurationSeconds: int | None = Field(default=None, ge=1, le=240)
     championTeamId: int | None = Field(default=None, ge=1)
     championDecidedAt: str | None = None
+    broadcastMatchId: int | None = Field(default=None, ge=1)
 
 
 class RespinWindowOpen(BaseModel):
@@ -92,6 +93,10 @@ class TournamentUpdate(BaseModel):
     @classmethod
     def parse_config(cls, value):
         return TournamentBase.parse_config(value)
+
+
+class TournamentBroadcastMatchUpdate(BaseModel):
+    broadcastMatchId: int | None = Field(default=None, ge=1)
 
 
 class Tournament(TournamentBase):

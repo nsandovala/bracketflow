@@ -499,6 +499,33 @@ def update_tournament(
     return updated
 
 
+def update_tournament_broadcast_match(
+    db: Session,
+    tournament: models.Tournament,
+    match_id: int | None,
+) -> models.Tournament:
+    config = read_tournament_config(tournament)
+    if match_id is None:
+        config.pop("broadcastMatchId", None)
+    else:
+        match = db.query(models.Match).filter(models.Match.id == match_id).first()
+        if match is None or match.tournament_id != tournament.id:
+            raise ValueError("El match no pertenece al torneo seleccionado.")
+        if (
+            match.team_a_id is None
+            or match.team_b_id is None
+            or match.winner_id is not None
+            or match.status in {"completed", "waiting"}
+        ):
+            raise ValueError("Solo una serie jugable con ambos equipos puede enviarse a transmisión.")
+        config["broadcastMatchId"] = match.id
+
+    write_tournament_config(tournament, config)
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
 def get_tournaments(db: Session) -> list[models.Tournament]:
     tournaments = (
         db.query(models.Tournament)

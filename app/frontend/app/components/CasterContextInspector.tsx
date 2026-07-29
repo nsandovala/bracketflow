@@ -34,6 +34,7 @@ import {
   reconcileCasterInspectorSelection,
   toggleCasterInspectorContext,
 } from "../../lib/casterInspectorState.mjs";
+import type { KillRaceCasterPlayer } from "../../lib/killRaceCasterState.mjs";
 
 type ContextKey = "leader" | "kills" | "mvp" | "definition" | "matches";
 
@@ -53,6 +54,14 @@ type Props = {
   activeMatch: Match | null;
   loading: boolean;
   backendOnline: boolean;
+  killRaceState?: {
+    teamTotals: Array<{ teamId: number; kills: number }>;
+    confirmedMapCount: number;
+    mvp: KillRaceCasterPlayer[];
+    broadcastMatch: Match | null;
+    champion: Team | null;
+    completedSeriesCount: number;
+  } | null;
 };
 
 function formatPoints(value: number) {
@@ -84,6 +93,7 @@ export default function CasterContextInspector({
   activeMatch,
   loading,
   backendOnline,
+  killRaceState = null,
 }: Props) {
   const matchPointThreshold =
     matchCompletionPolicy?.matchPointThreshold ?? undefined;
@@ -198,6 +208,35 @@ export default function CasterContextInspector({
       detail: latestReportedMatch ? `Último reporte: Partida ${latestReportedMatch.round}` : "Sin reportes oficiales",
     },
   ];
+  if (killRaceState) {
+    const topTeam = [...killRaceState.teamTotals].sort((a, b) => b.kills - a.kills)[0];
+    cards[0] = {
+      key: "leader",
+      label: killRaceState.champion ? "Campeón" : "Líder confirmado",
+      value: killRaceState.champion?.name ?? (topTeam ? teamById.get(topTeam.teamId)?.name ?? "Equipo" : "Sin datos"),
+      detail: topTeam ? `${topTeam.kills} K confirmadas` : "Mapas confirmados pendientes",
+    };
+    cards[1] = {
+      key: "kills",
+      label: "Top kills / equipo",
+      value: topTeam ? `${teamById.get(topTeam.teamId)?.name ?? "Equipo"} · ${topTeam.kills} K` : "Datos pendientes",
+      detail: `${killRaceState.confirmedMapCount} mapas confirmados`,
+    };
+    cards[2] = {
+      key: "mvp",
+      label: "MVP / jugadores",
+      value: killRaceState.mvp.length
+        ? killRaceState.mvp.map((player) => player.playerName).join(" / ")
+        : "Player stats pendientes",
+      detail: killRaceState.mvp.length ? `${killRaceState.mvp[0].kills} K confirmadas` : "No se infiere MVP sin desglose",
+    };
+    cards[4] = {
+      key: "matches",
+      label: "Partidas / serie",
+      value: killRaceState.broadcastMatch ? `Match ${killRaceState.broadcastMatch.id}` : "Sin match en transmisión",
+      detail: `${killRaceState.completedSeriesCount} series completadas`,
+    };
+  }
 
   return (
     <>

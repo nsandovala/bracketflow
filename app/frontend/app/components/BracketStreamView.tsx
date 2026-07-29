@@ -67,7 +67,7 @@ export default function BracketStreamView({
           </div>
         </header>
 
-        <BracketView tournament={tournament} engine={engine} teams={teams} matches={matches} mode="stream" />
+        <BracketView tournament={tournament} engine={engine} teams={teams} matches={matches} mode="stream" density="compact" />
 
         {!obs && (
           <footer className="bf-stream-strip">
