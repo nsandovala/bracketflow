@@ -2088,7 +2088,10 @@ export default function WorldSeriesOperator({
                   </div>
                 ) : (
                   <KillRaceResultIntake
-                    key={activeMatch.id}
+                    key={`${activeMatch.id}:${
+                      activeMatch.maps.find((map) => map.result_status !== "confirmed")?.map_number ??
+                      activeMatch.maps.filter((map) => map.result_status === "confirmed").length + 1
+                    }`}
                     match={activeMatch}
                     leftTeam={activeMatchTeamA}
                     rightTeam={activeMatchTeamB}

@@ -174,13 +174,18 @@ export default function CasterHub() {
   const compatibleOverlays = (isKillRace ? KILL_RACE_OVERLAYS : OVERLAYS).filter((overlay) =>
     compatibleLayouts.includes(overlay.layout)
   );
-  const killRaceState = isKillRace
-    ? buildKillRaceCasterState({
-        matches,
-        teams,
-        broadcastMatchId: selectedTournament?.config?.broadcastMatchId ?? null,
-      })
-    : null;
+  const broadcastMatchId = selectedTournament?.config?.broadcastMatchId ?? null;
+  const killRaceState = useMemo(
+    () =>
+      isKillRace
+        ? buildKillRaceCasterState({
+            matches,
+            teams,
+            broadcastMatchId,
+          })
+        : null,
+    [broadcastMatchId, isKillRace, matches, teams]
+  );
   const standings = sortedStandings.map((entry) => ({
     ...entry,
     team_name: teams.find((team) => team.id === entry.team_id)?.name ?? entry.team_name,
@@ -252,10 +257,23 @@ export default function CasterHub() {
       ? resolvedLeaderLabel
       : "Sin datos suficientes";
   const teamToWatchContext = highestKillsContext;
+  const killRaceTopTeam = killRaceState?.teamTotals[0] ?? null;
+  const killRaceMvpNames = killRaceState?.mvp.map((player) => player.playerName) ?? [];
 
   const nowNarration = (() => {
     if (!selectedTournament) {
       return "Selecciona un torneo para preparar la señal y la narrativa.";
+    }
+    if (isKillRace) {
+      if (killRaceState?.champion) {
+        return `Cierra con ${killRaceState.champion.name}, campeón confirmado, y conserva las estadísticas finales.`;
+      }
+      if (killRaceState?.broadcastMatch) {
+        return `Sigue el Match ${killRaceState.broadcastMatch.id}, la serie enviada por Operator.`;
+      }
+      return killRaceTopTeam
+        ? `${killRaceTopTeam.teamName} lidera las kills confirmadas; no hay serie al aire.`
+        : "Kill Race está en preparación; no hay mapas confirmados ni serie al aire.";
     }
     if (championLabel) {
       return `Cierra con ${championLabel}: el campeonato ya está decidido.`;
@@ -555,7 +573,17 @@ export default function CasterHub() {
 
               <div className="bf-caster-note-block">
                 <span>Top 3 equipos</span>
-                {topThree.length > 0 ? (
+                {isKillRace && killRaceState?.teamTotals.length ? (
+                  <ol>
+                    {killRaceState.teamTotals.slice(0, 3).map((entry, index) => (
+                      <li key={entry.teamId}>
+                        <b>{index + 1}</b>
+                        <strong>{entry.teamName}</strong>
+                        <small>{entry.kills} K · {entry.confirmedMaps} mapas confirmados</small>
+                      </li>
+                    ))}
+                  </ol>
+                ) : topThree.length > 0 ? (
                   <ol>
                     {topThree.map((entry, index) => (
                       <li key={entry.team_id}>
@@ -573,22 +601,30 @@ export default function CasterHub() {
               <div className="bf-caster-note-block">
                 <span>Equipo a seguir</span>
                 <p>
-                  <strong>{teamToWatch}</strong>
-                  {highestKills ? ` lidera en kills con ${highestKills.kills}.` : " no tiene estadísticas todavía."}
-                  {teamToWatchContext?.notes ? ` Nota Identity: ${teamToWatchContext.notes}` : ""}
+                  <strong>{isKillRace ? killRaceTopTeam?.teamName ?? "Sin datos suficientes" : teamToWatch}</strong>
+                  {isKillRace
+                    ? killRaceTopTeam ? ` lidera con ${killRaceTopTeam.kills} kills confirmadas.` : " no tiene mapas confirmados."
+                    : highestKills ? ` lidera en kills con ${highestKills.kills}.` : " no tiene estadísticas todavía."}
+                  {!isKillRace && teamToWatchContext?.notes ? ` Nota Identity: ${teamToWatchContext.notes}` : ""}
                 </p>
               </div>
 
               <div className="bf-caster-note-block">
                 <span>
-                  {mvp.kind === "player"
+                  {isKillRace
+                    ? killRaceMvpNames.length > 1 ? "MVP empatado" : killRaceMvpNames.length === 1 ? "MVP confirmado" : "MVP pendiente"
+                    : mvp.kind === "player"
                     ? mvp.tiedWith.length > 0
                       ? "MVP empatado"
                       : "MVP actual"
                     : "MVP pendiente"}
                 </span>
                 <p>
-                  {mvp.kind === "player" ? (
+                  {isKillRace ? (
+                    killRaceMvpNames.length
+                      ? <><strong>{killRaceMvpNames.join(" / ")}</strong> · {killRaceState?.mvp[0]?.kills ?? 0} K confirmadas.</>
+                      : "Sin desglose individual; no se infiere MVP desde kills de equipo."
+                  ) : mvp.kind === "player" ? (
                     mvp.tiedWith.length > 0 ? (
                       <>
                         MVP empatado:{" "}
@@ -611,8 +647,10 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-note-block">
-                <span>Match Point / campeón</span>
-                <p>{matchPointMessage ?? (bracketChampion ? `Campeón de bracket: ${bracketChampion.displayName}.` : "Sin definición activa confirmada.")}</p>
+                <span>{isKillRace ? "Campeón" : "Match Point / campeón"}</span>
+                <p>{isKillRace
+                  ? killRaceState?.champion ? `Campeón de Kill Race: ${killRaceState.champion.name}.` : "La llave sigue abierta."
+                  : matchPointMessage ?? (bracketChampion ? `Campeón de bracket: ${bracketChampion.displayName}.` : "Sin definición activa confirmada.")}</p>
               </div>
 
               <div className="bf-caster-now">

@@ -7,6 +7,8 @@ import {
   getMatchPointDefinitionSummary,
   reconcileCasterInspectorSelection,
   toggleCasterInspectorContext,
+  toggleCasterPlayerSelection,
+  reconcileCasterPlayerSelection,
 } from "../lib/casterInspectorState.mjs";
 
 test("all five Caster cards activate their inspector panel", () => {
@@ -16,6 +18,20 @@ test("all five Caster cards activate their inspector panel", () => {
     state = toggleCasterInspectorContext(state, contextKey);
     assert.equal(state.selected, contextKey);
   }
+});
+
+test("Kill Race player selection opens, closes, replaces and clears stale keys", () => {
+  let selected = toggleCasterPlayerSelection(null, "1:7");
+  assert.equal(selected, "1:7");
+  selected = toggleCasterPlayerSelection(selected, "1:7");
+  assert.equal(selected, null);
+  selected = toggleCasterPlayerSelection(selected, "2:7");
+  assert.equal(selected, "2:7");
+  assert.equal(reconcileCasterPlayerSelection(selected, ["1:7"]), null);
+});
+
+test("same nickname in different teams uses distinct player keys", () => {
+  assert.notEqual("1:endgamex", "2:endgamex");
 });
 
 test("Match Point panel consumes the backend completion policy", () => {

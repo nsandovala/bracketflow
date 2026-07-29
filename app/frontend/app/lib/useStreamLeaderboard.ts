@@ -29,7 +29,7 @@ import { ACTIVE_WORLD_SERIES_TOURNAMENT_KEY } from "./useWorldSeriesPractice";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
 
 // Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
-export const STREAM_POLL_INTERVAL_MS = 7000;
+export const STREAM_POLL_INTERVAL_MS = 1800;
 
 export type StreamStanding = LeaderboardEntry & {
   players: string[];
@@ -91,6 +91,7 @@ function buildSignature(
     tournament?.config?.championTeamId != null
       ? `${tournament.config.championTeamId}:${tournament.config.championDecidedAt ?? ""}`
       : "";
+  const broadcastKey = tournament?.config?.broadcastMatchId ?? "-";
   const roster = teams
     .map(
       (team) =>
@@ -128,7 +129,7 @@ function buildSignature(
           .join("/")}`
     )
     .join("|");
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}:${matchRows}`;
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${broadcastKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}:${matchRows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
@@ -167,7 +168,7 @@ export function useStreamLeaderboard(
 
   useEffect(() => {
     let active = true;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchOnce() {
       try {
@@ -279,12 +280,16 @@ export function useStreamLeaderboard(
       }
     }
 
-    void fetchOnce();
-    timer = setInterval(() => void fetchOnce(), pollMs);
+    async function poll() {
+      await fetchOnce();
+      if (active) timer = setTimeout(() => void poll(), pollMs);
+    }
+
+    void poll();
 
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
   }, [preferredTournamentId, pollMs]);
 

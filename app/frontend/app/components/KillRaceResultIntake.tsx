@@ -14,6 +14,10 @@ import {
   buildManualKillRacePreview,
   getProjectedSeriesScore,
 } from "../../lib/killRaceIntake.mjs";
+import {
+  clearKillRaceDraft,
+  getManualKillsFromMap,
+} from "../../lib/killRaceDraftState.mjs";
 
 type Source = "txt" | "csv" | "manual";
 type Props = { match: Match; leftTeam: Team; rightTeam: Team; onChanged: () => Promise<unknown> };
@@ -31,7 +35,9 @@ export default function KillRaceResultIntake({ match, leftTeam, rightTeam, onCha
   const mapNumber = nextMap;
   const [content, setContent] = useState("");
   const [source, setSource] = useState<Source>("manual");
-  const [manualKills, setManualKills] = useState<Record<number, string>>({});
+  const [manualKills, setManualKills] = useState<Record<number, string>>(() =>
+    getManualKillsFromMap(match.maps.find((item) => item.map_number === nextMap))
+  );
   const [preview, setPreview] = useState<KillRaceImportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -105,8 +111,11 @@ export default function KillRaceResultIntake({ match, leftTeam, rightTeam, onCha
     setBusy(true);
     try {
       await confirmKillRaceResult(match.id, mapNumber);
+      const emptyDraft = clearKillRaceDraft();
       setMessage("Resultado confirmado. El mapa quedó cerrado y la serie fue actualizada.");
-      setPreview(null);
+      setManualKills(emptyDraft.manualKills);
+      setContent(emptyDraft.content);
+      setPreview(emptyDraft.preview);
       await onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No se pudo confirmar.");

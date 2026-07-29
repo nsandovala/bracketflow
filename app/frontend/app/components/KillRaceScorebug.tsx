@@ -18,7 +18,7 @@ export default function KillRaceScorebug({ tournamentId, match, teams, connected
   if (!match) {
     return (
       <main className="kr-scorebug-stage">
-        <div className="kr-scorebug is-empty">Esperando una serie jugable</div>
+        <div className="kr-scorebug is-empty">Sin serie al aire</div>
       </main>
     );
   }

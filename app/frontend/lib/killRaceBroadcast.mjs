@@ -38,13 +38,7 @@ export function resolveKillRaceScorebugMatch(matches, explicitMatchId, broadcast
   }
   const broadcast = matches.find((match) => match.id === broadcastMatchId);
   if (broadcast && (isPlayable(broadcast) || broadcast.maps.length > 0)) return broadcast;
-  return (
-    matches.find((match) =>
-      isPlayable(match) && match.maps.some((map) => map.result_status === "live" || map.result_status === "provisional")
-    ) ??
-    matches.find(isPlayable) ??
-    null
-  );
+  return null;
 }
 
 export function killRaceVisualKey(tournamentId, match) {

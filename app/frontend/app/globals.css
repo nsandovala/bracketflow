@@ -10861,7 +10861,8 @@ a:focus-visible {
 .kr-operator-series > .opr-panel { margin: 0; }
 
 .kr-intake { display: grid; gap: 12px; margin-top: 14px; }
-.kr-intake-section { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--amon-line); border-radius: 14px; background: rgba(3, 7, 12, .38); }
+.kr-intake-section { display: grid; gap: 12px; padding: 14px 4px; border: 0; border-top: 1px solid rgba(255,255,255,.07); border-radius: 0; background: transparent; }
+.kr-intake-section:first-child { border-top: 0; }
 .kr-intake-section-head { display: flex; align-items: center; gap: 10px; }
 .kr-intake-section-head > span { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--amon-gold-line); border-radius: 50%; color: var(--amon-gold-hi); font-size: .7rem; font-weight: 900; }
 .kr-intake-section-head > div { display: grid; gap: 2px; }
@@ -10895,7 +10896,7 @@ a:focus-visible {
 .kr-preview-meta strong { color: var(--amon-gold-hi); font-size: .7rem; }
 .kr-preview-empty { margin: 0; color: var(--amon-muted); font-size: .78rem; }
 .kr-errors { margin: 0; padding-left: 18px; }
-.kr-official-actions { border-color: rgba(255,211,110,.22); }
+.kr-official-actions { padding: 14px; border: 1px solid rgba(255,211,110,.22); border-radius: 12px; background: rgba(255,211,110,.025); }
 .kr-intake-message { margin: 0; color: var(--amon-text); font-size: .78rem; }
 .kr-confirm-button { min-height: 38px; padding: 0 14px; border: 1px solid rgba(255,108,108,.45); border-radius: 9px; background: rgba(116,25,25,.34); color: #ffd3d3; font-weight: 900; cursor: pointer; }
 .kr-confirm-button:disabled { cursor: not-allowed; opacity: .42; }
@@ -10924,13 +10925,26 @@ a:focus-visible {
 .kr-scorebug-series i { padding: 0 6px; color: var(--amon-gold-hi); font-style: normal; }
 @keyframes kr-scorebug-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
 
-.kr-scorebug { width: min(65vw, 1060px); min-width: 760px; max-height: 110px; }
+.kr-scorebug { box-sizing: border-box; width: min(65vw, 1060px); min-width: 760px; min-height: 110px; max-height: none; overflow: visible; }
+.kr-scorebug-team footer { min-height: 18px; padding-bottom: 1px; line-height: 1.35; }
 .kr-broadcast-state { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .kr-broadcast-state span { padding: 5px 8px; border: 1px solid var(--amon-line); border-radius: 999px; color: var(--amon-muted); font-size: .65rem; }
 .kr-broadcast-state b { color: var(--amon-gold-hi); }
 .bf-bracket-view.is-compact .bf-rb-seed { min-width: 250px; }
 .bf-bracket-view.is-compact .bf-rb-team { min-height: 44px; padding: 7px 9px; }
 .bf-bracket-view.is-compact .bf-rb-seed-head { padding: 7px 9px; }
+.bf-kr-player-table { display: grid; gap: 2px; }
+.bf-kr-player-row { display: grid; grid-template-columns: 40px minmax(120px, 1.2fr) minmax(120px, 1fr) 70px 70px 80px 110px; align-items: center; min-width: 0; border-bottom: 1px solid rgba(255,255,255,.07); color: var(--amon-muted); }
+.bf-kr-player-row > span { min-width: 0; padding: 9px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bf-kr-player-row.is-head { color: var(--amon-muted); font-size: .66rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.bf-kr-player-row.is-active { background: rgba(255,211,110,.06); color: var(--amon-text); }
+.bf-kr-player-open { width: 100%; padding: 5px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--amon-text); font: inherit; font-weight: 800; text-align: left; cursor: pointer; }
+.bf-kr-player-open:hover { background: rgba(255,255,255,.05); }
+.bf-kr-player-open:focus-visible { outline: 2px solid var(--amon-gold-hi); outline-offset: 2px; }
+.bf-kr-player-detail { display: grid; gap: 12px; padding: 14px; border: 1px solid rgba(255,211,110,.2); border-radius: 10px; background: rgba(3,7,12,.42); }
+.bf-kr-player-detail > header { display: flex; justify-content: space-between; gap: 16px; }
+.bf-kr-player-detail h3, .bf-kr-player-detail p { margin: 0; }
+.bf-kr-player-detail header > div:first-child > span { color: var(--amon-gold-hi); font-size: .67rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 
 .bf-stream-bracket-page.bf-stream-transparent,
 .bf-stream-bracket-page.bf-stream-transparent .bf-stream-stage,

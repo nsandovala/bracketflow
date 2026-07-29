@@ -10,6 +10,10 @@ import {
 } from "../lib/killRaceBroadcast.mjs";
 import { buildKillRaceCasterState } from "../lib/killRaceCasterState.mjs";
 import {
+  clearKillRaceDraft,
+  getManualKillsFromMap,
+} from "../lib/killRaceDraftState.mjs";
+import {
   buildManualKillRacePreview,
   getProjectedSeriesScore,
 } from "../lib/killRaceIntake.mjs";
@@ -40,16 +44,16 @@ test("invalid explicit match returns an honest empty state", () => {
   assert.equal(resolveKillRaceScorebugMatch([match(1, null)], 999, 1), null);
 });
 
-test("follow operator uses broadcast then provisional then next playable", () => {
+test("follow operator exclusively uses broadcastMatchId", () => {
   assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, "provisional")], null, 1).id, 1);
-  assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, "provisional")], null, null).id, 2);
+  assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, "provisional")], null, null), null);
 });
 
 test("caster analytics use confirmed maps only, deduplicate maps and preserve MVP ties", () => {
   const confirmed = {
     ...match(7, "confirmed"),
     maps: [{
-      id: 77, map_number: 1, result_status: "confirmed",
+      id: 77, map_number: 1, result_status: "confirmed", kills_a: 14, kills_b: 0,
       player_stats: [
         { player_id: 1, player_name: "Vito", side: "left", kills: 7 },
         { player_id: 2, player_name: "Jasfa", side: "left", kills: 7 },
@@ -69,8 +73,96 @@ test("caster analytics use confirmed maps only, deduplicate maps and preserve MV
     broadcastMatchId: 8,
   });
   assert.equal(state.confirmedMapCount, 1);
+  assert.equal(state.teamTotals.find((team) => team.teamId === 1).kills, 14);
   assert.deepEqual(state.mvp.map((player) => player.playerName), ["Jasfa", "Vito"]);
   assert.equal(state.broadcastMatch.id, 8);
+});
+
+test("team totals survive confirmed maps without individual stats", () => {
+  const state = buildKillRaceCasterState({
+    matches: [{
+      ...match(9, "confirmed"),
+      maps: [{ id: 90, result_status: "confirmed", kills_a: 12, kills_b: 9, player_stats: [] }],
+    }],
+    teams: [{ id: 1, name: "Left" }, { id: 2, name: "Right" }],
+  });
+  assert.deepEqual(state.teamTotals.map((team) => team.kills), [12, 9]);
+  assert.deepEqual(state.mvp, []);
+});
+
+test("provisional maps do not change official caster analytics", () => {
+  const state = buildKillRaceCasterState({
+    matches: [{
+      ...match(9, "provisional"),
+      maps: [{
+        id: 91, result_status: "provisional", kills_a: 99, kills_b: 88,
+        player_stats: [{ player_id: 1, player_name: "Vito", side: "left", kills: 99 }],
+      }],
+    }],
+  });
+  assert.equal(state.confirmedMapCount, 0);
+  assert.deepEqual(state.teamTotals, []);
+  assert.deepEqual(state.mvp, []);
+});
+
+test("final tournament retains confirmed team and MVP analytics", () => {
+  const state = buildKillRaceCasterState({
+    matches: [{
+      ...match(10, "confirmed"), next_match_id: null, winner_id: 1, status: "completed",
+      maps: [{
+        id: 100, result_status: "confirmed", kills_a: 8, kills_b: 6,
+        player_stats: [{ player_id: 1, player_name: "Vito", side: "left", kills: 8 }],
+      }],
+    }],
+    teams: [{ id: 1, name: "Champions" }, { id: 2, name: "Runners-up" }],
+  });
+  assert.equal(state.champion.name, "Champions");
+  assert.equal(state.teamTotals[0].kills, 8);
+  assert.equal(state.mvp[0].playerName, "Vito");
+});
+
+test("player view model exposes stable identity, confirmed breakdown, average and MVP tie", () => {
+  const state = buildKillRaceCasterState({
+    matches: [{
+      ...match(12, "confirmed"),
+      maps: [
+        {
+          id: 120, map_number: 1, result_status: "confirmed", kills_a: 5, kills_b: 5,
+          player_stats: [
+            { player_id: 7, player_name: "EndGameX", side: "left", kills: 5 },
+            { player_id: 7, player_name: "EndGameX", side: "right", kills: 5 },
+          ],
+        },
+        {
+          id: 121, map_number: 2, result_status: "provisional", kills_a: 99, kills_b: 99,
+          player_stats: [{ player_id: 7, player_name: "EndGameX", side: "left", kills: 99 }],
+        },
+      ],
+    }],
+    teams: [{ id: 1, name: "Left" }, { id: 2, name: "Right" }],
+  });
+  assert.equal(state.playerRanking.length, 2);
+  assert.notEqual(state.playerRanking[0].playerKey, state.playerRanking[1].playerKey);
+  for (const player of state.playerRanking) {
+    assert.equal(player.confirmedKills, 5);
+    assert.equal(player.confirmedMapCount, 1);
+    assert.equal(player.averageKills, 5);
+    assert.equal(player.rank, 1);
+    assert.equal(player.isMvp, true);
+    assert.equal(player.isTiedMvp, true);
+    assert.deepEqual(player.mapBreakdown, [{ matchId: 12, mapNumber: 1, kills: 5 }]);
+  }
+});
+
+test("provisional draft reloads, confirmed draft clears and matches do not inherit values", () => {
+  const provisional = {
+    result_status: "provisional",
+    player_stats: [{ player_id: 7, kills: 5 }, { player_id: 8, kills: 4 }],
+  };
+  assert.deepEqual(getManualKillsFromMap(provisional), { 7: "5", 8: "4" });
+  assert.deepEqual(getManualKillsFromMap({ ...provisional, result_status: "confirmed" }), {});
+  assert.deepEqual(getManualKillsFromMap(undefined), {});
+  assert.deepEqual(clearKillRaceDraft(), { manualKills: {}, content: "", preview: null });
 });
 
 test("preview calculates player total and exposes provisional state", () => {
