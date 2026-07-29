@@ -1752,7 +1752,7 @@ export default function WorldSeriesOperator({
   }
 
   return (
-    <main className="bf-page bf-page-operator">
+    <main className={`bf-page bf-page-operator${isKillRace ? " is-kill-race" : ""}`}>
       <div className="opr-amb" aria-hidden="true" />
 
       {!isKillRace && matchPointStatus.state !== "idle" ? (
@@ -2006,18 +2006,21 @@ export default function WorldSeriesOperator({
             </div>
           </div>
 
-          {mode === "bracket" || mode === "op" ? (
-            <BracketView
-              tournament={selectedTournament}
-              engine={selectedEngine}
-              teams={teams}
-              matches={matches}
-              mode="operator"
-              actions={bracketViewActions}
-            />
-          ) : null}
-
-          {mode !== "setup" ? (
+          {mode !== "setup" ? <div className="kr-operator-cockpit">
+            <div className="kr-operator-bracket">
+              <BracketView
+                tournament={selectedTournament}
+                engine={selectedEngine}
+                teams={teams}
+                matches={matches}
+                mode="operator"
+                actions={bracketViewActions}
+                activeMatchId={activeMatch?.id ?? null}
+                onSelectMatch={onSelectKillRaceMatch}
+              />
+            </div>
+            <aside className="kr-operator-series">
+          {
             activeMatch && activeMatchTeamA && activeMatchTeamB ? (
               <section className="opr-panel">
                 <div className="opr-eyebrow">Serie actual</div>
@@ -2064,6 +2067,7 @@ export default function WorldSeriesOperator({
                   </div>
                 ) : (
                   <KillRaceResultIntake
+                    key={activeMatch.id}
                     match={activeMatch}
                     leftTeam={activeMatchTeamA}
                     rightTeam={activeMatchTeamB}
@@ -2086,7 +2090,9 @@ export default function WorldSeriesOperator({
                             </span>
                           </div>
                           <span className="r">
-                            {map.map_winner_id === activeMatch.team_a_id
+                            {map.result_status !== "confirmed"
+                              ? `${map.result_status === "provisional" ? "Provisional" : "En vivo"} · no suma a la serie`
+                              : map.map_winner_id === activeMatch.team_a_id
                               ? `Gana ${activeMatchTeamALabel}`
                               : `Gana ${activeMatchTeamBLabel}`}
                           </span>
@@ -2160,7 +2166,9 @@ export default function WorldSeriesOperator({
                 ) : null}
               </section>
             )
-          ) : null}
+          }
+            </aside>
+          </div> : null}
 
           {mode === "setup" ? (
             selectedEngine ? (

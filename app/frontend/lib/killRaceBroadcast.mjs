@@ -22,6 +22,8 @@ export function selectKillRaceScorebugMatch(matches) {
 
 export function killRaceVisualKey(tournamentId, match) {
   return `${tournamentId ?? "-"}:${match?.id ?? "-"}:${(match?.maps ?? [])
-    .map((map) => `${map.map_number}:${map.result_status}:${map.kills_a}-${map.kills_b}`)
+    .map((map) => `${map.map_number}:${map.result_status}:${map.kills_a}-${map.kills_b}:${(map.player_stats ?? [])
+      .map((stat) => `${stat.player_id}=${stat.kills}`)
+      .join(",")}`)
     .join("|")}`;
 }

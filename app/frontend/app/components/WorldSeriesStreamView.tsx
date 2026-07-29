@@ -18,6 +18,7 @@ import {
   getMatchPointStatusMessage,
 } from "../../lib/tournamentStatus";
 import { selectKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
+import { resolveStreamSurface } from "../../lib/streamRouting.mjs";
 
 export type StreamLayout =
   | "full"
@@ -27,6 +28,7 @@ export type StreamLayout =
   | "matchpoint"
   | "mvp"
   | "leaderboard"
+  | "bracket"
   | "scorebug";
 
 // Layouts que se anclan como overlay fijo transparente (browser source OBS).
@@ -74,6 +76,10 @@ export default function WorldSeriesStreamView({
     matchPointStatus.state === "champion"
       ? `Campeon por Match Point: ${matchPointStatus.championLabel}`
       : matchPointMessage ?? tournament?.game ?? "World Series";
+  const streamSurface = resolveStreamSurface(layout, {
+    isKillRace: engine?.scoringProfile === "kill_race",
+    isBracket,
+  });
 
   useEffect(() => {
     const body = document.body;
@@ -96,12 +102,20 @@ export default function WorldSeriesStreamView({
     };
   }, [transparent]);
 
-  if (engine?.scoringProfile === "kill_race" && layout === "scorebug") {
+  if (streamSurface === "scorebug") {
     const scorebugMatch = selectKillRaceScorebugMatch(matches);
-    return <KillRaceScorebug match={scorebugMatch} teams={teams} connected={connected} />;
+    return <KillRaceScorebug tournamentId={tournament?.id ?? tournamentId} match={scorebugMatch} teams={teams} connected={connected} />;
   }
 
-  if (isBracket) {
+  if (streamSurface === "unsupported-scorebug") {
+    return (
+      <main className="kr-scorebug-stage">
+        <div className="kr-scorebug is-empty">Scorebug disponible solo para Kill Race</div>
+      </main>
+    );
+  }
+
+  if (streamSurface === "bracket") {
     return (
       <BracketStreamView
         tournament={tournament}

@@ -25,11 +25,12 @@ import {
 } from "../../lib/identityResolver";
 import BroadcastSetup from "./BroadcastSetup";
 import CasterContextInspector from "./CasterContextInspector";
+import { getCompatibleOverlayLayouts } from "../../lib/streamRouting.mjs";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
 type OverlayDefinition = {
-  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard";
+  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard" | "scorebug" | "bracket";
   title: string;
   description: string;
   note?: string;
@@ -67,6 +68,21 @@ const OVERLAYS: OverlayDefinition[] = [
     layout: "leaderboard",
     title: "Leaderboard",
     description: "Tabla completa para escenas de análisis y cierre de ronda.",
+    transparent: true,
+  },
+];
+
+const KILL_RACE_OVERLAYS: OverlayDefinition[] = [
+  {
+    layout: "scorebug",
+    title: "Kill Race Scorebug",
+    description: "Marcador compacto de serie y kills individuales para el multistream 2x2.",
+    transparent: true,
+  },
+  {
+    layout: "bracket",
+    title: "Bracket",
+    description: "Llave completa read-only para una escena independiente de OBS.",
     transparent: true,
   },
 ];
@@ -148,6 +164,14 @@ export default function CasterHub() {
 
   const engine = selectedTournament ? selectedEngine ?? resolveTournamentEngine(selectedTournament) : null;
   const isBracket = engine?.primaryView === "bracket";
+  const isKillRace = engine?.scoringProfile === "kill_race";
+  const compatibleLayouts = getCompatibleOverlayLayouts({
+    isKillRace,
+    supportsMatchPoint: Boolean(engine?.supportsMatchPoint),
+  });
+  const compatibleOverlays = (isKillRace ? KILL_RACE_OVERLAYS : OVERLAYS).filter((overlay) =>
+    compatibleLayouts.includes(overlay.layout)
+  );
   const standings = sortedStandings.map((entry) => ({
     ...entry,
     team_name: teams.find((team) => team.id === entry.team_id)?.name ?? entry.team_name,
@@ -412,10 +436,12 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-overlay-list">
-                {OVERLAYS.map((overlay) => {
+                {compatibleOverlays.map((overlay) => {
                   const url = getOverlayUrl(selectedTournament.id, overlay);
                   const status = copyState?.key === overlay.layout ? copyState.status : null;
-                  const isRecommended = overlay.layout === broadcastSetup.defaultLayout;
+                  const isRecommended = isKillRace
+                    ? overlay.layout === "scorebug"
+                    : overlay.layout === broadcastSetup.defaultLayout;
                   return (
                     <article
                       className={`bf-caster-overlay${isRecommended ? " is-recommended" : ""}`}
@@ -443,7 +469,7 @@ export default function CasterHub() {
                     </article>
                   );
                 })}
-                <article className="bf-caster-overlay bf-caster-overlay-dark">
+                {!isKillRace ? <article className="bf-caster-overlay bf-caster-overlay-dark">
                   <div className="bf-caster-overlay-copy">
                     <h3>Leaderboard dark</h3>
                     <p>Escena de leaderboard a pantalla completa con fondo oscuro.</p>
@@ -468,7 +494,7 @@ export default function CasterHub() {
                       Open overlay
                     </button>
                   </div>
-                </article>
+                </article> : null}
               </div>
             </section>
 

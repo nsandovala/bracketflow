@@ -20,6 +20,7 @@ import {
   type ReactBracketSeed,
   toBracketRounds,
 } from "../../lib/toBracketRounds";
+import { getBracketFitScale, isBracketMatchSelectable } from "../../lib/bracketInteraction.mjs";
 
 type BracketViewProps = {
   tournament: Tournament | null;
@@ -28,6 +29,8 @@ type BracketViewProps = {
   matches: Match[];
   mode: "setup" | "stream" | "operator" | "standings";
   actions?: ReactNode;
+  activeMatchId?: number | null;
+  onSelectMatch?: (matchId: number) => void;
 };
 
 function SeedContent({ seed }: { seed: ReactBracketSeed }) {
@@ -75,8 +78,20 @@ function SeedContent({ seed }: { seed: ReactBracketSeed }) {
   );
 }
 
-function renderSeed(props: IRenderSeedProps) {
+function renderSeed(
+  props: IRenderSeedProps,
+  options: {
+    activeMatchId: number | null;
+    selectable: boolean;
+    onSelect?: (matchId: number) => void;
+  }
+) {
   const seed = props.seed as ReactBracketSeed;
+  const isActive = seed.matchId === options.activeMatchId;
+
+  function select() {
+    if (options.selectable) options.onSelect?.(seed.matchId);
+  }
 
   return (
     <Seed
@@ -85,7 +100,27 @@ function renderSeed(props: IRenderSeedProps) {
       style={{ padding: "14px 18px" }}
     >
       <SeedItem style={{ background: "transparent", boxShadow: "none" }}>
-        <SeedContent seed={seed} />
+        <div
+          className={[
+            "bf-rb-seed-control",
+            isActive ? "is-active" : "",
+            options.selectable ? "is-selectable" : "is-readonly",
+          ].join(" ")}
+          role={options.selectable ? "button" : undefined}
+          tabIndex={options.selectable ? 0 : undefined}
+          aria-current={isActive ? "true" : undefined}
+          aria-disabled={options.selectable ? undefined : true}
+          onClick={select}
+          onKeyDown={(event) => {
+            if (options.selectable && (event.key === "Enter" || event.key === " ")) {
+              event.preventDefault();
+              select();
+            }
+          }}
+        >
+          {isActive ? <span className="bf-rb-current-label">Serie actual</span> : null}
+          <SeedContent seed={seed} />
+        </div>
       </SeedItem>
     </Seed>
   );
@@ -210,10 +245,13 @@ export default function BracketView({
   matches,
   mode,
   actions,
+  activeMatchId = null,
+  onSelectMatch,
 }: BracketViewProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const rounds = toBracketRounds(matches, teams, engine?.teamSize ?? 2);
+  const matchById = new Map(matches.map((match) => [match.id, match]));
   const hasTeams = teams.length > 0;
   const hasMatches = matches.length > 0;
   const champion = findChampion(matches, teams);
@@ -240,11 +278,7 @@ export default function BracketView({
     if (!board) return;
     const contentWidth = board.scrollWidth;
     const containerWidth = board.clientWidth;
-    if (contentWidth > containerWidth) {
-      setScale(Math.max(0.55, containerWidth / contentWidth));
-    } else {
-      setScale(1);
-    }
+    setScale(getBracketFitScale(contentWidth, containerWidth));
   }
 
   function handleReset() {
@@ -310,7 +344,17 @@ export default function BracketView({
                 bracketClassName="bf-rb-root"
                 roundClassName="bf-rb-round"
                 roundTitleComponent={renderRoundTitle}
-                renderSeedComponent={renderSeed}
+                renderSeedComponent={(props) => {
+                  const seed = props.seed as ReactBracketSeed;
+                  const match = matchById.get(seed.matchId);
+                  return renderSeed(props, {
+                    activeMatchId,
+                    selectable: match
+                      ? isBracketMatchSelectable(match, mode, Boolean(onSelectMatch))
+                      : false,
+                    onSelect: onSelectMatch,
+                  });
+                }}
               />
             </div>
           </div>

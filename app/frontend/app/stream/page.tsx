@@ -21,6 +21,7 @@ function parseLayout(value: string | null): StreamLayout {
     value === "matchpoint" ||
     value === "mvp" ||
     value === "leaderboard" ||
+    value === "bracket" ||
     value === "scorebug"
   ) {
     return value;

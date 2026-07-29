@@ -1,47 +1,83 @@
 "use client";
 
 import { Match, Team } from "../../lib/api";
-import { getKillRaceBroadcastStatus } from "../../lib/killRaceBroadcast.mjs";
+import {
+  calculatePlayerTotal,
+  getKillRaceBroadcastStatus,
+  killRaceVisualKey,
+} from "../../lib/killRaceBroadcast.mjs";
 
-type Props = { match: Match | null; teams: Team[]; connected: boolean };
+type Props = {
+  tournamentId: number | null;
+  match: Match | null;
+  teams: Team[];
+  connected: boolean;
+};
 
-function side(match: Match, teams: Team[], value: "left" | "right") {
-  const teamId = value === "left" ? match.team_a_id : match.team_b_id;
+export default function KillRaceScorebug({ tournamentId, match, teams, connected }: Props) {
+  if (!match) {
+    return (
+      <main className="kr-scorebug-stage">
+        <div className="kr-scorebug is-empty">Esperando una serie jugable</div>
+      </main>
+    );
+  }
   const current =
     match.maps.find((item) => item.result_status !== "confirmed") ??
-    match.maps.slice().sort((a, b) => b.map_number - a.map_number)[0];
-  return {
-    name: teams.find((candidate) => candidate.id === teamId)?.name ?? "Por definir",
-    kills: value === "left" ? current?.kills_a ?? 0 : current?.kills_b ?? 0,
-    stats: current?.player_stats.filter((player) => player.side === value) ?? [],
-    map: current?.map_number ?? match.maps.length + 1,
-    status: current?.result_status ?? (match.status === "in_progress" ? "live" : "pending"),
-  };
-}
+    match.maps.slice().sort((a, b) => b.map_number - a.map_number)[0] ??
+    null;
+  const leftTeam = teams.find((team) => team.id === match.team_a_id);
+  const rightTeam = teams.find((team) => team.id === match.team_b_id);
+  const leftStats = current?.player_stats.filter((player) => player.side === "left") ?? [];
+  const rightStats = current?.player_stats.filter((player) => player.side === "right") ?? [];
+  const leftTotal = current ? calculatePlayerTotal(leftStats) : null;
+  const rightTotal = current ? calculatePlayerTotal(rightStats) : null;
+  const leader =
+    leftTotal === null || rightTotal === null || leftTotal === rightTotal
+      ? null
+      : leftTotal > rightTotal ? "left" : "right";
+  const status = getKillRaceBroadcastStatus(
+    current?.result_status ?? (match.status === "in_progress" ? "live" : "pending"),
+    connected
+  );
+  const visualKey = killRaceVisualKey(tournamentId, match);
 
-export default function KillRaceScorebug({ match, teams, connected }: Props) {
-  if (!match) {
-    return <main className="kr-scorebug-stage"><div className="kr-scorebug is-empty">Esperando serie</div></main>;
-  }
-  const left = side(match, teams, "left");
-  const right = side(match, teams, "right");
-  const status = getKillRaceBroadcastStatus(left.status, connected);
   return (
     <main className="kr-scorebug-stage" aria-label="Kill Race scorebug">
-      <section className="kr-scorebug">
-        <div className="kr-scorebug-side is-left">
-          <strong>{left.name}</strong>
-          <span>{left.stats.map((item) => `${item.player_name} ${item.kills}`).join(" · ") || "Sin desglose"}</span>
+      <section className="kr-scorebug" key={visualKey}>
+        <header className="kr-scorebug-head">
+          <span>PARTIDA {current?.map_number ?? match.maps.length + 1} · BO{match.best_of}</span>
+          <strong className={`is-${status.toLowerCase()}`}>{status}</strong>
+        </header>
+        <div className={`kr-scorebug-team is-left${leader === "left" ? " is-leading" : ""}`}>
+          <h2>{leftTeam?.name ?? "Por definir"}</h2>
+          <div className="kr-scorebug-player-list">
+            {(current ? leftStats : leftTeam?.members ?? []).map((entry) => {
+              const isStat = "player_name" in entry;
+              return <p key={isStat ? entry.player_id : entry.player.id}>
+                <span>{isStat ? entry.player_name : entry.player.nickname}</span>
+                <b>{isStat ? `${entry.kills} K` : "—"}</b>
+              </p>;
+            })}
+          </div>
+          <footer><span>TOTAL</span><b>{leftTotal === null ? "—" : `${leftTotal} K`}</b></footer>
         </div>
-        <b className="kr-scorebug-kills" key={`l-${left.kills}`}>{left.kills}<small>KILLS</small></b>
-        <div className="kr-scorebug-center">
-          <strong>{match.maps_won_a}–{match.maps_won_b}</strong>
-          <span>PARTIDA {left.map} · {status}</span>
+        <div className="kr-scorebug-series">
+          <span>SERIE</span>
+          <strong>{match.maps_won_a}<i>—</i>{match.maps_won_b}</strong>
         </div>
-        <b className="kr-scorebug-kills" key={`r-${right.kills}`}>{right.kills}<small>KILLS</small></b>
-        <div className="kr-scorebug-side is-right">
-          <strong>{right.name}</strong>
-          <span>{right.stats.map((item) => `${item.player_name} ${item.kills}`).join(" · ") || "Sin desglose"}</span>
+        <div className={`kr-scorebug-team is-right${leader === "right" ? " is-leading" : ""}`}>
+          <h2>{rightTeam?.name ?? "Por definir"}</h2>
+          <div className="kr-scorebug-player-list">
+            {(current ? rightStats : rightTeam?.members ?? []).map((entry) => {
+              const isStat = "player_name" in entry;
+              return <p key={isStat ? entry.player_id : entry.player.id}>
+                <span>{isStat ? entry.player_name : entry.player.nickname}</span>
+                <b>{isStat ? `${entry.kills} K` : "—"}</b>
+              </p>;
+            })}
+          </div>
+          <footer><span>TOTAL</span><b>{rightTotal === null ? "—" : `${rightTotal} K`}</b></footer>
         </div>
       </section>
     </main>
