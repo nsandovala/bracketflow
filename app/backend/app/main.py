@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import crud, schemas
+from .kill_race_import import PlayerRef, build_preview
 from .database import Base, engine, ensure_sqlite_schema, get_db
 from .ocr_provider import (
     OCR_IMAGE_MAX_BYTES,
@@ -681,6 +682,87 @@ def upsert_match_map(
         return crud.upsert_map_result(db, tournament, match, payload)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post(
+    "/matches/{match_id}/kill-race/import-preview",
+    response_model=schemas.KillRaceImportPreview,
+)
+def preview_kill_race_import(
+    match_id: int,
+    payload: schemas.KillRaceImportRequest,
+    db: Session = Depends(get_db),
+) -> schemas.KillRaceImportPreview:
+    match = crud.get_match(db, match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    tournament = get_tournament_or_404(db, match.tournament_id)
+    if crud.get_engine_key(tournament) != "kill_race_bracket":
+        raise HTTPException(status_code=400, detail="Solo disponible para Kill Race.")
+    if match.team_a_id is None or match.team_b_id is None:
+        raise HTTPException(status_code=409, detail="El match no tiene dos equipos listos.")
+    left = crud.get_team(db, match.team_a_id)
+    right = crud.get_team(db, match.team_b_id)
+    if left is None or right is None:
+        raise HTTPException(status_code=409, detail="No se pudieron resolver los equipos.")
+    players = [
+        PlayerRef(
+            id=member.player.id,
+            name=member.player.nickname,
+            team_id=team.id,
+            side=side,
+        )
+        for team, side in ((left, "left"), (right, "right"))
+        for member in team.members
+    ]
+    return build_preview(
+        format=payload.format,
+        content=payload.content,
+        match_id=match.id,
+        expected_map_number=payload.map_number,
+        left_team_id=left.id,
+        left_team_name=left.name,
+        right_team_id=right.id,
+        right_team_name=right.name,
+        players=players,
+    )
+
+
+@app.put("/matches/{match_id}/kill-race/result", response_model=schemas.Match)
+def update_kill_race_result(
+    match_id: int,
+    payload: schemas.KillRaceResultInput,
+    db: Session = Depends(get_db),
+) -> schemas.Match:
+    match = crud.get_match(db, match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    tournament = get_tournament_or_404(db, match.tournament_id)
+    ensure_tournament_is_mutable(tournament)
+    try:
+        return crud.upsert_kill_race_result(db, tournament, match, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/matches/{match_id}/kill-race/maps/{map_number}/confirm",
+    response_model=schemas.Match,
+)
+def confirm_kill_race_result(
+    match_id: int,
+    map_number: int,
+    db: Session = Depends(get_db),
+) -> schemas.Match:
+    match = crud.get_match(db, match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    tournament = get_tournament_or_404(db, match.tournament_id)
+    ensure_tournament_is_mutable(tournament)
+    try:
+        return crud.confirm_kill_race_result(db, tournament, match, map_number)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get(

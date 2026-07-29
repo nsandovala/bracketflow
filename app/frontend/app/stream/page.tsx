@@ -20,7 +20,8 @@ function parseLayout(value: string | null): StreamLayout {
     value === "lower-third" ||
     value === "matchpoint" ||
     value === "mvp" ||
-    value === "leaderboard"
+    value === "leaderboard" ||
+    value === "scorebug"
   ) {
     return value;
   }

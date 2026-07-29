@@ -123,8 +123,30 @@ class MatchMap(Base):
     kills_a: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     kills_b: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     map_winner_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+    result_status: Mapped[str] = mapped_column(String, nullable=False, default="confirmed")
 
     match: Mapped["Match"] = relationship("Match", back_populates="maps")
+    player_stats: Mapped[list["MatchMapPlayerStat"]] = relationship(
+        "MatchMapPlayerStat", back_populates="match_map", cascade="all, delete-orphan"
+    )
+
+
+class MatchMapPlayerStat(Base):
+    __tablename__ = "match_map_player_stats"
+    __table_args__ = (
+        UniqueConstraint("match_map_id", "player_id", name="uq_match_map_player"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    match_map_id: Mapped[int] = mapped_column(
+        ForeignKey("match_maps.id"), nullable=False, index=True
+    )
+    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), nullable=False)
+    side: Mapped[str] = mapped_column(String, nullable=False)
+    player_name: Mapped[str] = mapped_column(String, nullable=False)
+    kills: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    match_map: Mapped["MatchMap"] = relationship("MatchMap", back_populates="player_stats")
 
 
 class TeamResult(Base):

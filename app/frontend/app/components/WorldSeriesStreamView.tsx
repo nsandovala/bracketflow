@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import BackgroundParticles from "./BackgroundParticles";
 import BracketStreamView from "./BracketStreamView";
+import KillRaceScorebug from "./KillRaceScorebug";
 import StreamOverlayLeaderboard from "./StreamOverlayLeaderboard";
 import StreamOverlayLowerThird from "./StreamOverlayLowerThird";
 import StreamOverlayMatchPoint from "./StreamOverlayMatchPoint";
@@ -16,6 +17,7 @@ import {
   getMatchPointStatusFromPolicy,
   getMatchPointStatusMessage,
 } from "../../lib/tournamentStatus";
+import { selectKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
 
 export type StreamLayout =
   | "full"
@@ -24,7 +26,8 @@ export type StreamLayout =
   | "lower-third"
   | "matchpoint"
   | "mvp"
-  | "leaderboard";
+  | "leaderboard"
+  | "scorebug";
 
 // Layouts que se anclan como overlay fijo transparente (browser source OBS).
 const ANCHORED_LAYOUTS: StreamLayout[] = ["sidebar", "lower", "lower-third", "matchpoint", "mvp"];
@@ -92,6 +95,11 @@ export default function WorldSeriesStreamView({
       body.style.background = prevBodyBg;
     };
   }, [transparent]);
+
+  if (engine?.scoringProfile === "kill_race" && layout === "scorebug") {
+    const scorebugMatch = selectKillRaceScorebugMatch(matches);
+    return <KillRaceScorebug match={scorebugMatch} teams={teams} connected={connected} />;
+  }
 
   if (isBracket) {
     return (

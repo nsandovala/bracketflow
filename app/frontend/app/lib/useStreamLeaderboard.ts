@@ -84,7 +84,8 @@ function buildSignature(
   teams: Team[],
   standings: StreamStanding[],
   results: TeamResultDetail[],
-  afterGameNumber: number
+  afterGameNumber: number,
+  matches: Match[]
 ) {
   const championKey =
     tournament?.config?.championTeamId != null
@@ -114,7 +115,20 @@ function buildSignature(
   const policyKey = matchCompletionPolicy
     ? `${matchCompletionPolicy.state}:${matchCompletionPolicy.code}:${matchCompletionPolicy.matchPointThreshold ?? "-"}:${matchCompletionPolicy.championTeamId ?? "-"}`
     : "-";
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}`;
+  const matchRows = matches
+    .map(
+      (match) =>
+        `${match.id}:${match.status}:${match.maps_won_a}-${match.maps_won_b}:${match.maps
+          .map(
+            (map) =>
+              `${map.map_number}:${map.result_status}:${map.kills_a}-${map.kills_b}:${map.player_stats
+                .map((stat) => `${stat.player_id}=${stat.kills}`)
+                .join(",")}`
+          )
+          .join("/")}`
+    )
+    .join("|");
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}:${matchRows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
@@ -232,7 +246,8 @@ export function useStreamLeaderboard(
           teams,
           standings,
           results,
-          afterGameNumber
+          afterGameNumber,
+          matches
         );
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.

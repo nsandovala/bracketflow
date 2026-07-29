@@ -1370,6 +1370,10 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     saveTeamReport,
     saveOfficialReportFromDraft,
     saveKillRaceMap,
+    refreshSelectedTournament: () =>
+      selectedTournamentId === null
+        ? Promise.resolve()
+        : refreshSelectedTournament(selectedTournamentId),
     selectMatch: setSelectedMatchId,
   };
 }

@@ -214,6 +214,33 @@ export type MatchMap = {
   kills_a: number;
   kills_b: number;
   map_winner_id: number | null;
+  result_status: "pending" | "live" | "provisional" | "confirmed";
+  player_stats: KillRacePlayerStat[];
+};
+
+export type KillRacePlayerStat = {
+  player_id: number;
+  player_name: string;
+  side: "left" | "right";
+  kills: number;
+};
+
+export type KillRaceSideInput = {
+  side: "left" | "right";
+  team_id: number;
+  team_name: string;
+  players: Array<{ player_id: number; player_name: string; kills: number }>;
+  total_kills: number;
+};
+
+export type KillRaceImportPreview = {
+  valid: boolean;
+  match_id: number;
+  map_number: number | null;
+  left: KillRaceSideInput | null;
+  right: KillRaceSideInput | null;
+  errors: Array<{ code: string; message: string; row: number | null }>;
+  conflicts: Array<{ code: string; message: string; row: number | null }>;
 };
 
 export type TeamResultPlayerStat = {
@@ -525,6 +552,37 @@ export function generateRouletteTeams(
 
 export function getMatches(tournamentId: number) {
   return request<Match[]>(`/tournaments/${tournamentId}/matches`);
+}
+
+export function previewKillRaceImport(
+  matchId: number,
+  payload: { format: "txt" | "csv"; content: string; map_number: number }
+) {
+  return request<KillRaceImportPreview>(`/matches/${matchId}/kill-race/import-preview`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function saveKillRaceProvisional(
+  matchId: number,
+  payload: {
+    map_number: number;
+    status: "pending" | "live" | "provisional";
+    left: KillRaceSideInput;
+    right: KillRaceSideInput;
+  }
+) {
+  return request<Match>(`/matches/${matchId}/kill-race/result`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function confirmKillRaceResult(matchId: number, mapNumber: number) {
+  return request<Match>(`/matches/${matchId}/kill-race/maps/${mapNumber}/confirm`, {
+    method: "POST",
+  });
 }
 
 export function createBattleRoyaleMatch(
