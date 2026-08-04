@@ -111,6 +111,15 @@ export type Tournament = {
   config?: TournamentConfig;
 };
 
+export type BroadcastChannel = {
+  channelKey: string;
+  activeTournamentId: number | null;
+  broadcastMatchId: number | null;
+  engine: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+};
+
 export type MatchCompletionPolicyState =
   | "unsupported"
   | "disabled"
@@ -433,6 +442,20 @@ export function updateTournamentBroadcastMatch(
   return request<Tournament>(`/tournaments/${tournamentId}/broadcast-match`, {
     method: "PATCH",
     body: { broadcastMatchId },
+  });
+}
+
+export function getBroadcastChannel(channelKey = "main") {
+  return request<BroadcastChannel>(`/broadcast/channels/${encodeURIComponent(channelKey)}`);
+}
+
+export function updateBroadcastChannel(
+  channelKey: string,
+  payload: Partial<Omit<BroadcastChannel, "channelKey" | "updatedAt">>
+) {
+  return request<BroadcastChannel>(`/broadcast/channels/${encodeURIComponent(channelKey)}`, {
+    method: "PATCH",
+    body: payload,
   });
 }
 

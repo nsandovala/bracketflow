@@ -41,6 +41,7 @@ function OperatorPageClient() {
     resultDrafts,
     killRaceMapDrafts,
     broadcastMatchId,
+    broadcastChannel,
     sendMatchToBroadcast,
     updateResultDraft,
     updateKillRaceMapDraft,
@@ -150,6 +151,7 @@ function OperatorPageClient() {
       onUpdateKillRaceMapDraft={updateKillRaceMapDraft}
       onSelectKillRaceMatch={selectMatch}
       broadcastMatchId={broadcastMatchId}
+      broadcastChannel={broadcastChannel}
       onSendKillRaceMatchToBroadcast={sendMatchToBroadcast}
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);

@@ -42,6 +42,21 @@ class Tournament(Base):
     )
 
 
+class BroadcastChannel(Base):
+    __tablename__ = "broadcast_channels"
+
+    channel_key: Mapped[str] = mapped_column(String, primary_key=True)
+    active_tournament_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tournaments.id"), nullable=True, index=True
+    )
+    broadcast_match_id: Mapped[int | None] = mapped_column(
+        ForeignKey("matches.id"), nullable=True
+    )
+    engine: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_by: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class Player(Base):
     __tablename__ = "players"
 

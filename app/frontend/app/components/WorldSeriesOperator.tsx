@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import {
+  BroadcastChannel,
   Match,
   MatchCompletionPolicy,
   ParticipantImportResult,
@@ -113,6 +114,7 @@ type WorldSeriesOperatorProps = {
   onUpdateDraft: (matchId: number, teamId: number, patch: Partial<ResultDraft>) => void;
   onUpdateKillRaceMapDraft: (matchId: number, patch: Partial<KillRaceMapDraft>) => void;
   onSelectKillRaceMatch: (matchId: number | null) => void;
+  broadcastChannel: BroadcastChannel | null;
   broadcastMatchId: number | null;
   onSendKillRaceMatchToBroadcast: (matchId: number) => Promise<unknown>;
   onSaveTeamReport: (matchId: number, teamId: number) => void;
@@ -1481,6 +1483,7 @@ export default function WorldSeriesOperator({
   onLockBracketRespin,
   onUpdateDraft,
   onSelectKillRaceMatch,
+  broadcastChannel,
   broadcastMatchId,
   onSendKillRaceMatchToBroadcast,
   onSaveTeamReport,
@@ -2030,8 +2033,15 @@ export default function WorldSeriesOperator({
               <section className="opr-panel">
                 <div className="kr-broadcast-state">
                   <span><b>SERIE SELECCIONADA</b> Match {activeMatch.id}</span>
-                  <span><b>EN TRANSMISIÓN</b> {broadcastMatchId ? `Match ${broadcastMatchId}` : "Sin match"}</span>
+                  <span><b>EN TRANSMISIÓN</b> {broadcastMatchId ? `Match ${broadcastMatchId}` : "NO ESTÁ EN TRANSMISIÓN"}</span>
                 </div>
+                {broadcastChannel?.activeTournamentId !== selectedTournament?.id ? (
+                  <p className="bf-inline-error" role="alert">ESTE TORNEO NO ESTÁ AL AIRE EN EL CANAL MAIN.</p>
+                ) : broadcastMatchId !== null && broadcastMatchId !== activeMatch.id ? (
+                  <p className="bf-inline-error" role="alert">ATENCIÓN: editas el Match {activeMatch.id}, pero el Match {broadcastMatchId} está al aire.</p>
+                ) : broadcastMatchId === null ? (
+                  <p className="bf-inline-error" role="alert">NO ESTÁ EN TRANSMISIÓN. Usa “Enviar a transmisión” cuando la serie esté lista.</p>
+                ) : null}
                 <h2>{activeMatchTeamALabel} vs {activeMatchTeamBLabel}</h2>
                 <p className="sub">
                   Match {activeMatch.id} · Round {activeMatch.round} · BO{activeMatch.best_of} · Serie {activeMatch.maps_won_a}-{activeMatch.maps_won_b}

@@ -99,6 +99,22 @@ class TournamentBroadcastMatchUpdate(BaseModel):
     broadcastMatchId: int | None = Field(default=None, ge=1)
 
 
+class BroadcastChannelUpdate(BaseModel):
+    activeTournamentId: int | None = Field(default=None, ge=1)
+    broadcastMatchId: int | None = Field(default=None, ge=1)
+    engine: str | None = Field(default=None, max_length=80)
+    updatedBy: str | None = Field(default=None, max_length=120)
+
+
+class BroadcastChannel(BaseModel):
+    channelKey: str
+    activeTournamentId: int | None
+    broadcastMatchId: int | None
+    engine: str | None
+    updatedAt: str
+    updatedBy: str | None
+
+
 class Tournament(TournamentBase):
     id: int
     status: str

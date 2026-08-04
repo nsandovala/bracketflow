@@ -26,6 +26,11 @@ import {
   getCompatibleOverlayLayouts,
   resolveStreamSurface,
 } from "../lib/streamRouting.mjs";
+import {
+  getFollowOperatorOverlayUrl,
+  getOperatorTransmissionState,
+  resolveBroadcastContext,
+} from "../lib/broadcastChannel.mjs";
 
 const match = (id, status, killsA = 0) => ({
   id,
@@ -38,6 +43,40 @@ const match = (id, status, killsA = 0) => ({
 
 test("explicit scorebug match has priority over operator broadcast match", () => {
   assert.equal(resolveKillRaceScorebugMatch([match(1, null), match(2, null)], 2, 1).id, 2);
+});
+
+test("explicit match has priority over channel routing", () => {
+  assert.deepEqual(resolveBroadcastContext({
+    explicitTournamentId: 23,
+    explicitMatchId: 97,
+    channel: { activeTournamentId: 99, broadcastMatchId: 100 },
+  }), { tournamentId: 23, matchId: 97, source: "explicit" });
+});
+
+test("stable channel follows tournament and broadcast match switches without fallback", () => {
+  const first = resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: 23, broadcastMatchId: 97 } });
+  const switched = resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: 24, broadcastMatchId: 101 } });
+  const cleared = resolveBroadcastContext({ explicitTournamentId: 23, explicitMatchId: null, channel: { activeTournamentId: 24, broadcastMatchId: null } });
+  assert.deepEqual(first, { tournamentId: 23, matchId: 97, source: "channel" });
+  assert.deepEqual(switched, { tournamentId: 24, matchId: 101, source: "channel" });
+  assert.deepEqual(cleared, { tournamentId: 24, matchId: null, source: "channel" });
+});
+
+test("channel exposes honest empty tournament and match states", () => {
+  assert.deepEqual(resolveBroadcastContext({ explicitTournamentId: 23, explicitMatchId: null, channel: { activeTournamentId: null, broadcastMatchId: null } }), { tournamentId: null, matchId: null, source: "channel" });
+  assert.deepEqual(resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: 23, broadcastMatchId: null } }), { tournamentId: 23, matchId: null, source: "channel" });
+});
+
+test("operator warns when selected match differs from on-air match", () => {
+  assert.equal(getOperatorTransmissionState(98, { broadcastMatchId: 97 }).hasMismatch, true);
+  assert.equal(getOperatorTransmissionState(97, { broadcastMatchId: 97 }).isOnAir, true);
+  assert.equal(getOperatorTransmissionState(97, { broadcastMatchId: null }).hasBroadcast, false);
+});
+
+test("caster follow-operator URLs use channel main without tournamentId", () => {
+  const url = getFollowOperatorOverlayUrl("http://localhost:3000", "scorebug");
+  assert.match(url, /channel=main/);
+  assert.doesNotMatch(url, /tournamentId/);
 });
 
 test("invalid explicit match returns an honest empty state", () => {

@@ -33,6 +33,7 @@ function StreamPageClient() {
   const searchParams = useSearchParams();
   const tournamentId = parseTournamentId(searchParams.get("tournamentId"));
   const matchId = parseTournamentId(searchParams.get("matchId"));
+  const channel = searchParams.get("channel");
   const obs = searchParams.get("obs") === "1";
   const transparent = searchParams.get("bg") === "transparent";
   const brand = searchParams.get("brand");
@@ -42,6 +43,7 @@ function StreamPageClient() {
     <WorldSeriesStreamView
       tournamentId={tournamentId}
       matchId={matchId}
+      channel={channel}
       obs={obs}
       transparent={transparent}
       brand={brand}

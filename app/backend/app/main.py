@@ -64,6 +64,29 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/broadcast/channels/{channel_key}", response_model=schemas.BroadcastChannel)
+def get_broadcast_channel(
+    channel_key: str,
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        return crud.get_broadcast_channel(db, channel_key)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.patch("/broadcast/channels/{channel_key}", response_model=schemas.BroadcastChannel)
+def update_broadcast_channel(
+    channel_key: str,
+    payload: schemas.BroadcastChannelUpdate,
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        return crud.update_broadcast_channel(db, channel_key, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.get("/ocr/provider")
 def get_ocr_provider_status(
     provider: OcrExtractionProvider = Depends(get_ocr_provider),

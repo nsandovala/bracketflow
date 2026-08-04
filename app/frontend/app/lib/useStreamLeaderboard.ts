@@ -9,6 +9,8 @@ import {
   Team,
   TeamResultDetail,
   Tournament,
+  BroadcastChannel,
+  getBroadcastChannel,
   getLeaderboard,
   getIdentityPlayers,
   getIdentityTeams,
@@ -27,6 +29,7 @@ import {
 } from "../../lib/identityResolver";
 import { ACTIVE_WORLD_SERIES_TOURNAMENT_KEY } from "./useWorldSeriesPractice";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import { resolveBroadcastContext } from "../../lib/broadcastChannel.mjs";
 
 // Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
 export const STREAM_POLL_INTERVAL_MS = 1800;
@@ -46,6 +49,9 @@ export type StreamLeaderboardState = {
   afterGameNumber: number;
   connected: boolean;
   hasLoadedOnce: boolean;
+  channel: BroadcastChannel | null;
+  resolvedMatchId: number | null;
+  emptyReason: string | null;
 };
 
 // Mismo criterio de orden que el resto de la app (puntos, kills, best place, nombre).
@@ -149,6 +155,8 @@ async function resolveTournamentId(preferredId: number | null): Promise<number |
 
 export function useStreamLeaderboard(
   preferredTournamentId: number | null,
+  channelKey: string | null = null,
+  explicitMatchId: number | null = null,
   pollMs: number = STREAM_POLL_INTERVAL_MS
 ): StreamLeaderboardState {
   const [state, setState] = useState<StreamLeaderboardState>({
@@ -161,6 +169,9 @@ export function useStreamLeaderboard(
     afterGameNumber: 0,
     connected: false,
     hasLoadedOnce: false,
+    channel: null,
+    resolvedMatchId: explicitMatchId,
+    emptyReason: null,
   });
 
   // Firma del ultimo estado pintado: si el fetch nuevo coincide, no tocamos React.
@@ -172,7 +183,18 @@ export function useStreamLeaderboard(
 
     async function fetchOnce() {
       try {
-        const tournamentId = await resolveTournamentId(preferredTournamentId);
+        const channel = channelKey && explicitMatchId === null
+          ? await getBroadcastChannel(channelKey)
+          : null;
+        const fallbackTournamentId = channelKey
+          ? preferredTournamentId
+          : await resolveTournamentId(preferredTournamentId);
+        const context = resolveBroadcastContext({
+          explicitTournamentId: fallbackTournamentId,
+          explicitMatchId,
+          channel,
+        });
+        const tournamentId = context.tournamentId;
         if (tournamentId === null) {
           if (!active) return;
           setState((current) =>
@@ -188,6 +210,9 @@ export function useStreamLeaderboard(
                   afterGameNumber: 0,
                   connected: true,
                   hasLoadedOnce: true,
+                  channel,
+                  resolvedMatchId: context.matchId,
+                  emptyReason: channelKey ? "NO HAY TORNEO AL AIRE" : "Selecciona un torneo",
                 }
           );
           return;
@@ -241,7 +266,7 @@ export function useStreamLeaderboard(
           : results.length === 0
             ? 0
             : Math.max(...results.map((result) => result.round));
-        const nextSignature = buildSignature(
+        const nextSignature = `${buildSignature(
           tournament,
           matchCompletionPolicy,
           teams,
@@ -249,7 +274,7 @@ export function useStreamLeaderboard(
           results,
           afterGameNumber,
           matches
-        );
+        )}:${channel?.activeTournamentId ?? "-"}:${channel?.broadcastMatchId ?? "-"}:${channel?.updatedAt ?? "-"}`;
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.
         setState((current) => {
@@ -271,6 +296,9 @@ export function useStreamLeaderboard(
             afterGameNumber,
             connected: true,
             hasLoadedOnce: true,
+            channel,
+            resolvedMatchId: context.matchId,
+            emptyReason: channelKey && context.matchId === null ? "NO HAY MATCH AL AIRE" : null,
           };
         });
       } catch {
@@ -291,7 +319,7 @@ export function useStreamLeaderboard(
       active = false;
       if (timer) clearTimeout(timer);
     };
-  }, [preferredTournamentId, pollMs]);
+  }, [preferredTournamentId, channelKey, explicitMatchId, pollMs]);
 
   return state;
 }

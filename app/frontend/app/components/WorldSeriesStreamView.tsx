@@ -37,6 +37,7 @@ const ANCHORED_LAYOUTS: StreamLayout[] = ["sidebar", "lower", "lower-third", "ma
 type WorldSeriesStreamViewProps = {
   tournamentId: number | null;
   matchId: number | null;
+  channel: string | null;
   obs: boolean;
   transparent: boolean;
   brand: string | null;
@@ -46,6 +47,7 @@ type WorldSeriesStreamViewProps = {
 export default function WorldSeriesStreamView({
   tournamentId,
   matchId,
+  channel,
   obs,
   transparent,
   brand,
@@ -60,7 +62,9 @@ export default function WorldSeriesStreamView({
     results,
     afterGameNumber,
     connected,
-  } = useStreamLeaderboard(tournamentId);
+    resolvedMatchId,
+    emptyReason,
+  } = useStreamLeaderboard(tournamentId, channel, matchId);
   const engine = tournament ? resolveTournamentEngine(tournament) : null;
   const isBracket =
     engine?.scoringProfile === "kill_race" ||
@@ -104,10 +108,18 @@ export default function WorldSeriesStreamView({
     };
   }, [transparent]);
 
+  if (emptyReason) {
+    return (
+      <main className="kr-scorebug-stage">
+        <div className="kr-scorebug is-empty">{emptyReason}</div>
+      </main>
+    );
+  }
+
   if (streamSurface === "scorebug") {
     const scorebugMatch = resolveKillRaceScorebugMatch(
       matches,
-      matchId,
+      resolvedMatchId,
       tournament?.config?.broadcastMatchId ?? null
     );
     return <KillRaceScorebug tournamentId={tournament?.id ?? tournamentId} match={scorebugMatch} teams={teams} connected={connected} />;

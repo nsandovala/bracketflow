@@ -526,6 +526,94 @@ def update_tournament_broadcast_match(
     return tournament
 
 
+def _broadcast_channel_dict(channel: models.BroadcastChannel) -> dict:
+    return {
+        "channelKey": channel.channel_key,
+        "activeTournamentId": channel.active_tournament_id,
+        "broadcastMatchId": channel.broadcast_match_id,
+        "engine": channel.engine,
+        "updatedAt": channel.updated_at,
+        "updatedBy": channel.updated_by,
+    }
+
+
+def get_broadcast_channel(db: Session, channel_key: str) -> dict:
+    channel = db.get(models.BroadcastChannel, channel_key)
+    if channel is None and channel_key == "main":
+        channel = models.BroadcastChannel(
+            channel_key="main",
+            active_tournament_id=None,
+            broadcast_match_id=None,
+            engine=None,
+            updated_at=datetime.now(UTC).isoformat(),
+        )
+        db.add(channel)
+        db.commit()
+        db.refresh(channel)
+    if channel is None:
+        raise LookupError("Canal de transmisión no encontrado.")
+    return _broadcast_channel_dict(channel)
+
+
+def update_broadcast_channel(
+    db: Session,
+    channel_key: str,
+    payload: schemas.BroadcastChannelUpdate,
+) -> dict:
+    # model_fields_set distingue un campo omitido de un null intencional.
+    supplied = payload.model_fields_set
+    channel = db.get(models.BroadcastChannel, channel_key)
+    if channel is None:
+        channel = models.BroadcastChannel(
+            channel_key=channel_key,
+            active_tournament_id=None,
+            broadcast_match_id=None,
+            engine=None,
+            updated_at=datetime.now(UTC).isoformat(),
+        )
+        db.add(channel)
+
+    tournament_id = (
+        payload.activeTournamentId
+        if "activeTournamentId" in supplied
+        else channel.active_tournament_id
+    )
+    match_id = (
+        payload.broadcastMatchId
+        if "broadcastMatchId" in supplied
+        else channel.broadcast_match_id
+    )
+    # Cambiar de torneo sin indicar match nunca arrastra el match anterior.
+    if "activeTournamentId" in supplied and "broadcastMatchId" not in supplied:
+        match_id = None
+    tournament = None
+    if tournament_id is not None:
+        tournament = db.get(models.Tournament, tournament_id)
+        if tournament is None:
+            raise ValueError("El torneo indicado no existe.")
+    if match_id is not None:
+        match = db.get(models.Match, match_id)
+        if match is None:
+            raise ValueError("El match indicado no existe.")
+        if tournament_id is None or match.tournament_id != tournament_id:
+            raise ValueError("El match no pertenece al torneo activo del canal.")
+        update_tournament_broadcast_match(db, tournament, match_id)
+
+    channel.active_tournament_id = tournament_id
+    channel.broadcast_match_id = match_id
+    if "engine" in supplied:
+        channel.engine = payload.engine
+    elif "activeTournamentId" in supplied:
+        config = read_tournament_config(tournament) if tournament else {}
+        channel.engine = config.get("engine_key") if tournament else None
+    if "updatedBy" in supplied:
+        channel.updated_by = payload.updatedBy
+    channel.updated_at = datetime.now(UTC).isoformat()
+    db.commit()
+    db.refresh(channel)
+    return _broadcast_channel_dict(channel)
+
+
 def get_tournaments(db: Session) -> list[models.Tournament]:
     tournaments = (
         db.query(models.Tournament)

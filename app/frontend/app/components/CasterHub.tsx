@@ -27,6 +27,7 @@ import BroadcastSetup from "./BroadcastSetup";
 import CasterContextInspector from "./CasterContextInspector";
 import { getCompatibleOverlayLayouts } from "../../lib/streamRouting.mjs";
 import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
+import { getFollowOperatorOverlayUrl } from "../../lib/broadcastChannel.mjs";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
@@ -141,6 +142,7 @@ export default function CasterHub() {
     sortedStandings,
     tournamentResults: rawTournamentResults,
     selectedEngine,
+    broadcastChannel,
     selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
   const identityCatalog = useIdentityMetadata();
@@ -174,7 +176,13 @@ export default function CasterHub() {
   const compatibleOverlays = (isKillRace ? KILL_RACE_OVERLAYS : OVERLAYS).filter((overlay) =>
     compatibleLayouts.includes(overlay.layout)
   );
-  const broadcastMatchId = selectedTournament?.config?.broadcastMatchId ?? null;
+  const broadcastMatchId =
+    broadcastChannel?.activeTournamentId === selectedTournament?.id
+      ? broadcastChannel?.broadcastMatchId ?? null
+      : null;
+  const onAirTournament = tournaments.find(
+    (candidate) => candidate.id === broadcastChannel?.activeTournamentId
+  ) ?? null;
   const killRaceState = useMemo(
     () =>
       isKillRace
@@ -455,12 +463,14 @@ export default function CasterHub() {
 
           {isKillRace ? (
             <section className="bf-caster-context" aria-label="Match en transmisión">
-              <strong>EN TRANSMISIÓN</strong>
+              <strong>CANAL MAIN · EN TRANSMISIÓN</strong>
+              <span>Torneo: {onAirTournament?.name ?? "Ninguno"}</span>
               <span>
                 {killRaceState?.broadcastMatch
                   ? `Match ${killRaceState.broadcastMatch.id} · ${getMatchTeamLabel(killRaceState.broadcastMatch.team_a_id!)} vs ${getMatchTeamLabel(killRaceState.broadcastMatch.team_b_id!)}`
                   : "Sin serie enviada por Operator"}
               </span>
+              <span>Engine: {broadcastChannel?.engine ?? "Sin engine"}</span>
             </section>
           ) : null}
 
@@ -476,7 +486,9 @@ export default function CasterHub() {
 
               <div className="bf-caster-overlay-list">
                 {compatibleOverlays.map((overlay) => {
-                  const url = getOverlayUrl(selectedTournament.id, overlay);
+                  const url = isKillRace
+                    ? getFollowOperatorOverlayUrl(STREAM_ORIGIN, overlay.layout)
+                    : getOverlayUrl(selectedTournament.id, overlay);
                   const status = copyState?.key === overlay.layout ? copyState.status : null;
                   const isRecommended = isKillRace
                     ? overlay.layout === "scorebug"
@@ -494,6 +506,7 @@ export default function CasterHub() {
                           )}
                         </h3>
                         <p>{overlay.description}</p>
+                        {isKillRace ? <small className="bf-caster-overlay-note">Follow operator · canal main</small> : null}
                         {overlay.note && <small className="bf-caster-overlay-note">{overlay.note}</small>}
                         <code>{url}</code>
                       </div>

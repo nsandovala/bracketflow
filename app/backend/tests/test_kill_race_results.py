@@ -10,6 +10,8 @@ from app.crud import (
     get_match,
     read_tournament_config,
     update_tournament_broadcast_match,
+    get_broadcast_channel,
+    update_broadcast_channel,
     upsert_kill_race_result,
 )
 from app.database import Base
@@ -189,3 +191,42 @@ def test_broadcast_match_rejects_completed_and_foreign_match(db, kill_race):
     db.commit()
     with pytest.raises(ValueError, match="no pertenece"):
         update_tournament_broadcast_match(db, tournament, foreign.id)
+
+
+def test_main_broadcast_channel_is_persistent_and_merge_safe(db, kill_race):
+    tournament, match, *_ = kill_race
+    initial = get_broadcast_channel(db, "main")
+    assert initial["channelKey"] == "main"
+    assert initial["activeTournamentId"] is None
+
+    updated = update_broadcast_channel(db, "main", schemas.BroadcastChannelUpdate(
+        activeTournamentId=tournament.id,
+        broadcastMatchId=match.id,
+        engine="kill_race_bracket",
+        updatedBy="operator",
+    ))
+    merged = update_broadcast_channel(db, "main", schemas.BroadcastChannelUpdate(updatedBy="caster"))
+    assert merged["activeTournamentId"] == tournament.id
+    assert merged["broadcastMatchId"] == match.id
+    assert merged["engine"] == "kill_race_bracket"
+    assert merged["updatedBy"] == "caster"
+    assert merged["updatedAt"] >= updated["updatedAt"]
+
+
+def test_channel_tournament_switch_clears_previous_match(db, kill_race):
+    tournament, match, *_ = kill_race
+    update_broadcast_channel(db, "main", schemas.BroadcastChannelUpdate(
+        activeTournamentId=tournament.id, broadcastMatchId=match.id,
+    ))
+    other = models.Tournament(
+        name="Other channel tournament", game="Warzone", format="roulette_2v2",
+        team_size=2, scoring_profile="kill_race", status="active",
+        bracket_status="locked", config='{"engine_key":"kill_race_bracket"}',
+    )
+    db.add(other)
+    db.commit()
+    switched = update_broadcast_channel(
+        db, "main", schemas.BroadcastChannelUpdate(activeTournamentId=other.id)
+    )
+    assert switched["activeTournamentId"] == other.id
+    assert switched["broadcastMatchId"] is None

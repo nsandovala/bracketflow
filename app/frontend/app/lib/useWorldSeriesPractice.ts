@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ApiError,
+  BroadcastChannel,
   LeaderboardEntry,
   Match,
   MatchCompletionPolicy,
@@ -24,6 +25,7 @@ import {
   generateBracket,
   generateRouletteTeams,
   getHealth,
+  getBroadcastChannel,
   getLeaderboard,
   getMatchCompletionPolicy,
   getMatches,
@@ -41,7 +43,7 @@ import {
   saveMatchMap,
   saveMatchResult,
   updateTournament,
-  updateTournamentBroadcastMatch,
+  updateBroadcastChannel,
 } from "../../lib/api";
 import {
   ENGINE_PRESETS,
@@ -161,6 +163,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
   const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
+  const [broadcastChannel, setBroadcastChannel] = useState<BroadcastChannel | null>(null);
   const [matchCompletionPolicy, setMatchCompletionPolicy] =
     useState<MatchCompletionPolicy | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -307,6 +310,24 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     return () => window.clearTimeout(timeoutId);
   }, [refreshSelectedTournament, selectedTournamentId]);
 
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    async function pollChannel() {
+      try {
+        const channel = await getBroadcastChannel("main");
+        if (active) setBroadcastChannel(channel);
+      } finally {
+        if (active) timer = setTimeout(() => void pollChannel(), 1800);
+      }
+    }
+    void pollChannel();
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
   function selectTournament(tournamentId: number) {
     persistTournamentId(tournamentId);
     setSelectedTournamentId(tournamentId);
@@ -344,7 +365,14 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     if (selectedTournamentId === null) return null;
     setSubmitting(true);
     try {
-      const updated = await updateTournamentBroadcastMatch(selectedTournamentId, matchId);
+      const engine = selectedTournament ? resolveTournamentEngine(selectedTournament) : null;
+      const channel = await updateBroadcastChannel("main", {
+        activeTournamentId: selectedTournamentId,
+        broadcastMatchId: matchId,
+        engine: engine?.engineKey ?? null,
+      });
+      setBroadcastChannel(channel);
+      const updated = await getTournament(selectedTournamentId);
       setSelectedTournament(updated);
       setMessage(`Match ${matchId} enviado a transmisión.`);
       return updated;
@@ -1349,7 +1377,8 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
     pendingTeams,
     sortedStandings,
     selectedMatchId,
-    broadcastMatchId: selectedTournament?.config?.broadcastMatchId ?? null,
+    broadcastChannel,
+    broadcastMatchId: broadcastChannel?.broadcastMatchId ?? null,
     resultDrafts,
     killRaceMapDrafts,
     reportsLoaded,
