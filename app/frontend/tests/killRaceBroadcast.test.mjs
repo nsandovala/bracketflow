@@ -24,6 +24,7 @@ import {
 } from "../lib/bracketInteraction.mjs";
 import {
   getCompatibleOverlayLayouts,
+  resolveBracketPresentation,
   resolveStreamSurface,
 } from "../lib/streamRouting.mjs";
 import {
@@ -31,6 +32,10 @@ import {
   getOperatorTransmissionState,
   resolveBroadcastContext,
 } from "../lib/broadcastChannel.mjs";
+import {
+  buildKillRaceBracketBroadcast,
+  getKillRaceBracketLayout,
+} from "../lib/killRaceBracketBroadcast.mjs";
 
 const match = (id, status, killsA = 0) => ({
   id,
@@ -308,4 +313,247 @@ test("Kill Race and standings engines expose only compatible overlays", () => {
     ["sidebar", "lower-third", "matchpoint", "mvp", "leaderboard"]);
   assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: false, supportsMatchPoint: false }),
     ["sidebar", "lower-third", "mvp", "leaderboard"]);
+});
+
+const bracketTeam = (id) => ({
+  id,
+  name: `Team ${id}`,
+  tournament_id: 91,
+  source: "manual",
+  members: [{ id, team_id: id, player_id: id, player: { id, nickname: `Player ${id}` } }],
+});
+
+function bracketMatch(id, round, teamAId, teamBId, nextMatchId = null, nextSlot = null) {
+  return {
+    id,
+    round,
+    status: teamAId && teamBId ? "ready" : "waiting_opponent",
+    team_a_id: teamAId,
+    team_b_id: teamBId,
+    winner_id: null,
+    best_of: 3,
+    next_match_id: nextMatchId,
+    next_slot: nextSlot,
+    tournament_id: 91,
+    maps: [],
+    maps_won_a: 0,
+    maps_won_b: 0,
+  };
+}
+
+function sourceRoundsFor(matches, teams) {
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  const totalRounds = Math.max(...matches.map((entry) => entry.round));
+  const titleFor = (round) => round === totalRounds ? "Final" : round === totalRounds - 1 ? "Semifinal" : "Cuartos";
+  return Array.from({ length: totalRounds }, (_, index) => {
+    const round = index + 1;
+    return {
+      title: titleFor(round),
+      seeds: matches.filter((entry) => entry.round === round).map((entry) => {
+        const makeTeam = (teamId, side) => {
+          const team = teamsById.get(teamId);
+          if (team) {
+            return {
+              id: String(team.id), name: team.name, roster: team.members[0].player.nickname,
+              score: side === "a" ? entry.maps_won_a : entry.maps_won_b,
+              stateLabel: entry.winner_id === team.id ? "Ganador" : entry.winner_id ? "Eliminado" : "Listo",
+              isBye: false, isEmpty: false, isFuture: false,
+              isWinner: entry.winner_id === team.id,
+              isLoser: entry.winner_id !== null && entry.winner_id !== team.id,
+            };
+          }
+          const feeder = matches.find((candidate) => candidate.next_match_id === entry.id && candidate.next_slot === side);
+          const isBye = entry.round === 1 && Boolean(side === "a" ? entry.team_b_id : entry.team_a_id);
+          return {
+            id: `${isBye ? "bye" : "future"}-${entry.id}-${side}`,
+            name: isBye ? "Pasa directo" : "Esperando ganador",
+            roster: isBye ? "Libre por seed" : feeder ? `Ganador M${feeder.id}` : "Pendiente",
+            score: null, stateLabel: isBye ? "No jugable" : "Pendiente",
+            isBye, isEmpty: !isBye && !feeder, isFuture: Boolean(feeder),
+            isWinner: false, isLoser: false,
+          };
+        };
+        return {
+          id: entry.id,
+          matchId: entry.id,
+          matchLabel: `Match ${entry.id}`,
+          bestOf: entry.best_of,
+          status: entry.status,
+          statusLabel: "Pendiente",
+          statusTone: "ready",
+          teams: [makeTeam(entry.team_a_id, "a"), makeTeam(entry.team_b_id, "b")],
+        };
+      }),
+    };
+  });
+}
+
+function bracketFixture(teamCount) {
+  const teams = Array.from({ length: teamCount }, (_, index) => bracketTeam(index + 1));
+  const matches = teamCount <= 4
+    ? [
+        bracketMatch(1, 1, 1, 4, 3, "a"),
+        bracketMatch(2, 1, 2, 3, 3, "b"),
+        bracketMatch(3, 2, null, null),
+      ]
+    : [
+        bracketMatch(1, 1, 1, 8 <= teamCount ? 8 : null, 5, "a"),
+        bracketMatch(2, 1, 4, 5, 5, "b"),
+        bracketMatch(3, 1, 2, 7 <= teamCount ? 7 : null, 6, "a"),
+        bracketMatch(4, 1, 3, 6, 6, "b"),
+        bracketMatch(5, 2, null, null, 7, "a"),
+        bracketMatch(6, 2, null, null, 7, "b"),
+        bracketMatch(7, 3, null, null),
+      ];
+  const tournament = { id: 91, name: `${teamCount} Teams Cup`, status: "active" };
+  return { tournament, teams, matches, sourceRounds: sourceRoundsFor(matches, teams) };
+}
+
+function buildBracketModel(teamCount, overrides = {}) {
+  return buildKillRaceBracketBroadcast({ ...bracketFixture(teamCount), ...overrides });
+}
+
+test("P4: 4 teams produce rounds 2/1", () => {
+  assert.deepEqual(buildBracketModel(4).rounds.map((round) => round.seeds.length), [2, 1]);
+});
+
+test("P4: 6 teams preserve the 4/2/1 structure and BYEs", () => {
+  const model = buildBracketModel(6);
+  assert.deepEqual(model.rounds.map((round) => round.seeds.length), [4, 2, 1]);
+  assert.equal(model.rounds[0].seeds.filter((series) => series.isBye).length, 2);
+});
+
+test("P4: 8 teams produce rounds 4/2/1", () => {
+  assert.deepEqual(buildBracketModel(8).rounds.map((round) => round.seeds.length), [4, 2, 1]);
+});
+
+test("P4: broadcastMatchId marks exactly one series", () => {
+  const model = buildBracketModel(8, { broadcastMatchId: 2 });
+  assert.equal(model.rounds.flatMap((round) => round.seeds).filter((series) => series.isBroadcast).length, 1);
+  assert.equal(model.broadcastMatchId, 2);
+});
+
+test("P4: a non-broadcast in-progress match stays live without becoming on-air", () => {
+  const fixture = bracketFixture(8);
+  fixture.matches[0].status = "in_progress";
+  fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+  const model = buildKillRaceBracketBroadcast({ ...fixture, broadcastMatchId: 2 });
+  const live = model.rounds.flatMap((round) => round.seeds).find((series) => series.matchId === 1);
+  assert.equal(live.isLive, true);
+  assert.equal(live.isBroadcast, false);
+  assert.equal(live.statusLabel, "EN JUEGO");
+});
+
+test("P4: the broadcast match can be ready, live or completed", () => {
+  for (const status of ["ready", "in_progress", "completed"]) {
+    const fixture = bracketFixture(4);
+    fixture.matches[0].status = status;
+    if (status === "completed") fixture.matches[0].winner_id = 1;
+    fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+    const model = buildKillRaceBracketBroadcast({ ...fixture, broadcastMatchId: 1 });
+    const selected = model.rounds[0].seeds[0];
+    assert.equal(selected.isBroadcast, true);
+    assert.equal(selected.statusLabel, "EN TRANSMISIÓN");
+  }
+});
+
+test("P4: an invalid broadcast id never selects a fallback", () => {
+  const model = buildBracketModel(8, { broadcastMatchId: 999 });
+  assert.equal(model.broadcastMatchId, null);
+  assert.equal(model.broadcastSeries, null);
+  assert.equal(model.rounds.flatMap((round) => round.seeds).some((series) => series.isBroadcast), false);
+});
+
+test("P4: provisional data neither advances a team nor declares a winner", () => {
+  const fixture = bracketFixture(4);
+  fixture.matches[0].status = "in_progress";
+  fixture.matches[0].maps = [{ id: 1, map_number: 1, result_status: "provisional", kills_a: 99, kills_b: 1, map_winner_id: 1, player_stats: [] }];
+  fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+  const model = buildKillRaceBracketBroadcast(fixture);
+  assert.equal(model.rounds[0].seeds[0].winnerId, null);
+  assert.equal(model.rounds[1].seeds[0].leftTeam.isFuture, true);
+  assert.equal(model.champion, null);
+});
+
+test("P4: completed series uses winner_id", () => {
+  const fixture = bracketFixture(4);
+  Object.assign(fixture.matches[0], { status: "completed", winner_id: 4, maps_won_a: 0, maps_won_b: 2 });
+  fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+  const series = buildKillRaceBracketBroadcast(fixture).rounds[0].seeds[0];
+  assert.equal(series.winnerId, 4);
+  assert.equal(series.rightTeam.isWinner, true);
+  assert.equal(series.mapsWonB, 2);
+});
+
+test("P4: a completed final resolves the champion", () => {
+  const fixture = bracketFixture(4);
+  Object.assign(fixture.matches[2], { status: "completed", team_a_id: 1, team_b_id: 2, winner_id: 1, maps_won_a: 2, maps_won_b: 1 });
+  fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+  assert.deepEqual(buildKillRaceBracketBroadcast(fixture).champion, { teamId: 1, name: "Team 1", score: "2–1", matchId: 3 });
+});
+
+test("P4: an incomplete tournament never declares a champion", () => {
+  assert.equal(buildBracketModel(4).champion, null);
+});
+
+test("P4: BYEs do not count as played series", () => {
+  const model = buildBracketModel(6);
+  assert.equal(model.totalSeries, 5);
+  assert.equal(model.completedSeries, 0);
+});
+
+test("P4: four-team scale is larger than eight-team scale", () => {
+  const four = getKillRaceBracketLayout({ roundCount: 2, maxMatchesInRound: 2, viewportWidth: 1920, viewportHeight: 1080 });
+  const eight = getKillRaceBracketLayout({ roundCount: 3, maxMatchesInRound: 4, viewportWidth: 1920, viewportHeight: 1080 });
+  assert.ok(four.scale > eight.scale);
+});
+
+test("P4: adaptive scale never drops below its readable minimum", () => {
+  const layout = getKillRaceBracketLayout({ roundCount: 5, maxMatchesInRound: 16, viewportWidth: 640, viewportHeight: 480 });
+  assert.equal(layout.scale, layout.minimumScale);
+  assert.equal(layout.minimumScale, 0.72);
+});
+
+test("P4: 4, 6 and 8 teams do not request overflow at broadcast viewports", () => {
+  for (const viewport of [[1920, 1080], [1366, 768]]) {
+    const four = getKillRaceBracketLayout({ roundCount: 2, maxMatchesInRound: 2, viewportWidth: viewport[0], viewportHeight: viewport[1] });
+    const six = getKillRaceBracketLayout({ roundCount: 3, maxMatchesInRound: 4, viewportWidth: viewport[0], viewportHeight: viewport[1] });
+    const eight = getKillRaceBracketLayout({ roundCount: 3, maxMatchesInRound: 4, viewportWidth: viewport[0], viewportHeight: viewport[1] });
+    assert.equal(four.requestsOverflow || six.requestsOverflow || eight.requestsOverflow, false);
+  }
+});
+
+test("P4: visualKey reacts to winner, score and broadcastMatchId", () => {
+  const fixture = bracketFixture(4);
+  const initial = buildKillRaceBracketBroadcast(fixture).visualKey;
+  fixture.matches[0].winner_id = 1;
+  fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+  const winner = buildKillRaceBracketBroadcast(fixture).visualKey;
+  fixture.matches[0].maps_won_a = 1;
+  fixture.sourceRounds = sourceRoundsFor(fixture.matches, fixture.teams);
+  const score = buildKillRaceBracketBroadcast(fixture).visualKey;
+  const broadcast = buildKillRaceBracketBroadcast({ ...fixture, broadcastMatchId: 1 }).visualKey;
+  assert.notEqual(initial, winner);
+  assert.notEqual(winner, score);
+  assert.notEqual(score, broadcast);
+});
+
+test("P4: visualKey is stable for an equivalent cloned payload", () => {
+  const fixture = bracketFixture(8);
+  const first = buildKillRaceBracketBroadcast(fixture).visualKey;
+  const clone = structuredClone(fixture);
+  assert.equal(buildKillRaceBracketBroadcast(clone).visualKey, first);
+});
+
+test("P4: explicit URL context retains priority and bracket routing stays stable", () => {
+  assert.deepEqual(resolveBroadcastContext({
+    explicitTournamentId: 91,
+    explicitMatchId: 7,
+    channel: { activeTournamentId: 92, broadcastMatchId: 8 },
+  }), { tournamentId: 91, matchId: 7, source: "explicit" });
+  assert.equal(resolveStreamSurface("bracket", { isKillRace: true, isBracket: true }), "bracket");
+  assert.equal(resolveStreamSurface("bracket", { isKillRace: null, isBracket: false }), "bracket");
+  assert.equal(resolveStreamSurface("bracket", { isKillRace: false, isBracket: false }), "standings");
+  assert.equal(resolveBracketPresentation("kill_race"), "kill-race-broadcast");
+  assert.equal(resolveBracketPresentation("custom"), "bracket-view");
 });

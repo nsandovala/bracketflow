@@ -91,13 +91,14 @@ function buildSignature(
   standings: StreamStanding[],
   results: TeamResultDetail[],
   afterGameNumber: number,
-  matches: Match[]
+  matches: Match[],
+  resolvedMatchId: number | null
 ) {
   const championKey =
     tournament?.config?.championTeamId != null
       ? `${tournament.config.championTeamId}:${tournament.config.championDecidedAt ?? ""}`
       : "";
-  const broadcastKey = tournament?.config?.broadcastMatchId ?? "-";
+  const broadcastKey = resolvedMatchId ?? "-";
   const roster = teams
     .map(
       (team) =>
@@ -125,10 +126,10 @@ function buildSignature(
   const matchRows = matches
     .map(
       (match) =>
-        `${match.id}:${match.status}:${match.maps_won_a}-${match.maps_won_b}:${match.maps
+        `${match.id}:${match.round}:${match.status}:${match.team_a_id ?? "-"}:${match.team_b_id ?? "-"}:${match.winner_id ?? "-"}:${match.maps_won_a}-${match.maps_won_b}:${match.next_match_id ?? "-"}:${match.next_slot ?? "-"}:${match.maps
           .map(
             (map) =>
-              `${map.map_number}:${map.result_status}:${map.kills_a}-${map.kills_b}:${map.player_stats
+              `${map.id}:${map.map_number}:${map.result_status}:${map.map_winner_id ?? "-"}:${map.kills_a}-${map.kills_b}:${map.player_stats
                 .map((stat) => `${stat.player_id}=${stat.kills}`)
                 .join(",")}`
           )
@@ -273,8 +274,9 @@ export function useStreamLeaderboard(
           standings,
           results,
           afterGameNumber,
-          matches
-        )}:${channel?.activeTournamentId ?? "-"}:${channel?.broadcastMatchId ?? "-"}:${channel?.updatedAt ?? "-"}`;
+          matches,
+          context.matchId
+        )}:${channel?.activeTournamentId ?? "-"}:${channel?.broadcastMatchId ?? "-"}`;
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.
         setState((current) => {

@@ -2,8 +2,10 @@
 
 import BackgroundParticles from "./BackgroundParticles";
 import BracketView from "./BracketView";
+import KillRaceBracketBroadcast from "./KillRaceBracketBroadcast";
 import type { Match, Team, Tournament } from "../../lib/api";
 import type { ResolvedTournamentEngine } from "../../lib/tournamentModel";
+import { resolveBracketPresentation } from "../../lib/streamRouting.mjs";
 
 type BracketStreamViewProps = {
   tournament: Tournament | null;
@@ -14,6 +16,7 @@ type BracketStreamViewProps = {
   obs: boolean;
   transparent: boolean;
   brand: string | null;
+  broadcastMatchId: number | null;
 };
 
 export default function BracketStreamView({
@@ -25,7 +28,22 @@ export default function BracketStreamView({
   obs,
   transparent,
   brand,
+  broadcastMatchId,
 }: BracketStreamViewProps) {
+  if (resolveBracketPresentation(engine?.scoringProfile ?? null) === "kill-race-broadcast") {
+    return (
+      <KillRaceBracketBroadcast
+        tournament={tournament}
+        engine={engine}
+        teams={teams}
+        matches={matches}
+        broadcastMatchId={broadcastMatchId}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
   const pageClassName = [
     "bf-stream-page",
     "bf-stream-bracket-page",

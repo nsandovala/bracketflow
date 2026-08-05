@@ -153,7 +153,7 @@ export default function WorldSeriesStreamView({
     );
   }
 
-  if (emptyReason) {
+  if (emptyReason && streamSurface !== "bracket") {
     return (
       <main className="kr-scorebug-stage">
         <div className="kr-scorebug is-empty">{emptyReason}</div>
@@ -189,6 +189,7 @@ export default function WorldSeriesStreamView({
         obs={obs || layout !== "full"}
         transparent={transparent}
         brand={brand}
+        broadcastMatchId={resolvedMatchId}
       />
     );
   }

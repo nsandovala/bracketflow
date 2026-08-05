@@ -13,3 +13,6 @@ export function getCompatibleOverlayLayouts(capabilities: {
   isKillRace: boolean;
   supportsMatchPoint: boolean;
 }): string[];
+export function resolveBracketPresentation(
+  scoringProfile: string | null
+): "kill-race-broadcast" | "bracket-view";
