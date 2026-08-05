@@ -13,4 +13,9 @@ export function getOperatorTransmissionState(selectedMatchId: number | null, cha
   hasMismatch: boolean;
   hasBroadcast: boolean;
 };
-export function getFollowOperatorOverlayUrl(origin: string, layout: string, channelKey?: string): string;
+export function getFollowOperatorOverlayUrl(
+  origin: string,
+  layout: string,
+  channelKey?: string,
+  transparent?: boolean
+): string;

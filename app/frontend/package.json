@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/casterInspectorState.test.mjs tests/playerBroadcastProfile.test.mjs tests/teamResolution.test.mjs tests/ocrImageExtraction.test.mjs tests/ocrImageDraftReview.test.mjs tests/killRaceBroadcast.test.mjs"
+    "test": "node --test tests/casterInspectorState.test.mjs tests/playerBroadcastProfile.test.mjs tests/teamResolution.test.mjs tests/ocrImageExtraction.test.mjs tests/ocrImageDraftReview.test.mjs tests/killRaceBroadcast.test.mjs tests/killRaceIntermission.test.mjs"
   },
   "dependencies": {
     "next": "16.2.7",

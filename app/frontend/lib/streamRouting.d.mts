@@ -1,7 +1,13 @@
-export type StreamSurface = "scorebug" | "unsupported-scorebug" | "bracket" | "standings";
+export type StreamSurface =
+  | "scorebug"
+  | "unsupported-scorebug"
+  | "intermission"
+  | "unsupported-intermission"
+  | "bracket"
+  | "standings";
 export function resolveStreamSurface(
   layout: string,
-  capabilities: { isKillRace: boolean; isBracket: boolean }
+  capabilities: { isKillRace: boolean | null; isBracket: boolean }
 ): StreamSurface;
 export function getCompatibleOverlayLayouts(capabilities: {
   isKillRace: boolean;

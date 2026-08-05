@@ -4,6 +4,9 @@ import { useEffect } from "react";
 
 import BackgroundParticles from "./BackgroundParticles";
 import BracketStreamView from "./BracketStreamView";
+import KillRaceIntermission, {
+  KillRaceIntermissionUnavailable,
+} from "./KillRaceIntermission";
 import KillRaceScorebug from "./KillRaceScorebug";
 import StreamOverlayLeaderboard from "./StreamOverlayLeaderboard";
 import StreamOverlayLowerThird from "./StreamOverlayLowerThird";
@@ -18,6 +21,8 @@ import {
   getMatchPointStatusMessage,
 } from "../../lib/tournamentStatus";
 import { resolveKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
+import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
+import { buildKillRaceIntermission } from "../../lib/killRaceIntermission.mjs";
 import { resolveStreamSurface } from "../../lib/streamRouting.mjs";
 
 export type StreamLayout =
@@ -29,7 +34,8 @@ export type StreamLayout =
   | "mvp"
   | "leaderboard"
   | "bracket"
-  | "scorebug";
+  | "scorebug"
+  | "intermission";
 
 // Layouts que se anclan como overlay fijo transparente (browser source OBS).
 const ANCHORED_LAYOUTS: StreamLayout[] = ["sidebar", "lower", "lower-third", "matchpoint", "mvp"];
@@ -62,6 +68,7 @@ export default function WorldSeriesStreamView({
     results,
     afterGameNumber,
     connected,
+    channel: broadcastChannel,
     resolvedMatchId,
     emptyReason,
   } = useStreamLeaderboard(tournamentId, channel, matchId);
@@ -82,8 +89,9 @@ export default function WorldSeriesStreamView({
     matchPointStatus.state === "champion"
       ? `Campeon por Match Point: ${matchPointStatus.championLabel}`
       : matchPointMessage ?? tournament?.game ?? "World Series";
+  const isKillRace = engine?.scoringProfile === "kill_race";
   const streamSurface = resolveStreamSurface(layout, {
-    isKillRace: engine?.scoringProfile === "kill_race",
+    isKillRace: engine ? isKillRace : null,
     isBracket,
   });
 
@@ -107,6 +115,43 @@ export default function WorldSeriesStreamView({
       body.style.background = prevBodyBg;
     };
   }, [transparent]);
+
+  if (streamSurface === "intermission") {
+    const broadcastMatch =
+      resolvedMatchId === null
+        ? null
+        : matches.find((match) => match.id === resolvedMatchId) ?? null;
+    const killRaceCasterState = buildKillRaceCasterState({
+      matches,
+      teams,
+      broadcastMatchId: resolvedMatchId,
+    });
+    const viewModel = buildKillRaceIntermission({
+      tournament,
+      selectedEngine: engine,
+      broadcastChannel,
+      broadcastMatch,
+      teams,
+      matches,
+      killRaceCasterState,
+    });
+    return (
+      <KillRaceIntermission
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "unsupported-intermission") {
+    return (
+      <KillRaceIntermissionUnavailable
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
 
   if (emptyReason) {
     return (

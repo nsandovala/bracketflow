@@ -303,7 +303,7 @@ test("scorebug routing never falls through to bracket and bracket remains explic
 });
 
 test("Kill Race and standings engines expose only compatible overlays", () => {
-  assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: true, supportsMatchPoint: false }), ["scorebug", "bracket"]);
+  assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: true, supportsMatchPoint: false }), ["scorebug", "intermission", "bracket"]);
   assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: false, supportsMatchPoint: true }),
     ["sidebar", "lower-third", "matchpoint", "mvp", "leaderboard"]);
   assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: false, supportsMatchPoint: false }),

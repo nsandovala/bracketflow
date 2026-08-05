@@ -22,7 +22,13 @@ export function getOperatorTransmissionState(selectedMatchId, channel) {
   };
 }
 
-export function getFollowOperatorOverlayUrl(origin, layout, channelKey = "main") {
-  const query = new URLSearchParams({ channel: channelKey, layout, obs: "1", bg: "transparent" });
+export function getFollowOperatorOverlayUrl(
+  origin,
+  layout,
+  channelKey = "main",
+  transparent = true
+) {
+  const query = new URLSearchParams({ channel: channelKey, layout, obs: "1" });
+  if (transparent) query.set("bg", "transparent");
   return `${origin}/stream?${query.toString()}`;
 }

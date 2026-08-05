@@ -22,7 +22,8 @@ function parseLayout(value: string | null): StreamLayout {
     value === "mvp" ||
     value === "leaderboard" ||
     value === "bracket" ||
-    value === "scorebug"
+    value === "scorebug" ||
+    value === "intermission"
   ) {
     return value;
   }

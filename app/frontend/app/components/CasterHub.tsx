@@ -32,11 +32,12 @@ import { getFollowOperatorOverlayUrl } from "../../lib/broadcastChannel.mjs";
 const STREAM_ORIGIN = "http://localhost:3000";
 
 type OverlayDefinition = {
-  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard" | "scorebug" | "bracket";
+  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard" | "scorebug" | "intermission" | "bracket";
   title: string;
   description: string;
   note?: string;
   transparent: boolean;
+  transparentOption?: boolean;
 };
 
 const OVERLAYS: OverlayDefinition[] = [
@@ -78,8 +79,16 @@ const KILL_RACE_OVERLAYS: OverlayDefinition[] = [
   {
     layout: "scorebug",
     title: "Kill Race Scorebug",
-    description: "Marcador compacto de serie y kills individuales para el multistream 2x2.",
+    description: "Marcador compacto de serie y kills individuales para gameplay.",
     transparent: true,
+  },
+  {
+    layout: "intermission",
+    title: "Intermission",
+    description: "Escena de pausa con enfrentamiento, último mapa y jugador destacado.",
+    note: "ESCENA ENTRE PARTIDAS",
+    transparent: false,
+    transparentOption: true,
   },
   {
     layout: "bracket",
@@ -487,8 +496,22 @@ export default function CasterHub() {
               <div className="bf-caster-overlay-list">
                 {compatibleOverlays.map((overlay) => {
                   const url = isKillRace
-                    ? getFollowOperatorOverlayUrl(STREAM_ORIGIN, overlay.layout)
+                    ? getFollowOperatorOverlayUrl(
+                        STREAM_ORIGIN,
+                        overlay.layout,
+                        "main",
+                        overlay.transparent
+                      )
                     : getOverlayUrl(selectedTournament.id, overlay);
+                  const transparentUrl =
+                    isKillRace && overlay.transparentOption
+                      ? getFollowOperatorOverlayUrl(
+                          STREAM_ORIGIN,
+                          overlay.layout,
+                          "main",
+                          true
+                        )
+                      : null;
                   const status = copyState?.key === overlay.layout ? copyState.status : null;
                   const isRecommended = isKillRace
                     ? overlay.layout === "scorebug"
@@ -512,11 +535,20 @@ export default function CasterHub() {
                       </div>
                       <div className="bf-caster-overlay-actions">
                         <button type="button" onClick={() => void handleCopy(overlay.layout, url)}>
-                          {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copy URL"}
+                          {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copiar URL"}
                         </button>
                         <button type="button" className="is-open" onClick={() => openOverlay(url)}>
-                          Open overlay
+                          Abrir overlay
                         </button>
+                        {transparentUrl && (
+                          <button
+                            type="button"
+                            className="is-secondary"
+                            onClick={() => void handleCopy(`${overlay.layout}-transparent`, transparentUrl)}
+                          >
+                            Copiar transparente
+                          </button>
+                        )}
                       </div>
                     </article>
                   );
