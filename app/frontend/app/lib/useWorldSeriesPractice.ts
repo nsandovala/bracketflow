@@ -55,8 +55,17 @@ import {
 } from "../../lib/tournamentModel";
 import { getTeamDisplayName } from "../../lib/tournamentStatus";
 import { validateManualPlayerStats } from "../../lib/manualPlayerStats";
+import {
+  normalizeStandingsPollMs,
+  runSequentialPollCycle,
+} from "../../lib/killRaceStandings.mjs";
 
 export const ACTIVE_WORLD_SERIES_TOURNAMENT_KEY = "bf:world-series-practice:tournament-id";
+export const STANDINGS_POLL_INTERVAL_MS = 1800;
+
+type WorldSeriesPracticeOptions = {
+  pollMs?: number;
+};
 
 export type ResultDraft = {
   kills: string;
@@ -155,7 +164,53 @@ function getKillRaceOperableMatches(matches: Match[]) {
   );
 }
 
-export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
+function buildPracticeDataSignature(
+  tournament: Tournament,
+  teams: Team[],
+  matches: Match[]
+) {
+  const rosterSignature = [...teams]
+    .sort((left, right) => left.id - right.id)
+    .map(
+      (team) =>
+        `${team.id}:${team.name}:${[...(team.members ?? [])]
+          .sort((left, right) => left.player_id - right.player_id)
+          .map((member) => `${member.player_id}:${member.player.nickname}`)
+          .join(",")}`
+    )
+    .join("|");
+  const matchSignature = [...matches]
+    .sort((left, right) => left.round - right.round || left.id - right.id)
+    .map(
+      (match) =>
+        `${match.id}:${match.round}:${match.status}:${match.team_a_id ?? "-"}:${match.team_b_id ?? "-"}:${match.winner_id ?? "-"}:${match.maps_won_a}-${match.maps_won_b}:${match.next_match_id ?? "-"}:${[...(match.maps ?? [])]
+          .sort((left, right) => left.map_number - right.map_number || left.id - right.id)
+          .map(
+            (map) =>
+              `${map.id}:${map.map_number}:${map.result_status}:${map.kills_a}-${map.kills_b}:${map.map_winner_id ?? "-"}:${[...(map.player_stats ?? [])]
+                .sort(
+                  (left, right) =>
+                    left.side.localeCompare(right.side) ||
+                    left.player_id - right.player_id ||
+                    left.player_name.localeCompare(right.player_name)
+                )
+                .map(
+                  (player) =>
+                    `${player.side}:${player.player_id}:${player.player_name}:${player.kills}`
+                )
+                .join(",")}`
+          )
+          .join("/")}`
+    )
+    .join("|");
+  return `${tournament.id}:${tournament.name}:${tournament.status}:${tournament.bracket_status}:${JSON.stringify(tournament.config ?? {})}:${rosterSignature}:${matchSignature}`;
+}
+
+export function useWorldSeriesPractice(
+  preferredTournamentId?: number | null,
+  options?: WorldSeriesPracticeOptions
+) {
+  const pollMs = normalizeStandingsPollMs(options);
   const [backendOnline, setBackendOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -177,12 +232,17 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
 
   const selectedMatchIdRef = useRef<number | null>(selectedMatchId);
   const refreshRequestRef = useRef(0);
+  const practiceDataSignatureRef = useRef("");
+  const standingsRefreshPromiseRef = useRef<{
+    tournamentId: number;
+    promise: Promise<void>;
+  } | null>(null);
 
   useEffect(() => {
     selectedMatchIdRef.current = selectedMatchId;
   }, [selectedMatchId]);
 
-  const refreshSelectedTournament = useCallback(
+  const performRefreshSelectedTournament = useCallback(
     async (tournamentId: number, options?: { preferLatestMatch?: boolean }) => {
       const requestId = ++refreshRequestRef.current;
       const tournament = await getTournament(tournamentId);
@@ -230,6 +290,20 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         return;
       }
 
+      const nextDataSignature = buildPracticeDataSignature(
+        tournament,
+        nextTeams,
+        nextMatches
+      );
+      if (
+        pollMs !== null &&
+        !options?.preferLatestMatch &&
+        nextDataSignature === practiceDataSignatureRef.current
+      ) {
+        return;
+      }
+      practiceDataSignatureRef.current = nextDataSignature;
+
       setSelectedTournament(tournament);
       setMatchCompletionPolicy(nextMatchCompletionPolicy);
       setTeams(nextTeams);
@@ -239,7 +313,34 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
       setPlayers(nextPlayers);
       setSelectedMatchId(resolvedMatchId);
     },
-    []
+    [pollMs]
+  );
+
+  const refreshSelectedTournament = useCallback(
+    (tournamentId: number, options?: { preferLatestMatch?: boolean }) => {
+      if (pollMs === null || options?.preferLatestMatch) {
+        return performRefreshSelectedTournament(tournamentId, options);
+      }
+      if (standingsRefreshPromiseRef.current?.tournamentId === tournamentId) {
+        return standingsRefreshPromiseRef.current.promise;
+      }
+      const request = performRefreshSelectedTournament(tournamentId, options);
+      standingsRefreshPromiseRef.current = { tournamentId, promise: request };
+      void request.then(
+        () => {
+          if (standingsRefreshPromiseRef.current?.promise === request) {
+            standingsRefreshPromiseRef.current = null;
+          }
+        },
+        () => {
+          if (standingsRefreshPromiseRef.current?.promise === request) {
+            standingsRefreshPromiseRef.current = null;
+          }
+        }
+      );
+      return request;
+    },
+    [performRefreshSelectedTournament, pollMs]
   );
 
   const refreshTournaments = useCallback(
@@ -269,6 +370,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
         setSelectedMatchId(null);
         setResultDrafts({});
         setKillRaceMapDrafts({});
+        practiceDataSignatureRef.current = "";
         return;
       }
 
@@ -311,6 +413,40 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   }, [refreshSelectedTournament, selectedTournamentId]);
 
   useEffect(() => {
+    if (pollMs === null || selectedTournamentId === null) return;
+    const tournamentId = selectedTournamentId;
+    const intervalMs = pollMs;
+    let active = true;
+    let timer: number | null = null;
+
+    function schedule(delayMs: number) {
+      timer = window.setTimeout(() => void poll(), delayMs);
+    }
+
+    async function poll() {
+      await runSequentialPollCycle({
+        fetchOnce: async () => {
+          try {
+            await refreshSelectedTournament(tournamentId);
+            if (active) setBackendOnline(true);
+          } catch {
+            if (active) setBackendOnline(false);
+          }
+        },
+        isActive: () => active,
+        schedule,
+        delayMs: intervalMs,
+      });
+    }
+
+    schedule(intervalMs);
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [pollMs, refreshSelectedTournament, selectedTournamentId]);
+
+  useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     async function pollChannel() {
@@ -329,6 +465,7 @@ export function useWorldSeriesPractice(preferredTournamentId?: number | null) {
   }, []);
 
   function selectTournament(tournamentId: number) {
+    practiceDataSignatureRef.current = "";
     persistTournamentId(tournamentId);
     setSelectedTournamentId(tournamentId);
     setMatchCompletionPolicy(null);
