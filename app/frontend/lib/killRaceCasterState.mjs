@@ -1,3 +1,5 @@
+import { resolveKillRaceChampionTeam } from "./killRaceAwards.mjs";
+
 export function buildKillRaceCasterState({ matches = [], teams = [], broadcastMatchId = null }) {
   const teamKills = new Map();
   const teamMaps = new Map();
@@ -70,9 +72,7 @@ export function buildKillRaceCasterState({ matches = [], teams = [], broadcastMa
     player.isTiedMvp = player.isMvp && tiedMvp;
   });
   const mvp = playerRanking.filter((player) => player.isMvp);
-  const championId = teams.length
-    ? matches.find((match) => match.next_match_id === null && match.winner_id !== null)?.winner_id ?? null
-    : null;
+  const champion = resolveKillRaceChampionTeam({ matches, teams });
 
   return {
     teamTotals: [...teamKills].map(([teamId, kills]) => ({
@@ -85,8 +85,8 @@ export function buildKillRaceCasterState({ matches = [], teams = [], broadcastMa
     playerRanking,
     mvp,
     broadcastMatch: matches.find((match) => match.id === broadcastMatchId) ?? null,
-    champion: teams.find((team) => team.id === championId) ?? null,
-    tournamentStatus: championId ? "completed" : "live",
+    champion,
+    tournamentStatus: champion ? "completed" : "live",
     completedSeriesCount: matches.filter(
       (match) => match.status === "completed" || match.winner_id !== null
     ).length,

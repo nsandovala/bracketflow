@@ -27,12 +27,19 @@ import BroadcastSetup from "./BroadcastSetup";
 import CasterContextInspector from "./CasterContextInspector";
 import { getCompatibleOverlayLayouts } from "../../lib/streamRouting.mjs";
 import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
-import { getFollowOperatorOverlayUrl } from "../../lib/broadcastChannel.mjs";
+import {
+  buildKillRaceChampionOverlay,
+  buildKillRaceMvpOverlay,
+} from "../../lib/killRaceAwards.mjs";
+import {
+  getFollowOperatorOverlayUrl,
+  getTournamentOverlayUrl,
+} from "../../lib/broadcastChannel.mjs";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
 type OverlayDefinition = {
-  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard" | "scorebug" | "intermission" | "bracket";
+  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard" | "scorebug" | "intermission" | "bracket" | "champion";
   title: string;
   description: string;
   note?: string;
@@ -95,6 +102,19 @@ const KILL_RACE_OVERLAYS: OverlayDefinition[] = [
     title: "Bracket",
     description: "Llave completa read-only para una escena independiente de OBS.",
     transparent: true,
+  },
+  {
+    layout: "mvp",
+    title: "MVP / Jugador destacado",
+    description: "Jugador destacado confirmado del mapa, serie o torneo.",
+    transparent: true,
+  },
+  {
+    layout: "champion",
+    title: "Champion",
+    description: "Escena de coronación basada exclusivamente en la final confirmada.",
+    transparent: false,
+    transparentOption: true,
   },
 ];
 
@@ -202,6 +222,28 @@ export default function CasterHub() {
           })
         : null,
     [broadcastMatchId, isKillRace, matches, teams]
+  );
+  const killRaceMvpAward = useMemo(
+    () =>
+      isKillRace
+        ? buildKillRaceMvpOverlay({
+            tournament: selectedTournament,
+            teams,
+            matches,
+          })
+        : null,
+    [isKillRace, matches, selectedTournament, teams]
+  );
+  const killRaceChampionAward = useMemo(
+    () =>
+      isKillRace
+        ? buildKillRaceChampionOverlay({
+            tournament: selectedTournament,
+            teams,
+            matches,
+          })
+        : null,
+    [isKillRace, matches, selectedTournament, teams]
   );
   const standings = sortedStandings.map((entry) => ({
     ...entry,
@@ -494,7 +536,103 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-overlay-list">
-                {compatibleOverlays.map((overlay) => {
+                {isKillRace ? (
+                  <div className="bf-caster-overlay-group" aria-label="Canal main en vivo">
+                    <div className="bf-caster-overlay-group-head">
+                      <div>
+                        <span>CANAL MAIN · EN VIVO</span>
+                        <strong>Fuentes OBS estables</strong>
+                      </div>
+                      <p>Sigue la transmisión enviada por Operator.</p>
+                    </div>
+                    {KILL_RACE_OVERLAYS.filter(
+                      (overlay) => overlay.layout === "mvp" || overlay.layout === "champion"
+                    ).map((overlay) => {
+                      const url = getFollowOperatorOverlayUrl(
+                        STREAM_ORIGIN,
+                        overlay.layout,
+                        "main",
+                        true
+                      );
+                      const copyKey = `live-${overlay.layout}`;
+                      const status = copyState?.key === copyKey ? copyState.status : null;
+                      return (
+                        <article className="bf-caster-overlay is-live-source" key={copyKey}>
+                          <div className="bf-caster-overlay-copy">
+                            <h3>{overlay.title} · CANAL MAIN</h3>
+                            <p>Fuente OBS estable · sigue exclusivamente el canal main.</p>
+                            <small className="bf-caster-overlay-note">No cambia al seleccionar otro torneo.</small>
+                            <code>{url}</code>
+                          </div>
+                          <div className="bf-caster-overlay-actions">
+                            <button type="button" onClick={() => void handleCopy(copyKey, url)}>
+                              {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copiar URL OBS"}
+                            </button>
+                            <button type="button" className="is-open" onClick={() => openOverlay(url)}>
+                              Abrir canal al aire
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {isKillRace ? (
+                  <div className="bf-caster-overlay-group is-preview" aria-label="Preview del torneo seleccionado">
+                    <div className="bf-caster-overlay-group-head">
+                      <div>
+                        <span>PREVIEW · TORNEO SELECCIONADO</span>
+                        <strong>Vista previa histórica</strong>
+                      </div>
+                      <p>#{selectedTournament.id} · {selectedTournament.name}</p>
+                    </div>
+                    {KILL_RACE_OVERLAYS.filter(
+                      (overlay) => overlay.layout === "mvp" || overlay.layout === "champion"
+                    ).map((overlay) => {
+                      const url = getTournamentOverlayUrl(
+                        STREAM_ORIGIN,
+                        selectedTournament.id,
+                        overlay.layout
+                      );
+                      const copyKey = `preview-${overlay.layout}-${selectedTournament.id}`;
+                      const status = copyState?.key === copyKey ? copyState.status : null;
+                      const availabilityNote = overlay.layout === "mvp"
+                        ? killRaceMvpAward?.state === "ready"
+                          ? killRaceMvpAward.isTied
+                            ? `MVP empatado · ${killRaceMvpAward.leaders.length} jugadores confirmados`
+                            : `${killRaceMvpAward.title} disponible`
+                          : killRaceMvpAward?.state === "no-player-stats"
+                            ? "SIN DESGLOSE INDIVIDUAL CONFIRMADO"
+                            : "Esperando cierre o player stats confirmadas"
+                        : killRaceChampionAward?.state === "ready"
+                          ? `Campeón oficial · ${killRaceChampionAward.champion?.name}`
+                          : "CAMPEÓN AÚN NO DEFINIDO";
+                      return (
+                        <article className="bf-caster-overlay is-preview-source" key={copyKey}>
+                          <div className="bf-caster-overlay-copy">
+                            <h3>{overlay.title} · TORNEO SELECCIONADO</h3>
+                            <p>Histórico fijo · torneo #{selectedTournament.id}.</p>
+                            <small className="bf-caster-overlay-note">{availabilityNote}</small>
+                            <code>{url}</code>
+                          </div>
+                          <div className="bf-caster-overlay-actions">
+                            <button type="button" className="is-open" onClick={() => openOverlay(url)}>
+                              Abrir preview
+                            </button>
+                            <button type="button" onClick={() => void handleCopy(copyKey, url)}>
+                              {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copiar URL fija"}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {compatibleOverlays.filter(
+                  (overlay) => !isKillRace || (overlay.layout !== "mvp" && overlay.layout !== "champion")
+                ).map((overlay) => {
                   const url = isKillRace
                     ? getFollowOperatorOverlayUrl(
                         STREAM_ORIGIN,
@@ -574,6 +712,42 @@ export default function CasterHub() {
                             <div className="bf-caster-overlay-actions">
                               <button type="button" onClick={() => void handleCopy(`fixed-${match.id}`, url)}>Copy URL</button>
                               <button type="button" className="is-open" onClick={() => openOverlay(url)}>Open overlay</button>
+                            </div>
+                          </article>
+                        );
+                      })
+                  : null}
+                {isKillRace && killRaceChampionAward?.state !== "ready"
+                  ? matches
+                      .filter((match) =>
+                        match.team_a_id !== null &&
+                        match.team_b_id !== null &&
+                        match.maps.some(
+                          (map) =>
+                            map.result_status === "confirmed" &&
+                            (map.player_stats?.length ?? 0) > 0
+                        )
+                      )
+                      .map((match) => {
+                        const overlay = KILL_RACE_OVERLAYS.find(
+                          (candidate) => candidate.layout === "mvp"
+                        )!;
+                        const url = getTournamentOverlayUrl(
+                          STREAM_ORIGIN,
+                          selectedTournament.id,
+                          overlay.layout,
+                          match.id
+                        );
+                        return (
+                          <article className="bf-caster-overlay" key={`fixed-mvp-${match.id}`}>
+                            <div className="bf-caster-overlay-copy">
+                              <h3>MVP fijo · Match {match.id}</h3>
+                              <p>{getMatchTeamLabel(match.team_a_id!)} vs {getMatchTeamLabel(match.team_b_id!)}</p>
+                              <code>{url}</code>
+                            </div>
+                            <div className="bf-caster-overlay-actions">
+                              <button type="button" onClick={() => void handleCopy(`fixed-mvp-${match.id}`, url)}>Copiar URL fija</button>
+                              <button type="button" className="is-open" onClick={() => openOverlay(url)}>Abrir preview</button>
                             </div>
                           </article>
                         );

@@ -3,6 +3,9 @@ export type StreamSurface =
   | "unsupported-scorebug"
   | "intermission"
   | "unsupported-intermission"
+  | "kill-race-mvp"
+  | "kill-race-champion"
+  | "unsupported-champion"
   | "bracket"
   | "standings";
 export function resolveStreamSurface(

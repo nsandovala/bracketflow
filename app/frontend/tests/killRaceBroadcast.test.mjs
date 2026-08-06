@@ -61,14 +61,14 @@ test("explicit match has priority over channel routing", () => {
 test("stable channel follows tournament and broadcast match switches without fallback", () => {
   const first = resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: 23, broadcastMatchId: 97 } });
   const switched = resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: 24, broadcastMatchId: 101 } });
-  const cleared = resolveBroadcastContext({ explicitTournamentId: 23, explicitMatchId: null, channel: { activeTournamentId: 24, broadcastMatchId: null } });
+  const explicit = resolveBroadcastContext({ explicitTournamentId: 23, explicitMatchId: null, channel: { activeTournamentId: 24, broadcastMatchId: null } });
   assert.deepEqual(first, { tournamentId: 23, matchId: 97, source: "channel" });
   assert.deepEqual(switched, { tournamentId: 24, matchId: 101, source: "channel" });
-  assert.deepEqual(cleared, { tournamentId: 24, matchId: null, source: "channel" });
+  assert.deepEqual(explicit, { tournamentId: 23, matchId: null, source: "explicit" });
 });
 
 test("channel exposes honest empty tournament and match states", () => {
-  assert.deepEqual(resolveBroadcastContext({ explicitTournamentId: 23, explicitMatchId: null, channel: { activeTournamentId: null, broadcastMatchId: null } }), { tournamentId: null, matchId: null, source: "channel" });
+  assert.deepEqual(resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: null, broadcastMatchId: null } }), { tournamentId: null, matchId: null, source: "channel" });
   assert.deepEqual(resolveBroadcastContext({ explicitTournamentId: null, explicitMatchId: null, channel: { activeTournamentId: 23, broadcastMatchId: null } }), { tournamentId: 23, matchId: null, source: "channel" });
 });
 
@@ -308,7 +308,7 @@ test("scorebug routing never falls through to bracket and bracket remains explic
 });
 
 test("Kill Race and standings engines expose only compatible overlays", () => {
-  assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: true, supportsMatchPoint: false }), ["scorebug", "intermission", "bracket"]);
+  assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: true, supportsMatchPoint: false }), ["scorebug", "intermission", "bracket", "mvp", "champion"]);
   assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: false, supportsMatchPoint: true }),
     ["sidebar", "lower-third", "matchpoint", "mvp", "leaderboard"]);
   assert.deepEqual(getCompatibleOverlayLayouts({ isKillRace: false, supportsMatchPoint: false }),

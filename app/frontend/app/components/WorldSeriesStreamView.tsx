@@ -7,6 +7,8 @@ import BracketStreamView from "./BracketStreamView";
 import KillRaceIntermission, {
   KillRaceIntermissionUnavailable,
 } from "./KillRaceIntermission";
+import KillRaceMvpOverlay from "./KillRaceMvpOverlay";
+import KillRaceChampionOverlay from "./KillRaceChampionOverlay";
 import KillRaceScorebug from "./KillRaceScorebug";
 import StreamOverlayLeaderboard from "./StreamOverlayLeaderboard";
 import StreamOverlayLowerThird from "./StreamOverlayLowerThird";
@@ -23,6 +25,10 @@ import {
 import { resolveKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
 import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
 import { buildKillRaceIntermission } from "../../lib/killRaceIntermission.mjs";
+import {
+  buildKillRaceChampionOverlay,
+  buildKillRaceMvpOverlay,
+} from "../../lib/killRaceAwards.mjs";
 import { resolveStreamSurface } from "../../lib/streamRouting.mjs";
 
 export type StreamLayout =
@@ -35,7 +41,8 @@ export type StreamLayout =
   | "leaderboard"
   | "bracket"
   | "scorebug"
-  | "intermission";
+  | "intermission"
+  | "champion";
 
 // Layouts que se anclan como overlay fijo transparente (browser source OBS).
 const ANCHORED_LAYOUTS: StreamLayout[] = ["sidebar", "lower", "lower-third", "matchpoint", "mvp"];
@@ -115,6 +122,45 @@ export default function WorldSeriesStreamView({
       body.style.background = prevBodyBg;
     };
   }, [transparent]);
+
+  if (streamSurface === "kill-race-mvp") {
+    const viewModel = buildKillRaceMvpOverlay({
+      tournament,
+      teams,
+      matches,
+      broadcastMatchId: resolvedMatchId,
+    });
+    return (
+      <KillRaceMvpOverlay
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "kill-race-champion") {
+    const viewModel = buildKillRaceChampionOverlay({ tournament, teams, matches });
+    return (
+      <KillRaceChampionOverlay
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "unsupported-champion") {
+    const viewModel = buildKillRaceChampionOverlay({ tournament, teams, matches });
+    return (
+      <KillRaceChampionOverlay
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+        unsupported
+      />
+    );
+  }
 
   if (streamSurface === "intermission") {
     const broadcastMatch =

@@ -19,3 +19,9 @@ export function getFollowOperatorOverlayUrl(
   channelKey?: string,
   transparent?: boolean
 ): string;
+export function getTournamentOverlayUrl(
+  origin: string,
+  tournamentId: number,
+  layout: string,
+  matchId?: number | null
+): string;

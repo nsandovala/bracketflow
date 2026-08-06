@@ -1,5 +1,8 @@
 export function resolveBroadcastContext({ explicitTournamentId, explicitMatchId, channel }) {
-  if (explicitMatchId !== null && explicitMatchId !== undefined) {
+  if (
+    (explicitTournamentId !== null && explicitTournamentId !== undefined) ||
+    (explicitMatchId !== null && explicitMatchId !== undefined)
+  ) {
     return { tournamentId: explicitTournamentId, matchId: explicitMatchId, source: "explicit" };
   }
   if (channel) {
@@ -30,5 +33,13 @@ export function getFollowOperatorOverlayUrl(
 ) {
   const query = new URLSearchParams({ channel: channelKey, layout, obs: "1" });
   if (transparent) query.set("bg", "transparent");
+  return `${origin}/stream?${query.toString()}`;
+}
+
+export function getTournamentOverlayUrl(origin, tournamentId, layout, matchId = null) {
+  const query = new URLSearchParams({ tournamentId: String(tournamentId) });
+  if (matchId !== null && matchId !== undefined) query.set("matchId", String(matchId));
+  query.set("layout", layout);
+  query.set("obs", "1");
   return `${origin}/stream?${query.toString()}`;
 }
