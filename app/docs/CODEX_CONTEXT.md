@@ -24,12 +24,20 @@ No convertir Standings en una copia del bracket ni trasladar controles de Operat
 ## Broadcast vigente
 
 - Broadcast Channel `main` desacopla URLs OBS de IDs editoriales cambiantes.
+- `channel=main` es exclusivamente contexto LIVE: sigue el torneo/match que Operator envía al aire y sus URLs permanecen estables para OBS.
+- `tournamentId` explícito es contexto fijo de Preview/histórico: tiene prioridad sobre el canal y nunca reutiliza `broadcastMatchId` de `main`.
 - Scorebug, Bracket Stream e Intermission son superficies distintas.
 - Kill Race usa `KillRaceBracketBroadcast` como escena editorial independiente; `BracketView` permanece como componente web de Operator/Standings/Setup.
 - La serie `EN TRANSMISIÓN` es exclusivamente el `resolvedMatchId` de URL explícita o canal; `in_progress` sin selección editorial se presenta como `EN JUEGO`.
 - El bracket broadcast usa `toBracketRounds` como fuente de rounds, feeders, BYE, placeholders, ganadores y avance; `winner_id` y el score oficial son la única verdad competitiva.
 - Intermission no es multistream ni composición de gameplay.
-- No duplicar helpers de `killRaceCasterState`, `killRaceIntermission` o `killRaceStandings`.
+- `layout=mvp` usa `KillRaceMvpOverlay` solo para Kill Race; los motores acumulativos conservan `StreamOverlayMvp`.
+- `layout=champion` usa `KillRaceChampionOverlay` y exige una final real `completed` con `winner_id`; `championTeamId` aislado no corona.
+- `killRaceAwards.mjs` centraliza premios puros, identidad estable `teamId:playerId` con fallback por nickname, empates completos y `visualKey` estable.
+- MVP consume exclusivamente `player_stats` de mapas `confirmed`: mapa activo, acumulado de serie completada o acumulado de torneo finalizado. Nunca existe fallback a Team MVP.
+- MVP histórico de torneo completado no requiere `matchId`; una URL fija con `matchId` conserva scope de esa serie y rechaza matches ajenos al torneo.
+- Daño, asistencias, precisión, redeploys y K/D de partida no están persistidos. `declared_kd` es perfil declarado, no rendimiento oficial.
+- No duplicar helpers de `killRaceAwards`, `killRaceCasterState`, `killRaceIntermission` o `killRaceStandings`.
 
 ## Cómo retomar
 
@@ -38,6 +46,11 @@ No convertir Standings en una copia del bracket ni trasladar controles de Operat
 3. Consultar `docs/PARKING_LOT.md` solo para backlog diferido.
 4. Ejecutar `git status -sb`, `git diff --check` y `.\scripts\qa.ps1` antes de editar.
 
-## Próximo foco aprobado
+## Estado reciente y próximo foco
 
-P4 — Kill Race Bracket Broadcast v1 queda implementado en `feat/kill-race-bracket-broadcast-v1`, sin commit/push y pendiente de revisión visual humana porque el runtime no expuso navegador. El siguiente sprint previsto es P5 — MVP + Champion overlays; no abrirlo dentro de P4.
+- P4 fue implementado en `7b6ef73`; el handoff documental es `291b45d`. La rama se publicó y el smoke visual humano aprobó Bracket Broadcast.
+- P5 — Kill Race MVP + Champion Overlays v1 está implementado sin commit/push en `feat/kill-race-mvp-champion-overlays-v1`, basado en `291b45d`; los diseños MVP/Champion están aprobados y Caster Hub ya separa LIVE de Preview/histórico.
+- El histórico P5 quedó corregido con aislamiento estricto por torneo y está listo para cierre humano.
+- El smoke visual automatizado P5 sigue pendiente porque el runtime actual no expuso navegador; no confundir las comprobaciones HTTP 200 con QA visual.
+- El próximo sprint previsto es P6 — Scorebug y composición OBS final.
+- Continúan pendientes el bracket web, Fit/Reset y el refactor global de UI de Operator/Standings; no mezclarlos con P6.

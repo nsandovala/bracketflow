@@ -2,11 +2,12 @@
 
 ## Estado de Git
 
-- Rama actual: `feat/kill-race-bracket-broadcast-v1`.
-- Commit base: `61e8d24` (`docs(agents): close P3 and hand off P4`).
-- La rama parte del cierre aprobado de P3 (`3d77aa7` implementación, `61e8d24` handoff).
-- El working tree contiene P4 — Kill Race Bracket Broadcast v1 y esta actualización documental; estaba limpio al iniciar el sprint.
-- Commit y push: todavía no realizados por instrucción del sprint.
+- Rama actual: `feat/kill-race-mvp-champion-overlays-v1`.
+- Commit base: `291b45d` (`docs(agents): close P4 and hand off P5`).
+- La rama parte del P4 aprobado (`7b6ef73` implementación, `291b45d` handoff/documentación); P4 fue publicado y su smoke visual humano fue aprobado.
+- El working tree estaba limpio al iniciar P5 y ahora contiene P5 — Kill Race MVP + Champion Overlays v1 sin commit/push.
+- `.claude/` figura de forma intermitente como untracked del entorno; no se inspeccionó ni modificó y permanece fuera del sprint y de cualquier staging.
+- Commit, push y PR P5: no realizados por instrucción del sprint.
 - La rama parte de la línea de trabajo de Kill Race/Broadcast; no afirmar merges adicionales.
 
 Linaje conocido de commits de los sprints recientes:
@@ -19,6 +20,8 @@ Linaje conocido de commits de los sprints recientes:
 - `2d96ba5`
 - `3d77aa7`
 - `61e8d24`
+- `7b6ef73`
+- `291b45d`
 
 ## Sprints Kill Race completados
 
@@ -28,12 +31,134 @@ Linaje conocido de commits de los sprints recientes:
 4. Stable Broadcast Channel y alertas de transmisión.
 5. Kill Race Intermission Overlay v1.
 6. P3 — Kill Race Standings Detailed Web v1.
-7. P4 — Kill Race Bracket Broadcast v1 (implementado en working tree; sin commit/push).
+7. P4 — Kill Race Bracket Broadcast v1 (implementación `7b6ef73`, handoff `291b45d`, push y smoke humano aprobados).
+8. P5 — Kill Race MVP + Champion Overlays v1 (implementado en working tree; sin commit/push).
 
 Los commits anteriores son una línea de continuidad conocida; este documento no afirma que ramas aún abiertas hayan sido mergeadas.
 Se confirma que las ramas abiertas aun no han sido mergeadas.
 
-## Sprint actual — P4 Kill Race Bracket Broadcast v1
+## Sprint actual — P5 Kill Race MVP + Champion Overlays v1
+
+### Arquitectura y contratos
+
+- Helper puro compartido: `frontend/lib/killRaceAwards.mjs` y `killRaceAwards.d.mts`; no usa React, APIs, estado ni scoring.
+- `buildKillRaceMvpOverlay` resuelve alcance de último mapa confirmado, serie completada o torneo oficialmente completado; este último no requiere `matchId`.
+- `buildKillRaceChampionOverlay` solo corona desde el match final real, `status === completed`, `winner_id` oficial y ganador perteneciente al torneo.
+- `buildKillRaceCasterState` comparte la definición estricta; un `winner_id` en una final no completada ya no aparece como campeón.
+- `Tournament.config.championTeamId` no sustituye la final y no se usa para declarar el Champion Overlay.
+- Solo mapas `confirmed` alimentan bajas individuales, kills del campeón, promedios y rankings. Provisional queda fuera de premios oficiales.
+- No existen datos persistidos oficiales de daño, asistencias, K/D de partida, precisión o redeploys; `declared_kd` no participa.
+
+### MVP
+
+- Serie activa: último mapa `confirmed` de la serie transmitida y solo sus `player_stats`.
+- Serie completada: suma de todos sus mapas confirmados, mapas con stat por jugador, promedio y score oficial.
+- Torneo finalizado sin `matchId`: suma de todos los mapas confirmados del torneo y ranking MVP.
+- Un `matchId` explícito conserva scope de mapa/serie incluso si el torneo ya terminó; un id inválido o perteneciente a otro torneo no selecciona otra serie.
+- Los empates no se rompen: se conservan todos los líderes, con composición legible hasta cuatro jugadores.
+- Con resultados de equipo pero sin `player_stats`, el estado es `SIN DESGLOSE INDIVIDUAL CONFIRMADO`; no existe Team MVP ni reparto inferido.
+- En transparente, estados vacíos/pending no dibujan una tarjeta dominante sobre gameplay.
+
+### Champion
+
+- Presenta torneo, campeón, roster opcional, finalista, score oficial orientado al ganador, BO, series ganadas jugadas y kills confirmadas del campeón.
+- Los BYE no cuentan como series ganadas jugadas.
+- Las kills son contexto de rendimiento, nunca causa de coronación.
+- Sin final válida, debug declara `CAMPEÓN AÚN NO DEFINIDO`; transparente permanece visualmente seguro.
+
+### Routing, Caster y URLs
+
+- Kill Race: `layout=mvp` → `KillRaceMvpOverlay`; `layout=champion` → `KillRaceChampionOverlay`.
+- Otros motores conservan `StreamOverlayMvp`; Champion entrega un estado honesto no compatible.
+- `getCompatibleOverlayLayouts` de Kill Race expone scorebug, intermission, bracket, mvp y champion.
+- Caster Hub separa visual y semánticamente `CANAL MAIN · EN VIVO` de `PREVIEW · TORNEO SELECCIONADO`. Seleccionar un histórico cambia solo los previews; nunca las fuentes LIVE destinadas a OBS.
+- `channel=main` representa exclusivamente transmisión real y sigue a Operator. `tournamentId` explícito representa Preview/histórico, tiene prioridad y no consume `broadcastMatchId` del canal.
+- Los launchers MVP fijos por match conservan contexto explícito de torneo + serie; Champion no se duplica por match.
+- URLs LIVE estables:
+  - `/stream?channel=main&layout=mvp&obs=1&bg=transparent`
+  - `/stream?channel=main&layout=champion&obs=1&bg=transparent`
+- URLs Preview/histórico fijas:
+  - `/stream?tournamentId=ID&layout=mvp&obs=1`
+  - `/stream?tournamentId=ID&layout=champion&obs=1`
+  - `/stream?tournamentId=ID&matchId=MATCH_ID&layout=mvp&obs=1`
+
+### Polling y visualKey
+
+- No se agregaron timers, hooks ni fetches. Se conserva el polling secuencial de Stream a 1800 ms, última data válida, canal `main` y prioridad de URL explícita.
+- MVP reacciona a torneo, match, scope, mapa, estado, score y stats agregadas; Champion a final, status, winner, finalista, score, roster, kills y series.
+- Payload equivalente conserva el mismo `visualKey`; los componentes no usan key de remount en la escena raíz.
+
+### Archivos P5
+
+Nuevos:
+
+- `frontend/lib/killRaceAwards.mjs`
+- `frontend/lib/killRaceAwards.d.mts`
+- `frontend/app/components/KillRaceMvpOverlay.tsx`
+- `frontend/app/components/KillRaceChampionOverlay.tsx`
+- `frontend/tests/killRaceAwards.test.mjs`
+
+Modificados:
+
+- `frontend/app/components/CasterHub.tsx`
+- `frontend/app/components/WorldSeriesStreamView.tsx`
+- `frontend/app/stream/page.tsx`
+- `frontend/lib/killRaceCasterState.mjs`
+- `frontend/lib/streamRouting.mjs`
+- `frontend/lib/streamRouting.d.mts`
+- `frontend/lib/broadcastChannel.mjs`
+- `frontend/lib/broadcastChannel.d.mts`
+- `frontend/app/globals.css`
+- `frontend/package.json`
+- `frontend/tests/killRaceBroadcast.test.mjs`
+- `docs/CODEX_CONTEXT.md`
+- `docs/NEXT_STEPS.md`
+
+### Datos QA read-only
+
+- Base real: `backend/bracketflow.db`, abierta con SQLite `mode=ro`; no se modificó.
+- Torneo 25 / matches 102–103: activo, dos series en progreso, player stats confirmadas; match 103 contiene empate real de tres jugadores y canal `main` apunta a 25/103.
+- Torneo 24 / final 101: final completada, campeón/finalista/rosters y stats confirmadas.
+- Torneo 20 / final 91: seis equipos con BYE, final completada y mezcla de mapas con y sin player stats.
+- Torneos 6, 13 y 17: finales completadas y kills de equipo confirmadas sin desglose individual.
+- No existen actualmente mapas provisionales ni empate real de cuatro jugadores; ambos casos se cubren con tests puros, sin fixtures persistentes.
+
+### Smoke humano preparado · URLs locales exactas
+
+Mantener Operator transmitiendo torneo 25 / Match 103 y usar:
+
+- Caster Hub torneo 24: `http://localhost:3000/caster?tournamentId=24`
+- MVP LIVE (debe seguir en torneo 25): `http://localhost:3000/stream?channel=main&layout=mvp&obs=1&bg=transparent`
+- Champion LIVE (misma fuente estable): `http://localhost:3000/stream?channel=main&layout=champion&obs=1&bg=transparent`
+- MVP Preview torneo 24: `http://localhost:3000/stream?tournamentId=24&layout=mvp&obs=1`
+- Champion Preview torneo 24 / final 101: `http://localhost:3000/stream?tournamentId=24&layout=champion&obs=1`
+- MVP fijo final 101: `http://localhost:3000/stream?tournamentId=24&matchId=101&layout=mvp&obs=1`
+- Caster Hub torneo 20: `http://localhost:3000/caster?tournamentId=20`
+- MVP Preview torneo 20: `http://localhost:3000/stream?tournamentId=20&layout=mvp&obs=1`
+- Champion Preview torneo 20 / final 91: `http://localhost:3000/stream?tournamentId=20&layout=champion&obs=1`
+- Sin player stats, estado honesto MVP: `http://localhost:3000/stream?tournamentId=6&layout=mvp&obs=1`, `http://localhost:3000/stream?tournamentId=13&layout=mvp&obs=1`, `http://localhost:3000/stream?tournamentId=17&layout=mvp&obs=1`
+
+Validar 1920×1080 y 1366×768, oscuro y transparente, sin clipping/scroll; cambiar entre 24 y 20 debe cambiar ambos previews, mientras LIVE continúa en 25 sin F5. Después seleccionar un torneo WSOW desde Caster Hub y confirmar que MVP acumulativo sigue compatible y Champion Kill Race aparece como no compatible.
+
+### Tests, QA y runtime reales
+
+- QA inicial sobre `291b45d`: lint OK; frontend 162/162; build OK; backend 135/135.
+- QA final P5: `git diff --check` OK; lint OK; frontend 217/217; build productivo OK; backend 135/135.
+- La suite P5 contiene 55 tests; esta corrección agregó 13 regresiones focalizadas que cubren los 15 contratos LIVE/Preview, aislamiento por torneo, final/MVP histórico, selector, prioridad explícita, estados honestos, WSOW, polling y `visualKey`.
+- Backend y frontend levantaron en 8000/3000. Health y las rutas MVP/Champion fija, transparente y canal `main` respondieron HTTP 200.
+- Smoke visual real: **pendiente / no ejecutado**. Browser devolvió `No browser is available` y la lista de navegadores fue `[]`; HTTP 200 no es validación visual u OBS.
+- Persisten cuatro `SAWarning` SQLAlchemy preexistentes en `backend/app/crud.py:2176`; backend no fue modificado.
+
+### Deuda y siguiente sprint
+
+- Ejecutar smoke humano P5 a 1920×1080 y 1366×768 con los torneos reales anteriores; el empate de cuatro requiere un caso ingresado por flujo real antes de validarlo visualmente.
+- Validar sin F5 cambios de match/torneo por canal, transparencia, ausencia de scroll/clipping y no regresión en Scorebug, Intermission, Bracket Broadcast y MVP acumulativo.
+- P6 — Scorebug y composición OBS final es el siguiente sprint.
+- Continúan fuera de P5/P6 el refactor global UI, BracketView web, Operator, Standings y Fit/Reset.
+
+---
+
+## Sprint anterior — P4 Kill Race Bracket Broadcast v1
 
 ### Diagnóstico y arquitectura
 
@@ -105,18 +230,9 @@ Modificados:
 
 ### Smoke visual real
 
-- **Pendiente / no ejecutado.** Los servidores frontend/backend respondieron localmente y se verificaron datos reales disponibles (torneo 25: 4 equipos activo con dos series en progreso y canal `main` en Match 103; torneo 24: 4 equipos completado; torneo 20: 6 equipos completado).
-- El runtime de navegador controlado devolvió `No browser is available` y `agent.browsers.list()` devolvió `[]`, por lo que no fue posible inspeccionar 1920×1080 ni 1366×768.
-- La base actual tampoco contiene un torneo real de 8 equipos; ese caso está cubierto automáticamente, pero no visualmente.
-- No se afirma smoke visual, OBS, cambio sin F5, transparencia visual ni ausencia de regresión visual en Operator/Standings.
-
-### Próxima revisión humana
-
-1. Abrir las cuatro URLs estables en 1920×1080 y 1366×768.
-2. Validar torneo 25 para dos series en juego y una sola transmitida, torneo 20 para BYE/6 equipos y torneo 24 para campeón compacto.
-3. Preparar o ingresar mediante el flujo real un torneo de 8 equipos antes del smoke correspondiente; no usar datos demo persistentes.
-4. Confirmar conectores, clipping, legibilidad, transparencia y cero scrollbars; cambiar torneo/match en canal `main` sin F5.
-5. Revisar visualmente Operator y Standings; `BracketView.tsx` no fue modificado.
+- El smoke visual humano de P4 fue completado y aprobado antes de abrir P5.
+- Implementación P4: `7b6ef73`; documentación/handoff: `291b45d`; push completado.
+- Bracket Broadcast está aprobado. El bracket web y Fit/Reset continúan pendientes y no se tocaron en P5.
 
 ---
 
@@ -215,11 +331,9 @@ No existe ni se inventa tercer/cuarto lugar.
 ## Roadmap aprobado
 
 - P3 — Standings Detailed Web: completado y presente en la base `61e8d24`.
-- P4 — Bracket Broadcast v1: **implementado en working tree; falta revisión visual, commit/push**.
-- P5 — MVP + Champion overlays: siguiente sprint, no iniciado.
-- P6 — Scorebug y composición OBS final.
-
-No abrir P4 dentro de la rama P3.
+- P4 — Bracket Broadcast v1: aprobado (`7b6ef73`, handoff `291b45d`, push y smoke humano completados).
+- P5 — MVP + Champion overlays: diseños aprobados, histórico LIVE/Preview corregido e implementado en el working tree actual, sin commit/push; listo para cierre humano mediante el smoke preparado.
+- P6 — Scorebug y composición OBS final: siguiente sprint.
 
 ## Deuda técnica conocida
 
@@ -227,7 +341,7 @@ No abrir P4 dentro de la rama P3.
 - Double elimination todavía no implementado.
 - Desempates operativos requieren hardening adicional si reaparecen casos no cubiertos.
 - Daño, asistencias y K/D no forman parte del contrato persistido de `player_stats`.
-- Smoke visual P4 y pruebas reales en OBS siguen pendientes.
+- Smoke visual P5 y pruebas reales en OBS siguen pendientes.
 - Falta un torneo real de 8 equipos en la base local para completar el smoke exigido sin fixtures persistentes.
 - El contexto histórico de `docs/CODEX_CONTEXT.md` fue actualizado de forma mínima; `PARKING_LOT.md` conserva backlog no operativo.
 
@@ -235,17 +349,17 @@ No abrir P4 dentro de la rama P3.
 
 ### Próxima acción recomendada
 
-1. Ejecutar y documentar el smoke visual P4 pendiente antes de aprobar o cerrar la rama.
-2. Cerrar P4 en `feat/kill-race-bracket-broadcast-v1` solo después de revisión humana; actualmente no hay commit ni push.
+1. Ejecutar el smoke humano P5 pendiente con los torneos 25, 24, 20 y 6/13/17 descritos arriba.
+2. Revisar y cerrar P5 en `feat/kill-race-mvp-champion-overlays-v1`; actualmente no hay commit ni push P5.
 3. Antes de editar ejecutar:
    - `git status -sb`
    - `git diff --check`
    - `git log --oneline --decorate -3`
    - `.\scripts\qa.ps1`
-4. Leer primero `KillRaceBracketBroadcast.tsx`, `killRaceBracketBroadcast.mjs`, `toBracketRounds.ts`, `WorldSeriesStreamView.tsx` y esta sección P4.
-5. No iniciar P5 hasta aprobar composición, escalas y smoke visual de P4.
-6. No tocar backend, scoring, Operator, Caster Hub, Scorebug, Intermission ni Stable Broadcast Channel salvo alcance explícito nuevo.
-7. Mantener single elimination, `winner_id` oficial, ausencia de fallback editorial y URLs estables.
+4. Leer primero `killRaceAwards.mjs`, ambos overlays P5, `WorldSeriesStreamView.tsx`, `streamRouting.mjs` y la sección P5.
+5. No iniciar P6 hasta revisar MVP/Champion en 1920×1080 y 1366×768, oscuro/transparente y canal `main`.
+6. No tocar backend, scoring, Operator, Bracket Broadcast, Scorebug, Intermission ni Stable Broadcast Channel salvo alcance explícito nuevo.
+7. Mantener final `completed` + `winner_id` como verdad de campeón, mapas confirmed como verdad MVP y ausencia de fallback editorial.
 
 Comandos de reentrada:
 
