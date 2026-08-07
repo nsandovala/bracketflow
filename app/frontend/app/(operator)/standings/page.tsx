@@ -4,7 +4,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
 import WorldSeriesStandings from "../../components/WorldSeriesStandings";
-import { useWorldSeriesPractice } from "../../lib/useWorldSeriesPractice";
+import {
+  STANDINGS_POLL_INTERVAL_MS,
+  useWorldSeriesPractice,
+} from "../../lib/useWorldSeriesPractice";
 
 function parseTournamentId(value: string | null) {
   if (!value) {
@@ -30,8 +33,11 @@ function StandingsPageClient() {
     matches,
     tournamentResults,
     matchCompletionPolicy,
+    broadcastMatchId,
     selectTournament,
-  } = useWorldSeriesPractice(preferredTournamentId);
+  } = useWorldSeriesPractice(preferredTournamentId, {
+    pollMs: STANDINGS_POLL_INTERVAL_MS,
+  });
 
   useEffect(() => {
     if (selectedTournamentId !== null && selectedTournamentId !== preferredTournamentId) {
@@ -51,6 +57,7 @@ function StandingsPageClient() {
       matches={matches}
       results={tournamentResults}
       matchCompletionPolicy={matchCompletionPolicy}
+      broadcastMatchId={broadcastMatchId}
       onSelectTournament={(tournamentId) => {
         selectTournament(tournamentId);
         router.replace(`/standings?tournamentId=${tournamentId}`);

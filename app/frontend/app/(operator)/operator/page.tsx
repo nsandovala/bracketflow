@@ -40,6 +40,9 @@ function OperatorPageClient() {
     submitting,
     resultDrafts,
     killRaceMapDrafts,
+    broadcastMatchId,
+    broadcastChannel,
+    sendMatchToBroadcast,
     updateResultDraft,
     updateKillRaceMapDraft,
     selectMatch,
@@ -60,6 +63,7 @@ function OperatorPageClient() {
     saveTeamReport,
     saveOfficialReportFromDraft,
     saveKillRaceMap,
+    refreshSelectedTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
 
   const [teamName, setTeamName] = useState("");
@@ -146,6 +150,9 @@ function OperatorPageClient() {
       onUpdateDraft={updateResultDraft}
       onUpdateKillRaceMapDraft={updateKillRaceMapDraft}
       onSelectKillRaceMatch={selectMatch}
+      broadcastMatchId={broadcastMatchId}
+      broadcastChannel={broadcastChannel}
+      onSendKillRaceMatchToBroadcast={sendMatchToBroadcast}
       onSaveTeamReport={(matchId, teamId) => {
         void saveTeamReport(matchId, teamId);
       }}
@@ -153,6 +160,7 @@ function OperatorPageClient() {
       onSaveKillRaceMap={(matchId) => {
         void saveKillRaceMap(matchId);
       }}
+      onKillRaceResultChanged={refreshSelectedTournament}
       onCreateNextGame={() => {
         void createNextGame();
       }}

@@ -32,6 +32,7 @@ class TournamentConfig(BaseModel):
     rouletteRosterDurationSeconds: int | None = Field(default=None, ge=1, le=240)
     championTeamId: int | None = Field(default=None, ge=1)
     championDecidedAt: str | None = None
+    broadcastMatchId: int | None = Field(default=None, ge=1)
 
 
 class RespinWindowOpen(BaseModel):
@@ -92,6 +93,26 @@ class TournamentUpdate(BaseModel):
     @classmethod
     def parse_config(cls, value):
         return TournamentBase.parse_config(value)
+
+
+class TournamentBroadcastMatchUpdate(BaseModel):
+    broadcastMatchId: int | None = Field(default=None, ge=1)
+
+
+class BroadcastChannelUpdate(BaseModel):
+    activeTournamentId: int | None = Field(default=None, ge=1)
+    broadcastMatchId: int | None = Field(default=None, ge=1)
+    engine: str | None = Field(default=None, max_length=80)
+    updatedBy: str | None = Field(default=None, max_length=120)
+
+
+class BroadcastChannel(BaseModel):
+    channelKey: str
+    activeTournamentId: int | None
+    broadcastMatchId: int | None
+    engine: str | None
+    updatedAt: str
+    updatedBy: str | None
 
 
 class Tournament(TournamentBase):
@@ -248,6 +269,8 @@ class MatchMap(BaseModel):
     kills_a: int
     kills_b: int
     map_winner_id: int | None
+    result_status: Literal["pending", "live", "provisional", "confirmed"] = "confirmed"
+    player_stats: list["KillRacePlayerStat"] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -299,6 +322,81 @@ class MapResultUpsert(BaseModel):
     map_number: int = Field(ge=1)
     kills_a: int = Field(ge=0)
     kills_b: int = Field(ge=0)
+
+
+class KillRacePlayerInput(BaseModel):
+    player_id: int = Field(ge=1)
+    player_name: str = Field(min_length=1)
+    kills: int = Field(ge=0)
+
+    @field_validator("player_name")
+    @classmethod
+    def strip_player_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class KillRaceSideInput(BaseModel):
+    side: Literal["left", "right"]
+    team_id: int = Field(ge=1)
+    team_name: str = Field(min_length=1)
+    players: list[KillRacePlayerInput] = Field(min_length=1, max_length=2)
+    total_kills: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_total(self) -> "KillRaceSideInput":
+        calculated = sum(player.kills for player in self.players)
+        if calculated != self.total_kills:
+            raise ValueError(
+                f"totalKills {self.total_kills} no coincide con la suma de jugadores {calculated}"
+            )
+        return self
+
+
+class KillRaceResultInput(BaseModel):
+    map_number: int = Field(ge=1)
+    status: Literal["pending", "live", "provisional"] = "provisional"
+    left: KillRaceSideInput
+    right: KillRaceSideInput
+
+    @model_validator(mode="after")
+    def validate_sides(self) -> "KillRaceResultInput":
+        if self.left.side != "left" or self.right.side != "right":
+            raise ValueError("Los lados deben ser left y right.")
+        ids = [player.player_id for side in (self.left, self.right) for player in side.players]
+        if len(ids) != len(set(ids)):
+            raise ValueError("No se aceptan jugadores duplicados.")
+        return self
+
+
+class KillRacePlayerStat(BaseModel):
+    player_id: int
+    player_name: str
+    side: Literal["left", "right"]
+    kills: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class KillRaceImportRequest(BaseModel):
+    format: Literal["txt", "csv"]
+    content: str
+    map_number: int | None = Field(default=None, ge=1)
+
+
+class KillRaceImportIssue(BaseModel):
+    code: str
+    message: str
+    row: int | None = None
+
+
+class KillRaceImportPreview(BaseModel):
+    valid: bool
+    match_id: int
+    map_number: int | None
+    left: KillRaceSideInput | None = None
+    right: KillRaceSideInput | None = None
+    errors: list[KillRaceImportIssue] = Field(default_factory=list)
+    conflicts: list[KillRaceImportIssue] = Field(default_factory=list)
 
 
 class TeamResult(BaseModel):
@@ -615,3 +713,6 @@ class PlayerGameIdentity(BaseModel):
     updated_at: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+MatchMap.model_rebuild()

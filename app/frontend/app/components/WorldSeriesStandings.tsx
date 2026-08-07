@@ -1,6 +1,7 @@
 import StandingsTable from "./StandingsTable";
 import BracketView from "./BracketView";
 import ContextBar from "./ContextBar";
+import KillRaceStandingsDetailed from "./KillRaceStandingsDetailed";
 
 import {
   Match,
@@ -10,6 +11,10 @@ import {
   Tournament,
 } from "../../lib/api";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import {
+  buildKillRaceStandings,
+  resolveStandingsSurface,
+} from "../../lib/killRaceStandings.mjs";
 import {
   findChampion,
   getMatchPointStatusFromPolicy,
@@ -29,6 +34,7 @@ type WorldSeriesStandingsProps = {
   teams: Team[];
   matches: Match[];
   matchCompletionPolicy: MatchCompletionPolicy | null;
+  broadcastMatchId?: number | null;
   results?: TeamResultDetail[];
   onSelectTournament: (tournamentId: number) => void;
 };
@@ -43,16 +49,25 @@ export default function WorldSeriesStandings({
   teams,
   matches,
   matchCompletionPolicy,
+  broadcastMatchId = null,
   results,
   onSelectTournament,
 }: WorldSeriesStandingsProps) {
   const selectedEngine = selectedTournament
     ? resolveTournamentEngine(selectedTournament)
     : null;
-  const isBracket = selectedEngine
-    ? selectedEngine.scoringProfile === "kill_race" ||
-      selectedEngine.tournamentStructure !== "cumulative"
-    : false;
+  const standingsSurface = resolveStandingsSurface(selectedEngine);
+  const isKillRaceDetailed = standingsSurface === "kill-race-detailed";
+  const isBracket = standingsSurface === "bracket" || isKillRaceDetailed;
+  const killRaceViewModel = isKillRaceDetailed
+    ? buildKillRaceStandings({
+        tournament: selectedTournament,
+        engine: selectedEngine,
+        teams,
+        matches,
+        broadcastMatchId,
+      })
+    : null;
   const champion = isBracket ? findChampion(matches, teams) : null;
   const isCompleted = isBracket ? isTournamentCompleted(matches) : false;
   const matchPointStatus =
@@ -83,11 +98,21 @@ export default function WorldSeriesStandings({
       <section className="bf-standings-toolbar">
         <div>
           <span className="bf-standings-kicker">
-            {isBracket ? "Bracket / Resultados" : "Clasificación general"}
+            {isKillRaceDetailed
+              ? "KILL RACE · RENDIMIENTO"
+              : isBracket
+                ? "Bracket / Resultados"
+                : "Clasificación general"}
           </span>
-          <h2>{selectedTournament?.name ?? "Sin torneo activo"}</h2>
+          <h2>
+            {isKillRaceDetailed
+              ? "RANKING DE RENDIMIENTO"
+              : selectedTournament?.name ?? "Sin torneo activo"}
+          </h2>
           <p>
-            {isBracket
+            {isKillRaceDetailed
+              ? "El ranking refleja rendimiento por kills confirmadas. El avance oficial lo determina el resultado de cada serie."
+              : isBracket
               ? isCompleted
                 ? `Campeón: ${champion?.displayName ?? "—"} · Serie final ${champion?.finalScore ?? "—"}.`
                 : totalTeams > 0
@@ -144,7 +169,22 @@ export default function WorldSeriesStandings({
       ) : null}
 
       <section className="bf-standings-panel">
-        {isBracket ? (
+        {!selectedTournament ? (
+          <div className="kr-detailed-empty">
+            <span>BRACKETFLOW · ARENA DIGITAL</span>
+            <h3>SIN TORNEO SELECCIONADO</h3>
+            <p>Selecciona un torneo para consultar sus resultados.</p>
+          </div>
+        ) : isKillRaceDetailed && selectedEngine && killRaceViewModel ? (
+          <KillRaceStandingsDetailed
+            key={selectedTournament.id}
+            viewModel={killRaceViewModel}
+            tournament={selectedTournament}
+            engine={selectedEngine}
+            teams={teams}
+            matches={matches}
+          />
+        ) : standingsSurface === "bracket" ? (
           <BracketView
             tournament={selectedTournament}
             engine={selectedEngine}

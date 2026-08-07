@@ -291,3 +291,10 @@ Fuera de v0 (siguen en backlog):
   tenant/workspace.
 - Futuro: links explicitos `TeamProfile <-> Team` y
   `PlayerProfile <-> Player` para reemplazar el matching heuristico.
+
+## Kill Race Arena — Spartan Shield Roulette
+
+Reemplazar la ruleta visual por un escudo espartano segmentado.
+Mantener lógica, accesibilidad y resultado actual.
+Animación de giro con anillos/partículas tipo portal, sin copiar iconografía protegida.
+No bloquear operación ni reducir legibilidad.

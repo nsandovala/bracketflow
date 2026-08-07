@@ -32,8 +32,11 @@ import {
   createCasterInspectorSelection,
   getMatchPointDefinitionSummary,
   reconcileCasterInspectorSelection,
+  reconcileCasterPlayerSelection,
   toggleCasterInspectorContext,
+  toggleCasterPlayerSelection,
 } from "../../lib/casterInspectorState.mjs";
+import type { KillRaceCasterPlayer } from "../../lib/killRaceCasterState.mjs";
 
 type ContextKey = "leader" | "kills" | "mvp" | "definition" | "matches";
 
@@ -53,6 +56,20 @@ type Props = {
   activeMatch: Match | null;
   loading: boolean;
   backendOnline: boolean;
+  killRaceState?: {
+    teamTotals: Array<{
+      teamId: number;
+      teamName: string;
+      kills: number;
+      confirmedMaps: number;
+    }>;
+    playerRanking: KillRaceCasterPlayer[];
+    confirmedMapCount: number;
+    mvp: KillRaceCasterPlayer[];
+    broadcastMatch: Match | null;
+    champion: Team | null;
+    completedSeriesCount: number;
+  } | null;
 };
 
 function formatPoints(value: number) {
@@ -84,6 +101,7 @@ export default function CasterContextInspector({
   activeMatch,
   loading,
   backendOnline,
+  killRaceState = null,
 }: Props) {
   const matchPointThreshold =
     matchCompletionPolicy?.matchPointThreshold ?? undefined;
@@ -198,6 +216,42 @@ export default function CasterContextInspector({
       detail: latestReportedMatch ? `Último reporte: Partida ${latestReportedMatch.round}` : "Sin reportes oficiales",
     },
   ];
+  if (killRaceState) {
+    const topTeam = [...killRaceState.teamTotals].sort((a, b) => b.kills - a.kills)[0];
+    cards[0] = {
+      key: "leader",
+      label: killRaceState.champion ? "Campeón" : "Líder confirmado",
+      value: killRaceState.champion?.name ?? (topTeam ? teamById.get(topTeam.teamId)?.name ?? "Equipo" : "Sin datos"),
+      detail: topTeam ? `${topTeam.kills} K confirmadas` : "Mapas confirmados pendientes",
+    };
+    cards[1] = {
+      key: "kills",
+      label: "Top kills / equipo",
+      value: topTeam ? `${teamById.get(topTeam.teamId)?.name ?? "Equipo"} · ${topTeam.kills} K` : "Datos pendientes",
+      detail: `${killRaceState.confirmedMapCount} mapas confirmados`,
+    };
+    cards[2] = {
+      key: "mvp",
+      label: "MVP / jugadores",
+      value: killRaceState.mvp.length
+        ? killRaceState.mvp.map((player) => player.playerName).join(" / ")
+        : "Player stats pendientes",
+      detail: killRaceState.mvp.length ? `${killRaceState.mvp[0].kills} K confirmadas` : "No se infiere MVP sin desglose",
+    };
+    cards[4] = {
+      key: "matches",
+      label: "Partidas / serie",
+      value: killRaceState.broadcastMatch ? `Match ${killRaceState.broadcastMatch.id}` : "Sin match en transmisión",
+      detail: `${killRaceState.completedSeriesCount} series completadas`,
+    };
+    cards[3] = {
+      key: "definition",
+      label: "Definición",
+      value: killRaceState.champion?.name ?? "Torneo en curso",
+      detail: killRaceState.champion ? "Campeón confirmado" : "Llave Kill Race abierta",
+      gold: Boolean(killRaceState.champion),
+    };
+  }
 
   return (
     <>
@@ -239,6 +293,16 @@ export default function CasterContextInspector({
           <p className="bf-caster-inspector-empty">Cargando contexto oficial…</p>
         ) : !backendOnline ? (
           <p className="bf-caster-inspector-empty">Backend offline. No se puede actualizar este contexto.</p>
+        ) : killRaceState && selected === "leader" ? (
+          <KillRaceChampionDetail state={killRaceState} />
+        ) : killRaceState && selected === "kills" ? (
+          <KillRaceKillsDetail state={killRaceState} />
+        ) : killRaceState && selected === "mvp" ? (
+          <KillRaceMvpDetail state={killRaceState} />
+        ) : killRaceState && selected === "definition" ? (
+          <KillRaceChampionDetail state={killRaceState} />
+        ) : killRaceState && selected === "matches" ? (
+          <KillRaceSeriesDetail state={killRaceState} teams={teams} />
         ) : selected === "leader" ? (
           <LeaderDetail
             leader={leader}
@@ -288,6 +352,160 @@ export default function CasterContextInspector({
           />
         ) : null}
       </section>
+    </>
+  );
+}
+
+type KillRaceState = NonNullable<Props["killRaceState"]>;
+
+function KillRaceChampionDetail({ state }: { state: KillRaceState }) {
+  return (
+    <>
+      <InspectorTitle
+        title={state.champion ? `Campeón: ${state.champion.name}` : "Torneo Kill Race en curso"}
+        note={`${state.completedSeriesCount} series · ${state.confirmedMapCount} mapas confirmados`}
+      />
+      <p className="bf-caster-inspector-empty">
+        {state.champion
+          ? "La definición y las estadísticas finales permanecen disponibles."
+          : "La definición depende exclusivamente de la llave confirmada."}
+      </p>
+    </>
+  );
+}
+
+function KillRaceKillsDetail({ state }: { state: KillRaceState }) {
+  const leaderKills = state.teamTotals[0]?.kills ?? 0;
+  return (
+    <>
+      <InspectorTitle
+        title="Top kills / equipos"
+        note={state.teamTotals.filter((team) => team.kills === leaderKills).length > 1 ? "Liderato empatado" : "Kills confirmadas"}
+      />
+      <CompactRows
+        labels={["Equipo", "Kills", "Mapas", "Estado"]}
+        rows={state.teamTotals.map((team) => [
+          team.teamName,
+          String(team.kills),
+          String(team.confirmedMaps),
+          team.kills === leaderKills ? "Líder" : `-${leaderKills - team.kills}`,
+        ])}
+        empty="Aún no hay mapas confirmados."
+      />
+    </>
+  );
+}
+
+function KillRaceMvpDetail({ state }: { state: KillRaceState }) {
+  const [selectedPlayerKey, setSelectedPlayerKey] = useState<string | null>(null);
+  const availableKeys = state.playerRanking.map((player) => player.playerKey);
+  const selectedKey = reconcileCasterPlayerSelection(selectedPlayerKey, availableKeys);
+  if (selectedKey !== selectedPlayerKey) setSelectedPlayerKey(selectedKey);
+  return (
+    <>
+      <InspectorTitle
+        title={state.mvp.length > 1 ? "MVP empatado" : state.mvp.length === 1 ? "MVP confirmado" : "Sin desglose individual"}
+        note={state.mvp.length ? "Kills individuales de mapas confirmados" : "No se inventa MVP desde el total de equipo"}
+      />
+      {state.playerRanking.length === 0 ? (
+        <p className="bf-caster-inspector-empty">Sin desglose individual.</p>
+      ) : (
+        <div className="bf-kr-player-table" role="table" aria-label="MVP confirmado Kill Race">
+          <div className="bf-kr-player-row is-head" role="row">
+            {["#", "Jugador", "Equipo", "Kills", "Mapas", "Promedio", "Estado"].map((label) => (
+              <span role="columnheader" key={label}>{label}</span>
+            ))}
+          </div>
+          {state.playerRanking.map((player) => {
+            const active = selectedKey === player.playerKey;
+            const detailId = `kr-player-detail-${player.playerKey.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+            return (
+              <Fragment key={player.playerKey}>
+                <div className={`bf-kr-player-row${active ? " is-active" : ""}`} role="row">
+                  <span role="cell">{player.rank}</span>
+                  <span role="cell">
+                    <button
+                      type="button"
+                      className="bf-kr-player-open"
+                      aria-expanded={active}
+                      aria-controls={detailId}
+                      onClick={() =>
+                        setSelectedPlayerKey((current) =>
+                          toggleCasterPlayerSelection(current, player.playerKey)
+                        )
+                      }
+                    >
+                      {player.nickname}
+                    </button>
+                  </span>
+                  <span role="cell">{player.teamName}</span>
+                  <span role="cell">{player.confirmedKills}</span>
+                  <span role="cell">{player.confirmedMapCount}</span>
+                  <span role="cell">{player.averageKills.toFixed(1)}</span>
+                  <span role="cell">
+                    {player.isTiedMvp ? "MVP empatado" : player.isMvp ? "MVP" : "—"}
+                  </span>
+                </div>
+                {active ? <KillRacePlayerDetail id={detailId} player={player} /> : null}
+              </Fragment>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function KillRacePlayerDetail({
+  id,
+  player,
+}: {
+  id: string;
+  player: KillRaceCasterPlayer;
+}) {
+  return (
+    <section id={id} className="bf-kr-player-detail" aria-label={`Estadísticas de ${player.nickname}`}>
+      <header>
+        <div>
+          <span>Rendimiento oficial Kill Race</span>
+          <h3>{player.nickname}</h3>
+          <p>{player.teamName}</p>
+        </div>
+        <div className="bf-caster-inspector-metrics is-inline">
+          <span><b>{player.confirmedKills}</b> kills</span>
+          <span><b>{player.confirmedMapCount}</b> mapas</span>
+          <span><b>{player.averageKills.toFixed(1)}</b> promedio</span>
+          <span><b>#{player.rank}</b> ranking MVP</span>
+          {player.isTiedMvp ? <span><b>EMPATE</b> MVP</span> : null}
+        </div>
+      </header>
+      <CompactRows
+        labels={["Match", "Mapa", "Kills"]}
+        rows={player.mapBreakdown.map((map) => [
+          String(map.matchId),
+          String(map.mapNumber),
+          String(map.kills),
+        ])}
+        empty="Sin mapas confirmados con player stats."
+      />
+    </section>
+  );
+}
+
+function KillRaceSeriesDetail({ state, teams }: { state: KillRaceState; teams: Team[] }) {
+  const match = state.broadcastMatch;
+  const teamName = (id: number | null) => teams.find((team) => team.id === id)?.name ?? "Por definir";
+  return (
+    <>
+      <InspectorTitle
+        title={match ? `Match ${match.id} en transmisión` : "Sin serie al aire"}
+        note={`${state.completedSeriesCount} series completadas`}
+      />
+      {match ? (
+        <p className="bf-caster-inspector-empty">
+          {teamName(match.team_a_id)} vs {teamName(match.team_b_id)} · Serie {match.maps_won_a}–{match.maps_won_b}
+        </p>
+      ) : null}
     </>
   );
 }

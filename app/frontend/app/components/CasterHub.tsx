@@ -25,15 +25,26 @@ import {
 } from "../../lib/identityResolver";
 import BroadcastSetup from "./BroadcastSetup";
 import CasterContextInspector from "./CasterContextInspector";
+import { getCompatibleOverlayLayouts } from "../../lib/streamRouting.mjs";
+import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
+import {
+  buildKillRaceChampionOverlay,
+  buildKillRaceMvpOverlay,
+} from "../../lib/killRaceAwards.mjs";
+import {
+  getFollowOperatorOverlayUrl,
+  getTournamentOverlayUrl,
+} from "../../lib/broadcastChannel.mjs";
 
 const STREAM_ORIGIN = "http://localhost:3000";
 
 type OverlayDefinition = {
-  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard";
+  layout: "sidebar" | "lower-third" | "matchpoint" | "mvp" | "leaderboard" | "scorebug" | "intermission" | "bracket" | "champion";
   title: string;
   description: string;
   note?: string;
   transparent: boolean;
+  transparentOption?: boolean;
 };
 
 const OVERLAYS: OverlayDefinition[] = [
@@ -71,6 +82,42 @@ const OVERLAYS: OverlayDefinition[] = [
   },
 ];
 
+const KILL_RACE_OVERLAYS: OverlayDefinition[] = [
+  {
+    layout: "scorebug",
+    title: "Kill Race Scorebug",
+    description: "Marcador compacto de serie y kills individuales para gameplay.",
+    transparent: true,
+  },
+  {
+    layout: "intermission",
+    title: "Intermission",
+    description: "Escena de pausa con enfrentamiento, último mapa y jugador destacado.",
+    note: "ESCENA ENTRE PARTIDAS",
+    transparent: false,
+    transparentOption: true,
+  },
+  {
+    layout: "bracket",
+    title: "Bracket",
+    description: "Llave completa read-only para una escena independiente de OBS.",
+    transparent: true,
+  },
+  {
+    layout: "mvp",
+    title: "MVP / Jugador destacado",
+    description: "Jugador destacado confirmado del mapa, serie o torneo.",
+    transparent: true,
+  },
+  {
+    layout: "champion",
+    title: "Champion",
+    description: "Escena de coronación basada exclusivamente en la final confirmada.",
+    transparent: false,
+    transparentOption: true,
+  },
+];
+
 function parseTournamentId(value: string | null) {
   if (!value) {
     return null;
@@ -84,7 +131,7 @@ function formatPoints(points: number) {
   return Number.isInteger(points) ? String(points) : points.toFixed(1);
 }
 
-function getOverlayUrl(tournamentId: number, overlay: OverlayDefinition) {
+function getOverlayUrl(tournamentId: number, overlay: OverlayDefinition, matchId?: number) {
   const query = new URLSearchParams({
     tournamentId: String(tournamentId),
     obs: "1",
@@ -94,6 +141,7 @@ function getOverlayUrl(tournamentId: number, overlay: OverlayDefinition) {
     query.set("bg", "transparent");
   }
   query.set("layout", overlay.layout);
+  if (matchId !== undefined) query.set("matchId", String(matchId));
 
   return `${STREAM_ORIGIN}/stream?${query.toString()}`;
 }
@@ -123,6 +171,7 @@ export default function CasterHub() {
     sortedStandings,
     tournamentResults: rawTournamentResults,
     selectedEngine,
+    broadcastChannel,
     selectTournament,
   } = useWorldSeriesPractice(preferredTournamentId);
   const identityCatalog = useIdentityMetadata();
@@ -148,6 +197,54 @@ export default function CasterHub() {
 
   const engine = selectedTournament ? selectedEngine ?? resolveTournamentEngine(selectedTournament) : null;
   const isBracket = engine?.primaryView === "bracket";
+  const isKillRace = engine?.scoringProfile === "kill_race";
+  const compatibleLayouts = getCompatibleOverlayLayouts({
+    isKillRace,
+    supportsMatchPoint: Boolean(engine?.supportsMatchPoint),
+  });
+  const compatibleOverlays = (isKillRace ? KILL_RACE_OVERLAYS : OVERLAYS).filter((overlay) =>
+    compatibleLayouts.includes(overlay.layout)
+  );
+  const broadcastMatchId =
+    broadcastChannel?.activeTournamentId === selectedTournament?.id
+      ? broadcastChannel?.broadcastMatchId ?? null
+      : null;
+  const onAirTournament = tournaments.find(
+    (candidate) => candidate.id === broadcastChannel?.activeTournamentId
+  ) ?? null;
+  const killRaceState = useMemo(
+    () =>
+      isKillRace
+        ? buildKillRaceCasterState({
+            matches,
+            teams,
+            broadcastMatchId,
+          })
+        : null,
+    [broadcastMatchId, isKillRace, matches, teams]
+  );
+  const killRaceMvpAward = useMemo(
+    () =>
+      isKillRace
+        ? buildKillRaceMvpOverlay({
+            tournament: selectedTournament,
+            teams,
+            matches,
+          })
+        : null,
+    [isKillRace, matches, selectedTournament, teams]
+  );
+  const killRaceChampionAward = useMemo(
+    () =>
+      isKillRace
+        ? buildKillRaceChampionOverlay({
+            tournament: selectedTournament,
+            teams,
+            matches,
+          })
+        : null,
+    [isKillRace, matches, selectedTournament, teams]
+  );
   const standings = sortedStandings.map((entry) => ({
     ...entry,
     team_name: teams.find((team) => team.id === entry.team_id)?.name ?? entry.team_name,
@@ -219,10 +316,54 @@ export default function CasterHub() {
       ? resolvedLeaderLabel
       : "Sin datos suficientes";
   const teamToWatchContext = highestKillsContext;
+  const killRaceTopTeam = killRaceState?.teamTotals[0] ?? null;
+  const killRaceMvpNames = killRaceState?.mvp.map((player) => player.playerName) ?? [];
+  const onAirSeries = killRaceState?.broadcastMatch ?? null;
+  const mainChannelAlerts = isKillRace && selectedTournament ? [
+    ...(broadcastChannel?.activeTournamentId === null
+      ? ["CANAL MAIN SIN TORNEO · Asigna un torneo desde Operator antes de salir al aire."]
+      : []),
+    ...(broadcastChannel && broadcastChannel.activeTournamentId !== null && !onAirTournament
+      ? ["TORNEO NO DISPONIBLE · El canal main referencia un torneo eliminado o inaccesible."]
+      : []),
+    ...(onAirTournament && broadcastChannel?.broadcastMatchId === null
+      ? ["NO HAY MATCH AL AIRE · El torneo LIVE existe, pero no tiene una serie transmitida."]
+      : []),
+    ...(onAirTournament && selectedTournament.id !== onAirTournament.id
+      ? [`PREVIEW AISLADO · El selector muestra ${selectedTournament.name}, mientras LIVE sigue ${onAirTournament.name}.`]
+      : []),
+    ...(onAirTournament?.id === selectedTournament.id &&
+      activeMatch?.id && broadcastChannel?.broadcastMatchId &&
+      activeMatch.id !== broadcastChannel.broadcastMatchId
+      ? [`SERIE DISTINTA · La serie operativa seleccionada es Match ${activeMatch.id}; al aire está Match ${broadcastChannel.broadcastMatchId}.`]
+      : []),
+    ...(onAirTournament?.id === selectedTournament.id &&
+      broadcastChannel?.broadcastMatchId !== null && !onAirSeries
+      ? ["NO HAY MATCH AL AIRE · La referencia del canal no pertenece al torneo LIVE o ya no existe."]
+      : []),
+    ...(onAirSeries && onAirSeries.maps.length > 0 &&
+      !onAirSeries.maps.some((map) => (map.player_stats?.length ?? 0) > 0)
+      ? ["SIN PLAYER_STATS · Se muestran kills de equipo, sin inventar desglose individual."]
+      : []),
+    ...(onAirSeries && (onAirSeries.status === "completed" || onAirSeries.winner_id !== null)
+      ? ["MATCH FINALIZADO · La fuente LIVE conserva el resultado confirmado hasta cambiar de serie."]
+      : []),
+  ] : [];
 
   const nowNarration = (() => {
     if (!selectedTournament) {
       return "Selecciona un torneo para preparar la señal y la narrativa.";
+    }
+    if (isKillRace) {
+      if (killRaceState?.champion) {
+        return `Cierra con ${killRaceState.champion.name}, campeón confirmado, y conserva las estadísticas finales.`;
+      }
+      if (killRaceState?.broadcastMatch) {
+        return `Sigue el Match ${killRaceState.broadcastMatch.id}, la serie enviada por Operator.`;
+      }
+      return killRaceTopTeam
+        ? `${killRaceTopTeam.teamName} lidera las kills confirmadas; no hay serie al aire.`
+        : "Kill Race está en preparación; no hay mapas confirmados ni serie al aire.";
     }
     if (championLabel) {
       return `Cierra con ${championLabel}: el campeonato ya está decidido.`;
@@ -399,7 +540,29 @@ export default function CasterHub() {
             activeMatch={activeMatch}
             loading={loading}
             backendOnline={backendOnline}
+            killRaceState={killRaceState}
           />
+
+          {isKillRace ? (
+            <section className="bf-caster-context" aria-label="Match en transmisión">
+              <strong>CANAL MAIN · EN VIVO</strong>
+              <span>Torneo: {onAirTournament?.name ?? "Ninguno"}</span>
+              <span>
+                {onAirSeries
+                  ? `Match ${onAirSeries.id} · ${getMatchTeamLabel(onAirSeries.team_a_id!)} vs ${getMatchTeamLabel(onAirSeries.team_b_id!)}`
+                  : broadcastChannel?.broadcastMatchId
+                    ? `Match ${broadcastChannel.broadcastMatchId} · referencia no disponible en el torneo seleccionado`
+                  : "Sin serie enviada por Operator"}
+              </span>
+              <span>Engine: {broadcastChannel?.engine ?? "Sin engine"}</span>
+            </section>
+          ) : null}
+
+          {mainChannelAlerts.length > 0 ? (
+            <section className="bf-caster-broadcast-alerts" aria-label="Alertas operativas de broadcast">
+              {mainChannelAlerts.map((alert) => <p key={alert}>{alert}</p>)}
+            </section>
+          ) : null}
 
           <div className="bf-caster-grid">
             <section className="bf-caster-panel bf-caster-overlays">
@@ -412,7 +575,109 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-overlay-list">
-                {OVERLAYS.map((overlay) => {
+                {isKillRace ? (
+                  <div className="bf-caster-overlay-group" aria-label="Canal main en vivo">
+                    <div className="bf-caster-overlay-group-head">
+                      <div>
+                        <span>CANAL MAIN · EN VIVO</span>
+                        <strong>Fuentes OBS estables</strong>
+                      </div>
+                      <p>Sigue la transmisión enviada por Operator.</p>
+                    </div>
+                    <div className="bf-caster-overlay-source-grid">
+                      {KILL_RACE_OVERLAYS.map((overlay) => {
+                      const url = getFollowOperatorOverlayUrl(
+                        STREAM_ORIGIN,
+                        overlay.layout,
+                        "main",
+                        overlay.layout !== "intermission"
+                      );
+                      const copyKey = `live-${overlay.layout}`;
+                      const status = copyState?.key === copyKey ? copyState.status : null;
+                      return (
+                        <article
+                          className={`bf-caster-overlay is-live-source${overlay.layout === "champion" ? " is-champion-source" : ""}`}
+                          key={copyKey}
+                        >
+                          <div className="bf-caster-overlay-copy">
+                            <h3>{overlay.title} · CANAL MAIN</h3>
+                            <p>Fuente OBS estable · sigue exclusivamente el canal main.</p>
+                            <small className="bf-caster-overlay-note">No cambia al seleccionar otro torneo.</small>
+                            <code>{url}</code>
+                          </div>
+                          <div className="bf-caster-overlay-actions">
+                            <button type="button" onClick={() => void handleCopy(copyKey, url)}>
+                              {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copiar URL OBS"}
+                            </button>
+                            <button type="button" className="is-open" onClick={() => openOverlay(url)}>
+                              Abrir canal al aire
+                            </button>
+                          </div>
+                        </article>
+                      );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {isKillRace ? (
+                  <div className="bf-caster-overlay-group is-preview" aria-label="Preview del torneo seleccionado">
+                    <div className="bf-caster-overlay-group-head">
+                      <div>
+                        <span>PREVIEW · TORNEO SELECCIONADO</span>
+                        <strong>Vista previa histórica</strong>
+                      </div>
+                      <p>#{selectedTournament.id} · {selectedTournament.name}</p>
+                    </div>
+                    <div className="bf-caster-overlay-source-grid">
+                      {KILL_RACE_OVERLAYS.map((overlay) => {
+                      const url = getTournamentOverlayUrl(
+                        STREAM_ORIGIN,
+                        selectedTournament.id,
+                        overlay.layout
+                      );
+                      const copyKey = `preview-${overlay.layout}-${selectedTournament.id}`;
+                      const status = copyState?.key === copyKey ? copyState.status : null;
+                      const availabilityNote = overlay.layout === "mvp"
+                        ? killRaceMvpAward?.state === "ready"
+                          ? killRaceMvpAward.isTied
+                            ? `MVP empatado · ${killRaceMvpAward.leaders.length} jugadores confirmados`
+                            : `${killRaceMvpAward.title} disponible`
+                          : killRaceMvpAward?.state === "no-player-stats"
+                            ? "SIN DESGLOSE INDIVIDUAL CONFIRMADO"
+                            : "Esperando cierre o player stats confirmadas"
+                        : overlay.layout === "champion" && killRaceChampionAward?.state === "ready"
+                          ? `Campeón oficial · ${killRaceChampionAward.champion?.name}`
+                          : overlay.layout === "champion"
+                            ? "CAMPEÓN AÚN NO DEFINIDO"
+                            : "Preview fija: no sigue Operator ni modifica el canal main.";
+                      return (
+                        <article
+                          className={`bf-caster-overlay is-preview-source${overlay.layout === "champion" ? " is-champion-source" : ""}`}
+                          key={copyKey}
+                        >
+                          <div className="bf-caster-overlay-copy">
+                            <h3>{overlay.title} · TORNEO SELECCIONADO</h3>
+                            <p>Histórico fijo · torneo #{selectedTournament.id} · no sigue Operator.</p>
+                            <small className="bf-caster-overlay-note">{availabilityNote}</small>
+                            <code>{url}</code>
+                          </div>
+                          <div className="bf-caster-overlay-actions">
+                            <button type="button" className="is-open" onClick={() => openOverlay(url)}>
+                              Abrir preview
+                            </button>
+                            <button type="button" onClick={() => void handleCopy(copyKey, url)}>
+                              {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copiar URL fija"}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
+                {!isKillRace ? compatibleOverlays.map((overlay) => {
                   const url = getOverlayUrl(selectedTournament.id, overlay);
                   const status = copyState?.key === overlay.layout ? copyState.status : null;
                   const isRecommended = overlay.layout === broadcastSetup.defaultLayout;
@@ -434,16 +699,78 @@ export default function CasterHub() {
                       </div>
                       <div className="bf-caster-overlay-actions">
                         <button type="button" onClick={() => void handleCopy(overlay.layout, url)}>
-                          {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copy URL"}
+                          {status === "copied" ? "Copiada" : status === "error" ? "Reintentar" : "Copiar URL"}
                         </button>
                         <button type="button" className="is-open" onClick={() => openOverlay(url)}>
-                          Open overlay
+                          Abrir overlay
                         </button>
                       </div>
                     </article>
                   );
-                })}
-                <article className="bf-caster-overlay bf-caster-overlay-dark">
+                }) : null}
+                {isKillRace
+                  ? matches
+                      .filter((match) =>
+                        match.team_a_id !== null &&
+                        match.team_b_id !== null &&
+                        (match.winner_id === null ||
+                          match.maps.some((map) => map.result_status === "provisional"))
+                      )
+                      .map((match) => {
+                        const overlay = KILL_RACE_OVERLAYS[0];
+                        const url = getOverlayUrl(selectedTournament.id, overlay, match.id);
+                        return (
+                          <article className="bf-caster-overlay" key={`fixed-${match.id}`}>
+                            <div className="bf-caster-overlay-copy">
+                              <h3>Scorebug fijo · Match {match.id}</h3>
+                              <p>{getMatchTeamLabel(match.team_a_id!)} vs {getMatchTeamLabel(match.team_b_id!)}</p>
+                              <code>{url}</code>
+                            </div>
+                            <div className="bf-caster-overlay-actions">
+                              <button type="button" onClick={() => void handleCopy(`fixed-${match.id}`, url)}>Copy URL</button>
+                              <button type="button" className="is-open" onClick={() => openOverlay(url)}>Open overlay</button>
+                            </div>
+                          </article>
+                        );
+                      })
+                  : null}
+                {isKillRace && killRaceChampionAward?.state !== "ready"
+                  ? matches
+                      .filter((match) =>
+                        match.team_a_id !== null &&
+                        match.team_b_id !== null &&
+                        match.maps.some(
+                          (map) =>
+                            map.result_status === "confirmed" &&
+                            (map.player_stats?.length ?? 0) > 0
+                        )
+                      )
+                      .map((match) => {
+                        const overlay = KILL_RACE_OVERLAYS.find(
+                          (candidate) => candidate.layout === "mvp"
+                        )!;
+                        const url = getTournamentOverlayUrl(
+                          STREAM_ORIGIN,
+                          selectedTournament.id,
+                          overlay.layout,
+                          match.id
+                        );
+                        return (
+                          <article className="bf-caster-overlay" key={`fixed-mvp-${match.id}`}>
+                            <div className="bf-caster-overlay-copy">
+                              <h3>MVP fijo · Match {match.id}</h3>
+                              <p>{getMatchTeamLabel(match.team_a_id!)} vs {getMatchTeamLabel(match.team_b_id!)}</p>
+                              <code>{url}</code>
+                            </div>
+                            <div className="bf-caster-overlay-actions">
+                              <button type="button" onClick={() => void handleCopy(`fixed-mvp-${match.id}`, url)}>Copiar URL fija</button>
+                              <button type="button" className="is-open" onClick={() => openOverlay(url)}>Abrir preview</button>
+                            </div>
+                          </article>
+                        );
+                      })
+                  : null}
+                {!isKillRace ? <article className="bf-caster-overlay bf-caster-overlay-dark">
                   <div className="bf-caster-overlay-copy">
                     <h3>Leaderboard dark</h3>
                     <p>Escena de leaderboard a pantalla completa con fondo oscuro.</p>
@@ -468,7 +795,7 @@ export default function CasterHub() {
                       Open overlay
                     </button>
                   </div>
-                </article>
+                </article> : null}
               </div>
             </section>
 
@@ -482,7 +809,17 @@ export default function CasterHub() {
 
               <div className="bf-caster-note-block">
                 <span>Top 3 equipos</span>
-                {topThree.length > 0 ? (
+                {isKillRace && killRaceState?.teamTotals.length ? (
+                  <ol>
+                    {killRaceState.teamTotals.slice(0, 3).map((entry, index) => (
+                      <li key={entry.teamId}>
+                        <b>{index + 1}</b>
+                        <strong>{entry.teamName}</strong>
+                        <small>{entry.kills} K · {entry.confirmedMaps} mapas confirmados</small>
+                      </li>
+                    ))}
+                  </ol>
+                ) : topThree.length > 0 ? (
                   <ol>
                     {topThree.map((entry, index) => (
                       <li key={entry.team_id}>
@@ -500,22 +837,30 @@ export default function CasterHub() {
               <div className="bf-caster-note-block">
                 <span>Equipo a seguir</span>
                 <p>
-                  <strong>{teamToWatch}</strong>
-                  {highestKills ? ` lidera en kills con ${highestKills.kills}.` : " no tiene estadísticas todavía."}
-                  {teamToWatchContext?.notes ? ` Nota Identity: ${teamToWatchContext.notes}` : ""}
+                  <strong>{isKillRace ? killRaceTopTeam?.teamName ?? "Sin datos suficientes" : teamToWatch}</strong>
+                  {isKillRace
+                    ? killRaceTopTeam ? ` lidera con ${killRaceTopTeam.kills} kills confirmadas.` : " no tiene mapas confirmados."
+                    : highestKills ? ` lidera en kills con ${highestKills.kills}.` : " no tiene estadísticas todavía."}
+                  {!isKillRace && teamToWatchContext?.notes ? ` Nota Identity: ${teamToWatchContext.notes}` : ""}
                 </p>
               </div>
 
               <div className="bf-caster-note-block">
                 <span>
-                  {mvp.kind === "player"
+                  {isKillRace
+                    ? killRaceMvpNames.length > 1 ? "MVP empatado" : killRaceMvpNames.length === 1 ? "MVP confirmado" : "MVP pendiente"
+                    : mvp.kind === "player"
                     ? mvp.tiedWith.length > 0
                       ? "MVP empatado"
                       : "MVP actual"
                     : "MVP pendiente"}
                 </span>
                 <p>
-                  {mvp.kind === "player" ? (
+                  {isKillRace ? (
+                    killRaceMvpNames.length
+                      ? <><strong>{killRaceMvpNames.join(" / ")}</strong> · {killRaceState?.mvp[0]?.kills ?? 0} K confirmadas.</>
+                      : "Sin desglose individual; no se infiere MVP desde kills de equipo."
+                  ) : mvp.kind === "player" ? (
                     mvp.tiedWith.length > 0 ? (
                       <>
                         MVP empatado:{" "}
@@ -538,8 +883,10 @@ export default function CasterHub() {
               </div>
 
               <div className="bf-caster-note-block">
-                <span>Match Point / campeón</span>
-                <p>{matchPointMessage ?? (bracketChampion ? `Campeón de bracket: ${bracketChampion.displayName}.` : "Sin definición activa confirmada.")}</p>
+                <span>{isKillRace ? "Campeón" : "Match Point / campeón"}</span>
+                <p>{isKillRace
+                  ? killRaceState?.champion ? `Campeón de Kill Race: ${killRaceState.champion.name}.` : "La llave sigue abierta."
+                  : matchPointMessage ?? (bracketChampion ? `Campeón de bracket: ${bracketChampion.displayName}.` : "Sin definición activa confirmada.")}</p>
               </div>
 
               <div className="bf-caster-now">

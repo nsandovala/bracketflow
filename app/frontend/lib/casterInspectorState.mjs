@@ -47,6 +47,15 @@ export function toggleCasterInspectorContext(current, contextKey) {
   };
 }
 
+export function toggleCasterPlayerSelection(currentKey, playerKey) {
+  return currentKey === playerKey ? null : playerKey;
+}
+
+export function reconcileCasterPlayerSelection(currentKey, availablePlayerKeys) {
+  if (currentKey === null || availablePlayerKeys.includes(currentKey)) return currentKey;
+  return null;
+}
+
 export function getMatchPointDefinitionSummary({
   policy,
   status,

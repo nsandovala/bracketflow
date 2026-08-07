@@ -445,6 +445,27 @@ def test_bracket_remains_locked_after_lock_endpoint(db_session):
     assert tournament.bracket_status == "locked"
 
 
+def test_six_team_single_elimination_keeps_byes_and_three_round_shape(db_session):
+    tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
+    add_players(db_session, tournament.id, 12)
+    tournament = open_roster_respin(db_session, tournament, 180)
+    generate_roulette_teams(
+        db_session,
+        tournament,
+        schemas.RouletteGenerationRequest(shuffle_seed="six-team-bye", reset=True),
+    )
+    tournament = close_roster_respin(db_session, tournament)
+    tournament = lock_roster(db_session, tournament)
+    tournament = open_bracket_respin(db_session, tournament, 3)
+    matches, _ = generate_bracket(db_session, tournament)
+
+    assert len(matches) == 7
+    assert [sum(match.round == round_number for match in matches) for round_number in (1, 2, 3)] == [4, 2, 1]
+    first_round = [match for match in matches if match.round == 1]
+    assert sum(match.status == "completed" for match in first_round) == 2
+    assert sum(match.status == "ready" for match in first_round) == 2
+
+
 def test_first_saved_map_moves_locked_bracket_to_running(db_session):
     tournament = create_engine_tournament(db_session, "kill_race_bracket", 2, "kill_race")
     add_players(db_session, tournament.id, 8)

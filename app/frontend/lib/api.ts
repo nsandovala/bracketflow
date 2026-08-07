@@ -90,6 +90,7 @@ export type TournamentConfig = {
   rouletteStatus?: "generated" | "confirmed";
   championTeamId?: number;
   championDecidedAt?: string;
+  broadcastMatchId?: number;
 };
 
 export type Tournament = {
@@ -108,6 +109,15 @@ export type Tournament = {
   bracket_locked_at: string | null;
   engine_key?: TournamentEngineKey;
   config?: TournamentConfig;
+};
+
+export type BroadcastChannel = {
+  channelKey: string;
+  activeTournamentId: number | null;
+  broadcastMatchId: number | null;
+  engine: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
 };
 
 export type MatchCompletionPolicyState =
@@ -214,6 +224,33 @@ export type MatchMap = {
   kills_a: number;
   kills_b: number;
   map_winner_id: number | null;
+  result_status: "pending" | "live" | "provisional" | "confirmed";
+  player_stats: KillRacePlayerStat[];
+};
+
+export type KillRacePlayerStat = {
+  player_id: number;
+  player_name: string;
+  side: "left" | "right";
+  kills: number;
+};
+
+export type KillRaceSideInput = {
+  side: "left" | "right";
+  team_id: number;
+  team_name: string;
+  players: Array<{ player_id: number; player_name: string; kills: number }>;
+  total_kills: number;
+};
+
+export type KillRaceImportPreview = {
+  valid: boolean;
+  match_id: number;
+  map_number: number | null;
+  left: KillRaceSideInput | null;
+  right: KillRaceSideInput | null;
+  errors: Array<{ code: string; message: string; row: number | null }>;
+  conflicts: Array<{ code: string; message: string; row: number | null }>;
 };
 
 export type TeamResultPlayerStat = {
@@ -398,6 +435,30 @@ export function updateTournament(
   });
 }
 
+export function updateTournamentBroadcastMatch(
+  tournamentId: number,
+  broadcastMatchId: number | null
+) {
+  return request<Tournament>(`/tournaments/${tournamentId}/broadcast-match`, {
+    method: "PATCH",
+    body: { broadcastMatchId },
+  });
+}
+
+export function getBroadcastChannel(channelKey = "main") {
+  return request<BroadcastChannel>(`/broadcast/channels/${encodeURIComponent(channelKey)}`);
+}
+
+export function updateBroadcastChannel(
+  channelKey: string,
+  payload: Partial<Omit<BroadcastChannel, "channelKey" | "updatedAt">>
+) {
+  return request<BroadcastChannel>(`/broadcast/channels/${encodeURIComponent(channelKey)}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
 export function getMatchCompletionPolicy(tournamentId: number) {
   return request<MatchCompletionPolicy>(
     `/tournaments/${tournamentId}/match-completion-policy`
@@ -525,6 +586,37 @@ export function generateRouletteTeams(
 
 export function getMatches(tournamentId: number) {
   return request<Match[]>(`/tournaments/${tournamentId}/matches`);
+}
+
+export function previewKillRaceImport(
+  matchId: number,
+  payload: { format: "txt" | "csv"; content: string; map_number: number }
+) {
+  return request<KillRaceImportPreview>(`/matches/${matchId}/kill-race/import-preview`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function saveKillRaceProvisional(
+  matchId: number,
+  payload: {
+    map_number: number;
+    status: "pending" | "live" | "provisional";
+    left: KillRaceSideInput;
+    right: KillRaceSideInput;
+  }
+) {
+  return request<Match>(`/matches/${matchId}/kill-race/result`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function confirmKillRaceResult(matchId: number, mapNumber: number) {
+  return request<Match>(`/matches/${matchId}/kill-race/maps/${mapNumber}/confirm`, {
+    method: "POST",
+  });
 }
 
 export function createBattleRoyaleMatch(

@@ -4,6 +4,12 @@ import { useEffect } from "react";
 
 import BackgroundParticles from "./BackgroundParticles";
 import BracketStreamView from "./BracketStreamView";
+import KillRaceIntermission, {
+  KillRaceIntermissionUnavailable,
+} from "./KillRaceIntermission";
+import KillRaceMvpOverlay from "./KillRaceMvpOverlay";
+import KillRaceChampionOverlay from "./KillRaceChampionOverlay";
+import KillRaceScorebug from "./KillRaceScorebug";
 import StreamOverlayLeaderboard from "./StreamOverlayLeaderboard";
 import StreamOverlayLowerThird from "./StreamOverlayLowerThird";
 import StreamOverlayMatchPoint from "./StreamOverlayMatchPoint";
@@ -16,6 +22,14 @@ import {
   getMatchPointStatusFromPolicy,
   getMatchPointStatusMessage,
 } from "../../lib/tournamentStatus";
+import { resolveKillRaceScorebugMatch } from "../../lib/killRaceBroadcast.mjs";
+import { buildKillRaceCasterState } from "../../lib/killRaceCasterState.mjs";
+import { buildKillRaceIntermission } from "../../lib/killRaceIntermission.mjs";
+import {
+  buildKillRaceChampionOverlay,
+  buildKillRaceMvpOverlay,
+} from "../../lib/killRaceAwards.mjs";
+import { resolveStreamSurface } from "../../lib/streamRouting.mjs";
 
 export type StreamLayout =
   | "full"
@@ -24,21 +38,47 @@ export type StreamLayout =
   | "lower-third"
   | "matchpoint"
   | "mvp"
-  | "leaderboard";
+  | "leaderboard"
+  | "bracket"
+  | "scorebug"
+  | "intermission"
+  | "champion";
 
 // Layouts que se anclan como overlay fijo transparente (browser source OBS).
 const ANCHORED_LAYOUTS: StreamLayout[] = ["sidebar", "lower", "lower-third", "matchpoint", "mvp"];
 
 type WorldSeriesStreamViewProps = {
   tournamentId: number | null;
+  matchId: number | null;
+  channel: string | null;
   obs: boolean;
   transparent: boolean;
   brand: string | null;
   layout: StreamLayout;
 };
 
+function StreamReferenceEmpty({ reason }: { reason: string }) {
+  const message = reason === "TORNEO NO DISPONIBLE"
+    ? "El canal ya no tiene un torneo válido asignado."
+    : reason === "NO HAY MATCH AL AIRE"
+      ? "Operator todavía no ha enviado una serie a transmisión."
+      : reason === "RECONECTANDO"
+        ? "Conservando la última referencia mientras vuelve el backend."
+        : "Asigna un torneo y una serie desde Operator.";
+  return (
+    <main className="kr-scorebug-stage">
+      <section className="kr-scorebug is-empty" role="status">
+        <strong>{reason}</strong>
+        <span>{message}</span>
+      </section>
+    </main>
+  );
+}
+
 export default function WorldSeriesStreamView({
   tournamentId,
+  matchId,
+  channel,
   obs,
   transparent,
   brand,
@@ -53,7 +93,10 @@ export default function WorldSeriesStreamView({
     results,
     afterGameNumber,
     connected,
-  } = useStreamLeaderboard(tournamentId);
+    channel: broadcastChannel,
+    resolvedMatchId,
+    emptyReason,
+  } = useStreamLeaderboard(tournamentId, channel, matchId);
   const engine = tournament ? resolveTournamentEngine(tournament) : null;
   const isBracket =
     engine?.scoringProfile === "kill_race" ||
@@ -71,6 +114,11 @@ export default function WorldSeriesStreamView({
     matchPointStatus.state === "champion"
       ? `Campeon por Match Point: ${matchPointStatus.championLabel}`
       : matchPointMessage ?? tournament?.game ?? "World Series";
+  const isKillRace = engine?.scoringProfile === "kill_race";
+  const streamSurface = resolveStreamSurface(layout, {
+    isKillRace: engine ? isKillRace : null,
+    isBracket,
+  });
 
   useEffect(() => {
     const body = document.body;
@@ -93,7 +141,104 @@ export default function WorldSeriesStreamView({
     };
   }, [transparent]);
 
-  if (isBracket) {
+  if (emptyReason && streamSurface !== "bracket") {
+    return <StreamReferenceEmpty reason={emptyReason} />;
+  }
+
+  if (streamSurface === "kill-race-mvp") {
+    const viewModel = buildKillRaceMvpOverlay({
+      tournament,
+      teams,
+      matches,
+      broadcastMatchId: resolvedMatchId,
+    });
+    return (
+      <KillRaceMvpOverlay
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "kill-race-champion") {
+    const viewModel = buildKillRaceChampionOverlay({ tournament, teams, matches });
+    return (
+      <KillRaceChampionOverlay
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "unsupported-champion") {
+    const viewModel = buildKillRaceChampionOverlay({ tournament, teams, matches });
+    return (
+      <KillRaceChampionOverlay
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+        unsupported
+      />
+    );
+  }
+
+  if (streamSurface === "intermission") {
+    const broadcastMatch =
+      resolvedMatchId === null
+        ? null
+        : matches.find((match) => match.id === resolvedMatchId) ?? null;
+    const killRaceCasterState = buildKillRaceCasterState({
+      matches,
+      teams,
+      broadcastMatchId: resolvedMatchId,
+    });
+    const viewModel = buildKillRaceIntermission({
+      tournament,
+      selectedEngine: engine,
+      broadcastChannel,
+      broadcastMatch,
+      teams,
+      matches,
+      killRaceCasterState,
+    });
+    return (
+      <KillRaceIntermission
+        viewModel={viewModel}
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "unsupported-intermission") {
+    return (
+      <KillRaceIntermissionUnavailable
+        connected={connected}
+        transparent={transparent}
+      />
+    );
+  }
+
+  if (streamSurface === "scorebug") {
+    const scorebugMatch = resolveKillRaceScorebugMatch(
+      matches,
+      resolvedMatchId,
+      tournament?.config?.broadcastMatchId ?? null
+    );
+    return <KillRaceScorebug tournamentId={tournament?.id ?? tournamentId} match={scorebugMatch} teams={teams} connected={connected} />;
+  }
+
+  if (streamSurface === "unsupported-scorebug") {
+    return (
+      <main className="kr-scorebug-stage">
+        <div className="kr-scorebug is-empty">Scorebug disponible solo para Kill Race</div>
+      </main>
+    );
+  }
+
+  if (streamSurface === "bracket") {
     return (
       <BracketStreamView
         tournament={tournament}
@@ -104,6 +249,7 @@ export default function WorldSeriesStreamView({
         obs={obs || layout !== "full"}
         transparent={transparent}
         brand={brand}
+        broadcastMatchId={resolvedMatchId}
       />
     );
   }

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import {
+  BroadcastChannel,
   Match,
   MatchCompletionPolicy,
   ParticipantImportResult,
@@ -20,6 +21,7 @@ import {
   TeamResultDetail,
   Tournament,
 } from "../../lib/api";
+import KillRaceResultIntake from "./KillRaceResultIntake";
 import { estimateWorldSeriesPoints } from "../../lib/tournamentMode";
 import { getEffectiveLobbySize, ResolvedTournamentEngine } from "../../lib/tournamentModel";
 import { getOperatorNextAction } from "../../lib/operatorNextAction";
@@ -112,8 +114,12 @@ type WorldSeriesOperatorProps = {
   onUpdateDraft: (matchId: number, teamId: number, patch: Partial<ResultDraft>) => void;
   onUpdateKillRaceMapDraft: (matchId: number, patch: Partial<KillRaceMapDraft>) => void;
   onSelectKillRaceMatch: (matchId: number | null) => void;
+  broadcastChannel: BroadcastChannel | null;
+  broadcastMatchId: number | null;
+  onSendKillRaceMatchToBroadcast: (matchId: number) => Promise<unknown>;
   onSaveTeamReport: (matchId: number, teamId: number) => void;
   onSaveKillRaceMap: (matchId: number) => void;
+  onKillRaceResultChanged: () => Promise<unknown>;
   onCreateNextGame: () => void;
   onConfigureMatchPoint: (threshold: number) => Promise<unknown>;
   onRemoveLatestEmptyMatch: () => Promise<unknown>;
@@ -1462,7 +1468,6 @@ export default function WorldSeriesOperator({
   teamRoster,
   teamFormError,
   resultDrafts,
-  killRaceMapDrafts,
   onPreviewParticipants,
   onTeamNameChange,
   onTeamRosterChange,
@@ -1477,10 +1482,12 @@ export default function WorldSeriesOperator({
   onOpenBracketRespin,
   onLockBracketRespin,
   onUpdateDraft,
-  onUpdateKillRaceMapDraft,
   onSelectKillRaceMatch,
+  broadcastChannel,
+  broadcastMatchId,
+  onSendKillRaceMatchToBroadcast,
   onSaveTeamReport,
-  onSaveKillRaceMap,
+  onKillRaceResultChanged,
   onCreateNextGame,
   onConfigureMatchPoint,
   onRemoveLatestEmptyMatch,
@@ -1620,13 +1627,6 @@ export default function WorldSeriesOperator({
   );
   const bracketOpen =
     selectedTournament?.bracket_status === "respin_open" && bracketCountdown !== "00:00";
-  const killRaceDraft = activeMatch
-    ? killRaceMapDrafts[activeMatch.id] ?? {
-        mapNumber: String(Math.min(activeMatch.maps.length + 1, activeMatch.best_of)),
-        killsA: "",
-        killsB: "",
-      }
-    : null;
   const activeKillRaceSeriesClosed = activeMatch
     ? activeMatch.winner_id !== null ||
       activeMatch.status === "completed" ||
@@ -1759,7 +1759,7 @@ export default function WorldSeriesOperator({
   }
 
   return (
-    <main className="bf-page bf-page-operator">
+    <main className={`bf-page bf-page-operator${isKillRace ? " is-kill-race" : ""}`}>
       <div className="opr-amb" aria-hidden="true" />
 
       {!isKillRace && matchPointStatus.state !== "idle" ? (
@@ -2013,25 +2013,52 @@ export default function WorldSeriesOperator({
             </div>
           </div>
 
-          {mode === "bracket" || mode === "op" ? (
-            <BracketView
-              tournament={selectedTournament}
-              engine={selectedEngine}
-              teams={teams}
-              matches={matches}
-              mode="operator"
-              actions={bracketViewActions}
-            />
-          ) : null}
-
-          {mode !== "setup" ? (
+          {mode !== "setup" ? <div className="kr-operator-cockpit">
+            <div className="kr-operator-bracket">
+              <BracketView
+                tournament={selectedTournament}
+                engine={selectedEngine}
+                teams={teams}
+                matches={matches}
+                mode="operator"
+                actions={bracketViewActions}
+                activeMatchId={activeMatch?.id ?? null}
+                onSelectMatch={onSelectKillRaceMatch}
+                density="compact"
+              />
+            </div>
+            <aside className="kr-operator-series">
+          {
             activeMatch && activeMatchTeamA && activeMatchTeamB ? (
               <section className="opr-panel">
-                <div className="opr-eyebrow">Serie actual</div>
+                <div className="kr-broadcast-state">
+                  <span><b>SERIE SELECCIONADA</b> Match {activeMatch.id}</span>
+                  <span><b>EN TRANSMISIÓN</b> {broadcastMatchId ? `Match ${broadcastMatchId}` : "NO ESTÁ EN TRANSMISIÓN"}</span>
+                </div>
+                {broadcastChannel?.activeTournamentId !== selectedTournament?.id ? (
+                  <p className="bf-inline-error" role="alert">ESTE TORNEO NO ESTÁ AL AIRE EN EL CANAL MAIN.</p>
+                ) : broadcastMatchId !== null && broadcastMatchId !== activeMatch.id ? (
+                  <p className="bf-inline-error" role="alert">ATENCIÓN: editas el Match {activeMatch.id}, pero el Match {broadcastMatchId} está al aire.</p>
+                ) : broadcastMatchId === null ? (
+                  <p className="bf-inline-error" role="alert">NO ESTÁ EN TRANSMISIÓN. Usa “Enviar a transmisión” cuando la serie esté lista.</p>
+                ) : null}
                 <h2>{activeMatchTeamALabel} vs {activeMatchTeamBLabel}</h2>
                 <p className="sub">
                   Match {activeMatch.id} · Round {activeMatch.round} · BO{activeMatch.best_of} · Serie {activeMatch.maps_won_a}-{activeMatch.maps_won_b}
                 </p>
+                <button
+                  type="button"
+                  className="opr-save"
+                  disabled={
+                    submitting ||
+                    broadcastMatchId === activeMatch.id ||
+                    activeMatch.status === "completed" ||
+                    activeMatch.winner_id !== null
+                  }
+                  onClick={() => void onSendKillRaceMatchToBroadcast(activeMatch.id)}
+                >
+                  {broadcastMatchId === activeMatch.id ? "En transmisión" : "Enviar a transmisión"}
+                </button>
 
                 <div className="opr-teamgrid">
                   <div className="opr-teamcard">
@@ -2070,46 +2097,16 @@ export default function WorldSeriesOperator({
                     </div>
                   </div>
                 ) : (
-                  <div className="opr-inputs">
-                    <div className="opr-field">
-                      <label>Mapa</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max={activeMatch.best_of}
-                        value={killRaceDraft?.mapNumber ?? ""}
-                        onChange={(event) =>
-                          onUpdateKillRaceMapDraft(activeMatch.id, { mapNumber: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="opr-field">
-                      <label>Kills · {activeMatchTeamALabel}</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={killRaceDraft?.killsA ?? ""}
-                        onChange={(event) =>
-                          onUpdateKillRaceMapDraft(activeMatch.id, { killsA: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="opr-field">
-                      <label>Kills · {activeMatchTeamBLabel}</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={killRaceDraft?.killsB ?? ""}
-                        onChange={(event) =>
-                          onUpdateKillRaceMapDraft(activeMatch.id, { killsB: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="opr-total">
-                      <label>Estado</label>
-                      <b className="has-val">{activeMatch.maps_won_a}-{activeMatch.maps_won_b}</b>
-                    </div>
-                  </div>
+                  <KillRaceResultIntake
+                    key={`${activeMatch.id}:${
+                      activeMatch.maps.find((map) => map.result_status !== "confirmed")?.map_number ??
+                      activeMatch.maps.filter((map) => map.result_status === "confirmed").length + 1
+                    }`}
+                    match={activeMatch}
+                    leftTeam={activeMatchTeamA}
+                    rightTeam={activeMatchTeamB}
+                    onChanged={onKillRaceResultChanged}
+                  />
                 )}
 
                 {activeMatch.maps.length > 0 ? (
@@ -2127,7 +2124,9 @@ export default function WorldSeriesOperator({
                             </span>
                           </div>
                           <span className="r">
-                            {map.map_winner_id === activeMatch.team_a_id
+                            {map.result_status !== "confirmed"
+                              ? `${map.result_status === "provisional" ? "Provisional" : "En vivo"} · no suma a la serie`
+                              : map.map_winner_id === activeMatch.team_a_id
                               ? `Gana ${activeMatchTeamALabel}`
                               : `Gana ${activeMatchTeamBLabel}`}
                           </span>
@@ -2159,18 +2158,7 @@ export default function WorldSeriesOperator({
                       </button>
                     ) : null}
                   </div>
-                ) : (
-                  <div className="bf-hub-form-actions">
-                    <button
-                      type="button"
-                      className="opr-save"
-                      disabled={submitting}
-                      onClick={() => onSaveKillRaceMap(activeMatch.id)}
-                    >
-                      Guardar mapa
-                    </button>
-                  </div>
-                )}
+                ) : null}
               </section>
             ) : (
               <section className="opr-panel">
@@ -2212,7 +2200,9 @@ export default function WorldSeriesOperator({
                 ) : null}
               </section>
             )
-          ) : null}
+          }
+            </aside>
+          </div> : null}
 
           {mode === "setup" ? (
             selectedEngine ? (

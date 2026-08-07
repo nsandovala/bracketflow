@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from math import ceil, log2
 from collections import defaultdict
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -84,12 +84,15 @@ def write_tournament_config(tournament: models.Tournament, config: dict) -> None
 
 
 def is_tournament_finalized(tournament: models.Tournament) -> bool:
-    """Torneo cerrado: campeon ya decidido. No admite mutaciones operativas.
+    """Torneo competitivamente cerrado; conserva lectura, bloquea mutaciones.
 
-    Se considera finalizado si status == "completed" o si config.championTeamId
-    existe y es > 0 (persistido por evaluate_match_point / cierre de bracket).
+    ``status`` y ``bracket_status`` representan ciclos distintos. Cualquiera
+    puede cerrar la competencia, mientras ``championTeamId`` preserva el cierre
+    legacy de Match Point.
     """
-    if tournament.status == "completed":
+    if tournament.status in {"completed", "archived"}:
+        return True
+    if tournament.bracket_status == BRACKET_COMPLETED:
         return True
     champion_team_id = read_tournament_config(tournament).get("championTeamId")
     return isinstance(champion_team_id, int) and champion_team_id > 0
@@ -499,6 +502,121 @@ def update_tournament(
     return updated
 
 
+def update_tournament_broadcast_match(
+    db: Session,
+    tournament: models.Tournament,
+    match_id: int | None,
+) -> models.Tournament:
+    config = read_tournament_config(tournament)
+    if match_id is None:
+        config.pop("broadcastMatchId", None)
+    else:
+        match = db.query(models.Match).filter(models.Match.id == match_id).first()
+        if match is None or match.tournament_id != tournament.id:
+            raise ValueError("El match no pertenece al torneo seleccionado.")
+        if (
+            match.team_a_id is None
+            or match.team_b_id is None
+            or match.winner_id is not None
+            or match.status in {"completed", "waiting"}
+        ):
+            raise ValueError("Solo una serie jugable con ambos equipos puede enviarse a transmisión.")
+        config["broadcastMatchId"] = match.id
+
+    write_tournament_config(tournament, config)
+    db.commit()
+    db.refresh(tournament)
+    return tournament
+
+
+def _broadcast_channel_dict(channel: models.BroadcastChannel) -> dict:
+    return {
+        "channelKey": channel.channel_key,
+        "activeTournamentId": channel.active_tournament_id,
+        "broadcastMatchId": channel.broadcast_match_id,
+        "engine": channel.engine,
+        "updatedAt": channel.updated_at,
+        "updatedBy": channel.updated_by,
+    }
+
+
+def get_broadcast_channel(db: Session, channel_key: str) -> dict:
+    channel = db.get(models.BroadcastChannel, channel_key)
+    if channel is None and channel_key == "main":
+        channel = models.BroadcastChannel(
+            channel_key="main",
+            active_tournament_id=None,
+            broadcast_match_id=None,
+            engine=None,
+            updated_at=datetime.now(UTC).isoformat(),
+        )
+        db.add(channel)
+        db.commit()
+        db.refresh(channel)
+    if channel is None:
+        raise LookupError("Canal de transmisión no encontrado.")
+    return _broadcast_channel_dict(channel)
+
+
+def update_broadcast_channel(
+    db: Session,
+    channel_key: str,
+    payload: schemas.BroadcastChannelUpdate,
+) -> dict:
+    # model_fields_set distingue un campo omitido de un null intencional.
+    supplied = payload.model_fields_set
+    channel = db.get(models.BroadcastChannel, channel_key)
+    if channel is None:
+        channel = models.BroadcastChannel(
+            channel_key=channel_key,
+            active_tournament_id=None,
+            broadcast_match_id=None,
+            engine=None,
+            updated_at=datetime.now(UTC).isoformat(),
+        )
+        db.add(channel)
+
+    tournament_id = (
+        payload.activeTournamentId
+        if "activeTournamentId" in supplied
+        else channel.active_tournament_id
+    )
+    match_id = (
+        payload.broadcastMatchId
+        if "broadcastMatchId" in supplied
+        else channel.broadcast_match_id
+    )
+    # Cambiar de torneo sin indicar match nunca arrastra el match anterior.
+    if "activeTournamentId" in supplied and "broadcastMatchId" not in supplied:
+        match_id = None
+    tournament = None
+    if tournament_id is not None:
+        tournament = db.get(models.Tournament, tournament_id)
+        if tournament is None:
+            raise ValueError("El torneo indicado no existe.")
+    if match_id is not None:
+        match = db.get(models.Match, match_id)
+        if match is None:
+            raise ValueError("El match indicado no existe.")
+        if tournament_id is None or match.tournament_id != tournament_id:
+            raise ValueError("El match no pertenece al torneo activo del canal.")
+        update_tournament_broadcast_match(db, tournament, match_id)
+
+    channel.active_tournament_id = tournament_id
+    channel.broadcast_match_id = match_id
+    if "engine" in supplied:
+        channel.engine = payload.engine
+    elif "activeTournamentId" in supplied:
+        config = read_tournament_config(tournament) if tournament else {}
+        channel.engine = config.get("engine_key") if tournament else None
+    if "updatedBy" in supplied:
+        channel.updated_by = payload.updatedBy
+    channel.updated_at = datetime.now(UTC).isoformat()
+    db.commit()
+    db.refresh(channel)
+    return _broadcast_channel_dict(channel)
+
+
 def get_tournaments(db: Session) -> list[models.Tournament]:
     tournaments = (
         db.query(models.Tournament)
@@ -533,8 +651,35 @@ def archive_tournament(db: Session, tournament: models.Tournament) -> models.Tou
 
 
 def delete_tournament(db: Session, tournament: models.Tournament) -> None:
-    db.delete(tournament)
-    db.commit()
+    tournament_id = tournament.id
+    match_ids = [
+        match_id
+        for (match_id,) in db.query(models.Match.id)
+        .filter(models.Match.tournament_id == tournament_id)
+        .all()
+    ]
+    channel_filters = [models.BroadcastChannel.active_tournament_id == tournament_id]
+    if match_ids:
+        channel_filters.append(models.BroadcastChannel.broadcast_match_id.in_(match_ids))
+
+    channels = db.query(models.BroadcastChannel).filter(or_(*channel_filters)).all()
+    updated_at = datetime.now(UTC).isoformat()
+
+    try:
+        for channel in channels:
+            if channel.active_tournament_id == tournament_id:
+                channel.active_tournament_id = None
+                channel.broadcast_match_id = None
+                channel.engine = None
+            elif channel.broadcast_match_id in match_ids:
+                channel.broadcast_match_id = None
+            channel.updated_at = updated_at
+
+        db.delete(tournament)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def open_roster_respin(
@@ -913,7 +1058,9 @@ def add_player_to_team(
 def get_matches_by_tournament(db: Session, tournament_id: int) -> list[models.Match]:
     return (
         db.query(models.Match)
-        .options(selectinload(models.Match.maps))
+        .options(
+            selectinload(models.Match.maps).selectinload(models.MatchMap.player_stats)
+        )
         .filter(models.Match.tournament_id == tournament_id)
         .order_by(models.Match.round.asc(), models.Match.id.asc())
         .all()
@@ -923,7 +1070,9 @@ def get_matches_by_tournament(db: Session, tournament_id: int) -> list[models.Ma
 def get_match(db: Session, match_id: int) -> models.Match | None:
     return (
         db.query(models.Match)
-        .options(selectinload(models.Match.maps))
+        .options(
+            selectinload(models.Match.maps).selectinload(models.MatchMap.player_stats)
+        )
         .filter(models.Match.id == match_id)
         .first()
     )
@@ -943,7 +1092,10 @@ def get_match_maps_won(match: models.Match) -> tuple[int, int]:
 def _get_match_maps_won_from_db(db: Session, match: models.Match) -> tuple[int, int]:
     maps = (
         db.query(models.MatchMap)
-        .filter(models.MatchMap.match_id == match.id)
+        .filter(
+            models.MatchMap.match_id == match.id,
+            models.MatchMap.result_status == "confirmed",
+        )
         .all()
     )
     maps_won_a = sum(1 for item in maps if item.map_winner_id == match.team_a_id)
@@ -1928,12 +2080,14 @@ def upsert_map_result(
             kills_a=payload.kills_a,
             kills_b=payload.kills_b,
             map_winner_id=map_winner_id,
+            result_status="confirmed",
         )
         db.add(db_map)
     else:
         db_map.kills_a = payload.kills_a
         db_map.kills_b = payload.kills_b
         db_map.map_winner_id = map_winner_id
+        db_map.result_status = "confirmed"
 
     if tournament.bracket_status == BRACKET_LOCKED:
         tournament.bracket_status = BRACKET_RUNNING
@@ -1961,6 +2115,161 @@ def upsert_map_result(
     if refreshed is None:
         raise ValueError("Match not found after update")
     return build_match_schema(refreshed)
+
+
+def _validate_kill_race_side(
+    db: Session,
+    match: models.Match,
+    side: schemas.KillRaceSideInput,
+    expected_side: str,
+    expected_team_id: int,
+) -> None:
+    if side.side != expected_side or side.team_id != expected_team_id:
+        raise ValueError(f"El equipo del lado {expected_side} no pertenece al match.")
+    team = get_team(db, expected_team_id)
+    if team is None or len(team.members) != 2:
+        raise ValueError(f"El lado {expected_side} debe tener exactamente dos jugadores.")
+    if " ".join(side.team_name.casefold().split()) != " ".join(team.name.casefold().split()):
+        raise ValueError(
+            f"El nombre de equipo '{side.team_name}' no coincide con '{team.name}'."
+        )
+    member_ids = {member.player_id for member in team.members}
+    if len(side.players) != 2:
+        raise ValueError(f"El lado {expected_side} debe incluir exactamente dos jugadores.")
+    calculated_total = sum(player.kills for player in side.players)
+    if calculated_total != side.total_kills:
+        raise ValueError(
+            f"totalKills {side.total_kills} no coincide con la suma de jugadores {calculated_total}."
+        )
+    for player in side.players:
+        if player.player_id not in member_ids:
+            raise ValueError(f"{player.player_name} no pertenece al equipo {team.name}.")
+
+
+def upsert_kill_race_result(
+    db: Session,
+    tournament: models.Tournament,
+    match: models.Match,
+    payload: schemas.KillRaceResultInput,
+) -> schemas.Match:
+    if get_engine_key(tournament) not in KILL_RACE_ENGINE_KEYS:
+        raise ValueError("This endpoint is only available for Kill Race tournaments")
+    _ensure_kill_race_result_mutable(tournament, match)
+    if match.team_a_id is None or match.team_b_id is None:
+        raise ValueError("El match todavía no tiene dos equipos listos.")
+    if payload.map_number > match.best_of:
+        raise ValueError(f"El BO{match.best_of} no admite partida {payload.map_number}.")
+    _validate_kill_race_side(db, match, payload.left, "left", match.team_a_id)
+    _validate_kill_race_side(db, match, payload.right, "right", match.team_b_id)
+
+    db_map = (
+        db.query(models.MatchMap)
+        .filter(
+            models.MatchMap.match_id == match.id,
+            models.MatchMap.map_number == payload.map_number,
+        )
+        .first()
+    )
+    if db_map is not None and db_map.result_status == "confirmed":
+        raise ValueError("Un resultado confirmado no se puede sobrescribir.")
+    if db_map is None:
+        db_map = models.MatchMap(
+            match_id=match.id,
+            map_number=payload.map_number,
+            kills_a=payload.left.total_kills,
+            kills_b=payload.right.total_kills,
+            map_winner_id=None,
+            result_status=payload.status,
+        )
+        db.add(db_map)
+        db.flush()
+    else:
+        db_map.kills_a = payload.left.total_kills
+        db_map.kills_b = payload.right.total_kills
+        db_map.map_winner_id = None
+        db_map.result_status = payload.status
+        db.query(models.MatchMapPlayerStat).filter(
+            models.MatchMapPlayerStat.match_map_id == db_map.id
+        ).delete(synchronize_session=False)
+
+    for side in (payload.left, payload.right):
+        for player in side.players:
+            db.add(
+                models.MatchMapPlayerStat(
+                    match_map_id=db_map.id,
+                    player_id=player.player_id,
+                    side=side.side,
+                    player_name=player.player_name,
+                    kills=player.kills,
+                )
+            )
+    if match.winner_id is None:
+        match.status = "in_progress"
+    db.commit()
+    refreshed = get_match(db, match.id)
+    if refreshed is None:
+        raise ValueError("Match not found after update")
+    return build_match_schema(refreshed)
+
+
+def confirm_kill_race_result(
+    db: Session,
+    tournament: models.Tournament,
+    match: models.Match,
+    map_number: int,
+) -> schemas.Match:
+    _ensure_kill_race_result_mutable(tournament, match)
+    db_map = (
+        db.query(models.MatchMap)
+        .filter(
+            models.MatchMap.match_id == match.id,
+            models.MatchMap.map_number == map_number,
+        )
+        .first()
+    )
+    if db_map is None:
+        raise ValueError("No existe resultado provisional para confirmar.")
+    if db_map.result_status == "confirmed":
+        raise ValueError("El resultado ya está confirmado.")
+    if db_map.kills_a == db_map.kills_b:
+        raise ValueError("Empate de kills: resuelve el desempate antes de confirmar.")
+    db_map.result_status = "confirmed"
+    db_map.map_winner_id = (
+        match.team_a_id if db_map.kills_a > db_map.kills_b else match.team_b_id
+    )
+    if tournament.bracket_status == BRACKET_LOCKED:
+        tournament.bracket_status = BRACKET_RUNNING
+    db.flush()
+    maps_won_a, maps_won_b = _get_match_maps_won_from_db(db, match)
+    wins_needed = ceil(match.best_of / 2)
+    if maps_won_a >= wins_needed or maps_won_b >= wins_needed:
+        winner_id = match.team_a_id if maps_won_a > maps_won_b else match.team_b_id
+        match.winner_id = winner_id
+        match.status = "completed"
+        if match.next_match_id is not None:
+            next_match = get_match(db, match.next_match_id)
+            if next_match is not None:
+                _assign_match_slot(next_match, match.next_slot, winner_id)
+                _refresh_match_status(next_match)
+        elif tournament.bracket_status in {BRACKET_LOCKED, BRACKET_RUNNING}:
+            tournament.bracket_status = BRACKET_COMPLETED
+    elif match.winner_id is None:
+        match.status = "in_progress"
+    db.commit()
+    refreshed = get_match(db, match.id)
+    if refreshed is None:
+        raise ValueError("Match not found after confirmation")
+    return build_match_schema(refreshed)
+
+
+def _ensure_kill_race_result_mutable(
+    tournament: models.Tournament,
+    match: models.Match,
+) -> None:
+    if is_tournament_finalized(tournament):
+        raise ValueError("Torneo finalizado: no se permiten nuevas operaciones.")
+    if match.winner_id is not None:
+        raise ValueError("La serie ya esta decidida: no admite nuevos resultados.")
 
 
 def _cleanup_bracket_matches(db: Session, tournament_id: int) -> None:

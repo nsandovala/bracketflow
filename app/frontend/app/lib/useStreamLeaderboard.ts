@@ -9,6 +9,8 @@ import {
   Team,
   TeamResultDetail,
   Tournament,
+  BroadcastChannel,
+  getBroadcastChannel,
   getLeaderboard,
   getIdentityPlayers,
   getIdentityTeams,
@@ -27,9 +29,16 @@ import {
 } from "../../lib/identityResolver";
 import { ACTIVE_WORLD_SERIES_TOURNAMENT_KEY } from "./useWorldSeriesPractice";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
+import {
+  clearStreamSnapshot,
+  hasResolvedMatch,
+  isInvalidStreamReferenceError,
+  reduceStreamFetchFailure,
+  resolveBroadcastContext,
+} from "../../lib/broadcastChannel.mjs";
 
 // Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
-export const STREAM_POLL_INTERVAL_MS = 7000;
+export const STREAM_POLL_INTERVAL_MS = 1800;
 
 export type StreamStanding = LeaderboardEntry & {
   players: string[];
@@ -46,6 +55,9 @@ export type StreamLeaderboardState = {
   afterGameNumber: number;
   connected: boolean;
   hasLoadedOnce: boolean;
+  channel: BroadcastChannel | null;
+  resolvedMatchId: number | null;
+  emptyReason: string | null;
 };
 
 // Mismo criterio de orden que el resto de la app (puntos, kills, best place, nombre).
@@ -84,12 +96,15 @@ function buildSignature(
   teams: Team[],
   standings: StreamStanding[],
   results: TeamResultDetail[],
-  afterGameNumber: number
+  afterGameNumber: number,
+  matches: Match[],
+  resolvedMatchId: number | null
 ) {
   const championKey =
     tournament?.config?.championTeamId != null
       ? `${tournament.config.championTeamId}:${tournament.config.championDecidedAt ?? ""}`
       : "";
+  const broadcastKey = resolvedMatchId ?? "-";
   const roster = teams
     .map(
       (team) =>
@@ -114,7 +129,20 @@ function buildSignature(
   const policyKey = matchCompletionPolicy
     ? `${matchCompletionPolicy.state}:${matchCompletionPolicy.code}:${matchCompletionPolicy.matchPointThreshold ?? "-"}:${matchCompletionPolicy.championTeamId ?? "-"}`
     : "-";
-  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}`;
+  const matchRows = matches
+    .map(
+      (match) =>
+        `${match.id}:${match.round}:${match.status}:${match.team_a_id ?? "-"}:${match.team_b_id ?? "-"}:${match.winner_id ?? "-"}:${match.maps_won_a}-${match.maps_won_b}:${match.next_match_id ?? "-"}:${match.next_slot ?? "-"}:${match.maps
+          .map(
+            (map) =>
+              `${map.id}:${map.map_number}:${map.result_status}:${map.map_winner_id ?? "-"}:${map.kills_a}-${map.kills_b}:${map.player_stats
+                .map((stat) => `${stat.player_id}=${stat.kills}`)
+                .join(",")}`
+          )
+          .join("/")}`
+    )
+    .join("|");
+  return `${tournament?.id ?? "-"}:${tournament?.name ?? "-"}:${tournament?.game ?? "-"}:${tournament?.status ?? "-"}:${championKey}:${broadcastKey}:${policyKey}:${afterGameNumber}:${roster}:${rows}:${resultRows}:${matchRows}`;
 }
 
 async function resolveTournamentId(preferredId: number | null): Promise<number | null> {
@@ -134,6 +162,8 @@ async function resolveTournamentId(preferredId: number | null): Promise<number |
 
 export function useStreamLeaderboard(
   preferredTournamentId: number | null,
+  channelKey: string | null = null,
+  explicitMatchId: number | null = null,
   pollMs: number = STREAM_POLL_INTERVAL_MS
 ): StreamLeaderboardState {
   const [state, setState] = useState<StreamLeaderboardState>({
@@ -146,6 +176,9 @@ export function useStreamLeaderboard(
     afterGameNumber: 0,
     connected: false,
     hasLoadedOnce: false,
+    channel: null,
+    resolvedMatchId: explicitMatchId,
+    emptyReason: null,
   });
 
   // Firma del ultimo estado pintado: si el fetch nuevo coincide, no tocamos React.
@@ -153,28 +186,38 @@ export function useStreamLeaderboard(
 
   useEffect(() => {
     let active = true;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchOnce() {
+      let attemptedChannel: BroadcastChannel | null = null;
+      let attemptedMatchId = explicitMatchId;
       try {
-        const tournamentId = await resolveTournamentId(preferredTournamentId);
+        const channel = channelKey && preferredTournamentId === null && explicitMatchId === null
+          ? await getBroadcastChannel(channelKey)
+          : null;
+        attemptedChannel = channel;
+        const fallbackTournamentId = channelKey
+          ? preferredTournamentId
+          : await resolveTournamentId(preferredTournamentId);
+        const context = resolveBroadcastContext({
+          explicitTournamentId: fallbackTournamentId,
+          explicitMatchId,
+          channel,
+        });
+        attemptedMatchId = context.matchId;
+        const tournamentId = context.tournamentId;
         if (tournamentId === null) {
           if (!active) return;
-          setState((current) =>
-            current.connected && current.hasLoadedOnce && current.tournament === null
-              ? current
-              : {
-                  tournament: null,
-                  matchCompletionPolicy: null,
-                  teams: [],
-                  matches: [],
-                  standings: [],
-                  results: [],
-                  afterGameNumber: 0,
-                  connected: true,
-                  hasLoadedOnce: true,
-                }
-          );
+          signatureRef.current = "";
+          setState((current) => clearStreamSnapshot(current, {
+            channel,
+            resolvedMatchId: context.matchId,
+            emptyReason: explicitMatchId !== null
+              ? "NO HAY MATCH AL AIRE"
+              : channelKey
+                ? "SIN SERIE AL AIRE"
+                : "Selecciona un torneo",
+          }));
           return;
         }
 
@@ -204,6 +247,16 @@ export function useStreamLeaderboard(
 
         if (!active) return;
 
+        if (!hasResolvedMatch(matches, context.matchId)) {
+          signatureRef.current = "";
+          setState((current) => clearStreamSnapshot(current, {
+            channel,
+            resolvedMatchId: context.matchId,
+            emptyReason: "NO HAY MATCH AL AIRE",
+          }));
+          return;
+        }
+
         const catalog = { teams: identityTeams, players: identityPlayers, gameIdentities };
         const teams = resolveTournamentTeams(rawTeams, catalog);
         const results = resolveTournamentResults(rawResults, rawTeams, catalog);
@@ -226,14 +279,16 @@ export function useStreamLeaderboard(
           : results.length === 0
             ? 0
             : Math.max(...results.map((result) => result.round));
-        const nextSignature = buildSignature(
+        const nextSignature = `${buildSignature(
           tournament,
           matchCompletionPolicy,
           teams,
           standings,
           results,
-          afterGameNumber
-        );
+          afterGameNumber,
+          matches,
+          context.matchId
+        )}:${channel?.activeTournamentId ?? "-"}:${channel?.broadcastMatchId ?? "-"}`;
 
         // Solo re-render si cambio el contenido o si veniamos desconectados.
         setState((current) => {
@@ -255,23 +310,37 @@ export function useStreamLeaderboard(
             afterGameNumber,
             connected: true,
             hasLoadedOnce: true,
+            channel,
+            resolvedMatchId: context.matchId,
+            emptyReason:
+              context.source === "channel" && context.matchId === null
+                ? "NO HAY MATCH AL AIRE"
+                : null,
           };
         });
-      } catch {
+      } catch (error) {
         if (!active) return;
-        // Backend caido: conservamos la ultima data valida, solo bajamos la bandera.
-        setState((current) => (current.connected ? { ...current, connected: false } : current));
+        // 404 invalida el contexto editorial; fallos transitorios conservan el ultimo snapshot.
+        if (isInvalidStreamReferenceError(error)) signatureRef.current = "";
+        setState((current) => reduceStreamFetchFailure(current, error, {
+          channel: attemptedChannel ?? current.channel,
+          resolvedMatchId: attemptedMatchId,
+        }));
       }
     }
 
-    void fetchOnce();
-    timer = setInterval(() => void fetchOnce(), pollMs);
+    async function poll() {
+      await fetchOnce();
+      if (active) timer = setTimeout(() => void poll(), pollMs);
+    }
+
+    void poll();
 
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
-  }, [preferredTournamentId, pollMs]);
+  }, [preferredTournamentId, channelKey, explicitMatchId, pollMs]);
 
   return state;
 }

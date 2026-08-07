@@ -159,6 +159,29 @@ def ensure_sqlite_schema(db_engine: Engine | None = None) -> None:
             )
             """
         )
+        map_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(match_maps)").all()
+        }
+        if map_columns and "result_status" not in map_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE match_maps ADD COLUMN result_status TEXT NOT NULL DEFAULT 'confirmed'"
+            )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS match_map_player_stats (
+                id INTEGER PRIMARY KEY,
+                match_map_id INTEGER NOT NULL,
+                player_id INTEGER NOT NULL,
+                side TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                kills INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY(match_map_id) REFERENCES match_maps(id),
+                FOREIGN KEY(player_id) REFERENCES players(id),
+                CONSTRAINT uq_match_map_player UNIQUE (match_map_id, player_id)
+            )
+            """
+        )
 
     with db_engine.begin() as connection:
         team_result_columns = {
