@@ -29,7 +29,13 @@ import {
 } from "../../lib/identityResolver";
 import { ACTIVE_WORLD_SERIES_TOURNAMENT_KEY } from "./useWorldSeriesPractice";
 import { resolveTournamentEngine } from "../../lib/tournamentModel";
-import { resolveBroadcastContext } from "../../lib/broadcastChannel.mjs";
+import {
+  clearStreamSnapshot,
+  hasResolvedMatch,
+  isInvalidStreamReferenceError,
+  reduceStreamFetchFailure,
+  resolveBroadcastContext,
+} from "../../lib/broadcastChannel.mjs";
 
 // Polling del Stream View. Vive solo en /stream — no afecta a otros consumidores.
 export const STREAM_POLL_INTERVAL_MS = 1800;
@@ -183,10 +189,13 @@ export function useStreamLeaderboard(
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchOnce() {
+      let attemptedChannel: BroadcastChannel | null = null;
+      let attemptedMatchId = explicitMatchId;
       try {
-        const channel = channelKey && explicitMatchId === null
+        const channel = channelKey && preferredTournamentId === null && explicitMatchId === null
           ? await getBroadcastChannel(channelKey)
           : null;
+        attemptedChannel = channel;
         const fallbackTournamentId = channelKey
           ? preferredTournamentId
           : await resolveTournamentId(preferredTournamentId);
@@ -195,27 +204,20 @@ export function useStreamLeaderboard(
           explicitMatchId,
           channel,
         });
+        attemptedMatchId = context.matchId;
         const tournamentId = context.tournamentId;
         if (tournamentId === null) {
           if (!active) return;
-          setState((current) =>
-            current.connected && current.hasLoadedOnce && current.tournament === null
-              ? current
-              : {
-                  tournament: null,
-                  matchCompletionPolicy: null,
-                  teams: [],
-                  matches: [],
-                  standings: [],
-                  results: [],
-                  afterGameNumber: 0,
-                  connected: true,
-                  hasLoadedOnce: true,
-                  channel,
-                  resolvedMatchId: context.matchId,
-                  emptyReason: channelKey ? "NO HAY TORNEO AL AIRE" : "Selecciona un torneo",
-                }
-          );
+          signatureRef.current = "";
+          setState((current) => clearStreamSnapshot(current, {
+            channel,
+            resolvedMatchId: context.matchId,
+            emptyReason: explicitMatchId !== null
+              ? "NO HAY MATCH AL AIRE"
+              : channelKey
+                ? "SIN SERIE AL AIRE"
+                : "Selecciona un torneo",
+          }));
           return;
         }
 
@@ -244,6 +246,16 @@ export function useStreamLeaderboard(
         const leaderboard = isBracket ? [] : await getLeaderboard(tournamentId);
 
         if (!active) return;
+
+        if (!hasResolvedMatch(matches, context.matchId)) {
+          signatureRef.current = "";
+          setState((current) => clearStreamSnapshot(current, {
+            channel,
+            resolvedMatchId: context.matchId,
+            emptyReason: "NO HAY MATCH AL AIRE",
+          }));
+          return;
+        }
 
         const catalog = { teams: identityTeams, players: identityPlayers, gameIdentities };
         const teams = resolveTournamentTeams(rawTeams, catalog);
@@ -300,13 +312,20 @@ export function useStreamLeaderboard(
             hasLoadedOnce: true,
             channel,
             resolvedMatchId: context.matchId,
-            emptyReason: channelKey && context.matchId === null ? "NO HAY MATCH AL AIRE" : null,
+            emptyReason:
+              context.source === "channel" && context.matchId === null
+                ? "NO HAY MATCH AL AIRE"
+                : null,
           };
         });
-      } catch {
+      } catch (error) {
         if (!active) return;
-        // Backend caido: conservamos la ultima data valida, solo bajamos la bandera.
-        setState((current) => (current.connected ? { ...current, connected: false } : current));
+        // 404 invalida el contexto editorial; fallos transitorios conservan el ultimo snapshot.
+        if (isInvalidStreamReferenceError(error)) signatureRef.current = "";
+        setState((current) => reduceStreamFetchFailure(current, error, {
+          channel: attemptedChannel ?? current.channel,
+          resolvedMatchId: attemptedMatchId,
+        }));
       }
     }
 

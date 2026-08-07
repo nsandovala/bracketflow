@@ -2,11 +2,24 @@ export function calculatePlayerTotal(players = []) {
   return players.reduce((total, player) => total + player.kills, 0);
 }
 
+export function calculatePlayerTotalOrNull(players = []) {
+  return players.length > 0 ? calculatePlayerTotal(players) : null;
+}
+
 export function getKillRaceBroadcastStatus(resultStatus, connected = true) {
   if (!connected) return "RECONECTANDO";
-  if (resultStatus === "confirmed") return "FINAL";
-  if (resultStatus === "provisional") return "PROVISIONAL";
-  return "LIVE";
+  switch (resultStatus) {
+    case "confirmed":
+      return "FINAL";
+    case "provisional":
+      return "PROVISIONAL";
+    case "live":
+    case "in_progress":
+      return "LIVE";
+    case "pending":
+    default:
+      return "POR COMENZAR";
+  }
 }
 
 export function selectKillRaceScorebugMatch(matches) {
@@ -42,7 +55,7 @@ export function resolveKillRaceScorebugMatch(matches, explicitMatchId, broadcast
 }
 
 export function killRaceVisualKey(tournamentId, match) {
-  return `${tournamentId ?? "-"}:${match?.id ?? "-"}:${(match?.maps ?? [])
+  return `${tournamentId ?? "-"}:${match?.id ?? "-"}:${match?.status ?? "-"}:${match?.maps_won_a ?? 0}-${match?.maps_won_b ?? 0}:${(match?.maps ?? [])
     .map((map) => `${map.map_number}:${map.result_status}:${map.kills_a}-${map.kills_b}:${(map.player_stats ?? [])
       .map((stat) => `${stat.player_id}=${stat.kills}`)
       .join(",")}`)

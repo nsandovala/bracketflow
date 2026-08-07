@@ -25,3 +25,39 @@ export function getTournamentOverlayUrl(
   layout: string,
   matchId?: number | null
 ): string;
+export type StreamSnapshotLike = {
+  tournament: unknown | null;
+  matchCompletionPolicy: unknown | null;
+  teams: unknown[];
+  matches: unknown[];
+  standings: unknown[];
+  results: unknown[];
+  afterGameNumber: number;
+  connected: boolean;
+  hasLoadedOnce: boolean;
+  channel: unknown | null;
+  resolvedMatchId: number | null;
+  emptyReason: string | null;
+};
+export function clearStreamSnapshot<T extends StreamSnapshotLike>(
+  current: T,
+  options: {
+    channel?: unknown | null;
+    resolvedMatchId?: number | null;
+    emptyReason: string;
+  }
+): T;
+export function reduceStreamFetchFailure<T extends StreamSnapshotLike>(
+  current: T,
+  error: unknown,
+  options?: {
+    channel?: unknown | null;
+    resolvedMatchId?: number | null;
+    emptyReason?: string;
+  }
+): T;
+export function isInvalidStreamReferenceError(error: unknown): boolean;
+export function hasResolvedMatch(
+  matches: Array<{ id: number }>,
+  matchId: number | null | undefined
+): boolean;

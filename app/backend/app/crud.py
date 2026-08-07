@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from math import ceil, log2
 from collections import defaultdict
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -648,8 +648,35 @@ def archive_tournament(db: Session, tournament: models.Tournament) -> models.Tou
 
 
 def delete_tournament(db: Session, tournament: models.Tournament) -> None:
-    db.delete(tournament)
-    db.commit()
+    tournament_id = tournament.id
+    match_ids = [
+        match_id
+        for (match_id,) in db.query(models.Match.id)
+        .filter(models.Match.tournament_id == tournament_id)
+        .all()
+    ]
+    channel_filters = [models.BroadcastChannel.active_tournament_id == tournament_id]
+    if match_ids:
+        channel_filters.append(models.BroadcastChannel.broadcast_match_id.in_(match_ids))
+
+    channels = db.query(models.BroadcastChannel).filter(or_(*channel_filters)).all()
+    updated_at = datetime.now(UTC).isoformat()
+
+    try:
+        for channel in channels:
+            if channel.active_tournament_id == tournament_id:
+                channel.active_tournament_id = None
+                channel.broadcast_match_id = None
+                channel.engine = None
+            elif channel.broadcast_match_id in match_ids:
+                channel.broadcast_match_id = None
+            channel.updated_at = updated_at
+
+        db.delete(tournament)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def open_roster_respin(

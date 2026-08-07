@@ -10,6 +10,7 @@ import { toBracketRounds } from "../../lib/toBracketRounds";
 import {
   buildKillRaceBracketBroadcast,
   getKillRaceBracketLayout,
+  KILL_RACE_DENSE_MATCH_GAP,
   type KillRaceBroadcastSeries,
   type KillRaceBroadcastTeam,
 } from "../../lib/killRaceBracketBroadcast.mjs";
@@ -100,11 +101,18 @@ function BroadcastSeed({ series }: { series: KillRaceBroadcastSeries }) {
 function renderSeed(props: IRenderSeedProps) {
   const series = props.seed as KillRaceBroadcastSeries;
   const seedCount = props.rounds?.[props.roundIndex]?.seeds.length ?? 1;
+  const safeSeedCount = Math.max(1, seedCount);
+  const isDenseRound = safeSeedCount > 4;
+  const denseGaps = Math.max(0, safeSeedCount - 1) * KILL_RACE_DENSE_MATCH_GAP;
   return (
     <Seed
-      className="kr-broadcast-seed-shell"
+      className={`kr-broadcast-seed-shell${isDenseRound ? " is-density-constrained" : ""}`}
       mobileBreakpoint={props.breakpoint}
-      style={{ height: `${100 / Math.max(1, seedCount)}%` }}
+      style={{
+        height: isDenseRound
+          ? `calc((100% - 28px - ${denseGaps}px) / ${safeSeedCount})`
+          : `${100 / safeSeedCount}%`,
+      }}
     >
       <SeedItem style={{ background: "transparent", boxShadow: "none" }}>
         <BroadcastSeed series={series} />
@@ -182,6 +190,7 @@ export default function KillRaceBracketBroadcast({
     "--kr-bracket-scale": layout.scale,
     "--kr-bracket-card-width": `${layout.cardWidth}px`,
     "--kr-bracket-round-gap": `${layout.roundGap}px`,
+    "--kr-bracket-match-gap": `${layout.matchGap}px`,
     "--kr-bracket-base-width": `${layout.baseWidth}px`,
     "--kr-bracket-base-height": `${layout.baseHeight}px`,
     "--kr-bracket-scaled-width": `${layout.scaledWidth}px`,

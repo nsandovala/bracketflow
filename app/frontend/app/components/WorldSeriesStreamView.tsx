@@ -57,6 +57,24 @@ type WorldSeriesStreamViewProps = {
   layout: StreamLayout;
 };
 
+function StreamReferenceEmpty({ reason }: { reason: string }) {
+  const message = reason === "TORNEO NO DISPONIBLE"
+    ? "El canal ya no tiene un torneo válido asignado."
+    : reason === "NO HAY MATCH AL AIRE"
+      ? "Operator todavía no ha enviado una serie a transmisión."
+      : reason === "RECONECTANDO"
+        ? "Conservando la última referencia mientras vuelve el backend."
+        : "Asigna un torneo y una serie desde Operator.";
+  return (
+    <main className="kr-scorebug-stage">
+      <section className="kr-scorebug is-empty" role="status">
+        <strong>{reason}</strong>
+        <span>{message}</span>
+      </section>
+    </main>
+  );
+}
+
 export default function WorldSeriesStreamView({
   tournamentId,
   matchId,
@@ -122,6 +140,10 @@ export default function WorldSeriesStreamView({
       body.style.background = prevBodyBg;
     };
   }, [transparent]);
+
+  if (emptyReason && streamSurface !== "bracket") {
+    return <StreamReferenceEmpty reason={emptyReason} />;
+  }
 
   if (streamSurface === "kill-race-mvp") {
     const viewModel = buildKillRaceMvpOverlay({
@@ -196,14 +218,6 @@ export default function WorldSeriesStreamView({
         connected={connected}
         transparent={transparent}
       />
-    );
-  }
-
-  if (emptyReason && streamSurface !== "bracket") {
-    return (
-      <main className="kr-scorebug-stage">
-        <div className="kr-scorebug is-empty">{emptyReason}</div>
-      </main>
     );
   }
 

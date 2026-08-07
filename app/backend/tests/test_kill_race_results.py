@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from app import models, schemas
 from app.crud import (
     confirm_kill_race_result,
+    delete_tournament,
     get_match,
     read_tournament_config,
     update_tournament_broadcast_match,
@@ -230,3 +231,84 @@ def test_channel_tournament_switch_clears_previous_match(db, kill_race):
     )
     assert switched["activeTournamentId"] == other.id
     assert switched["broadcastMatchId"] is None
+
+
+def test_delete_tournament_clears_only_referencing_channels_in_one_commit(
+    db, kill_race, monkeypatch
+):
+    tournament, match, *_ = kill_race
+    other = models.Tournament(
+        name="Other persistent tournament", game="Warzone", format="roulette_2v2",
+        team_size=2, scoring_profile="kill_race", status="active",
+        bracket_status="locked", config='{"engine_key":"kill_race_bracket"}',
+    )
+    db.add(other)
+    db.flush()
+    affected = models.BroadcastChannel(
+        channel_key="main", active_tournament_id=tournament.id,
+        broadcast_match_id=match.id, engine="kill_race_bracket",
+        updated_at="2026-01-01T00:00:00+00:00", updated_by="operator",
+    )
+    untouched = models.BroadcastChannel(
+        channel_key="secondary", active_tournament_id=other.id,
+        broadcast_match_id=None, engine="kill_race_bracket",
+        updated_at="2026-01-02T00:00:00+00:00", updated_by="operator",
+    )
+    db.add_all([affected, untouched])
+    db.commit()
+
+    original_commit = db.commit
+    commit_calls = 0
+
+    def counted_commit():
+        nonlocal commit_calls
+        commit_calls += 1
+        original_commit()
+
+    monkeypatch.setattr(db, "commit", counted_commit)
+    delete_tournament(db, tournament)
+
+    cleaned = db.get(models.BroadcastChannel, "main")
+    preserved = db.get(models.BroadcastChannel, "secondary")
+    assert commit_calls == 1
+    assert cleaned.active_tournament_id is None
+    assert cleaned.broadcast_match_id is None
+    assert cleaned.engine is None
+    assert cleaned.updated_at != "2026-01-01T00:00:00+00:00"
+    assert preserved.active_tournament_id == other.id
+    assert preserved.updated_at == "2026-01-02T00:00:00+00:00"
+    assert db.get(models.Tournament, tournament.id) is None
+
+
+def test_delete_tournament_without_channel_still_works(db, kill_race):
+    tournament, *_ = kill_race
+    delete_tournament(db, tournament)
+    assert db.get(models.Tournament, tournament.id) is None
+    assert db.query(models.BroadcastChannel).count() == 0
+
+
+def test_delete_tournament_rolls_back_channel_cleanup_when_commit_fails(
+    db, kill_race, monkeypatch
+):
+    tournament, match, *_ = kill_race
+    channel = models.BroadcastChannel(
+        channel_key="main", active_tournament_id=tournament.id,
+        broadcast_match_id=match.id, engine="kill_race_bracket",
+        updated_at="2026-01-01T00:00:00+00:00",
+    )
+    db.add(channel)
+    db.commit()
+
+    def failing_commit():
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(db, "commit", failing_commit)
+    with pytest.raises(RuntimeError, match="forced commit failure"):
+        delete_tournament(db, tournament)
+
+    restored_channel = db.get(models.BroadcastChannel, "main")
+    assert restored_channel.active_tournament_id == tournament.id
+    assert restored_channel.broadcast_match_id == match.id
+    assert restored_channel.engine == "kill_race_bracket"
+    assert restored_channel.updated_at == "2026-01-01T00:00:00+00:00"
+    assert db.get(models.Tournament, tournament.id) is not None

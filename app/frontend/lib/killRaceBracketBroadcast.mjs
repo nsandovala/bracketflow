@@ -2,6 +2,8 @@ function asNumber(value, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+export const KILL_RACE_DENSE_MATCH_GAP = 10;
+
 function normalizeId(value) {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -138,10 +140,24 @@ export function getKillRaceBracketLayout({
   const cardWidth = isShowcase ? 390 : isStandard ? 342 : 304;
   const roundGap = isShowcase ? 118 : isStandard ? 82 : 58;
   const seedSlotHeight = isShowcase ? 244 : isStandard ? 146 : 116;
+  const matchHeight = isShowcase ? 244 : isStandard ? 146 : 122;
+  const matchGap = isShowcase || isStandard ? 0 : KILL_RACE_DENSE_MATCH_GAP;
+  const verticalChrome = isShowcase || isStandard ? 48 : 76;
   const baseWidth = safeRounds * cardWidth + Math.max(0, safeRounds - 1) * roundGap + 44;
-  const baseHeight = Math.max(380, safeMaxMatches * seedSlotHeight + 48);
+  const requiredHeight = Math.max(
+    380,
+    safeMaxMatches * matchHeight + Math.max(0, safeMaxMatches - 1) * matchGap + verticalChrome
+  );
+  const baseHeight = isShowcase || isStandard
+    ? Math.max(380, safeMaxMatches * seedSlotHeight + 48)
+    : requiredHeight;
   const availableWidth = Math.max(560, safeWidth - Math.max(56, safeWidth * 0.075));
-  const availableHeight = Math.max(330, safeHeight - (safeHeight <= 800 ? 174 : 208));
+  const heightReservation = !isShowcase && !isStandard && safeHeight <= 800
+    ? 144
+    : safeHeight <= 800
+      ? 174
+      : 208;
+  const availableHeight = Math.max(330, safeHeight - heightReservation);
   const widthFit = availableWidth / baseWidth;
   const heightFit = availableHeight / baseHeight;
   const preferredScale = isShowcase ? 1.2 : isStandard ? (safeWidth < 1500 ? 0.9 : 1) : 0.82;
@@ -156,6 +172,11 @@ export function getKillRaceBracketLayout({
     minimumScale,
     cardWidth,
     roundGap,
+    matchHeight,
+    matchGap,
+    requiredHeight,
+    availableWidth,
+    availableHeight,
     baseWidth,
     baseHeight,
     scaledWidth,

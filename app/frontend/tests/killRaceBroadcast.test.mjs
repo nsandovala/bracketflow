@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
   calculatePlayerTotal,
+  calculatePlayerTotalOrNull,
   getKillRaceBroadcastStatus,
   killRaceVisualKey,
   selectKillRaceScorebugMatch,
@@ -28,8 +30,12 @@ import {
   resolveStreamSurface,
 } from "../lib/streamRouting.mjs";
 import {
+  clearStreamSnapshot,
   getFollowOperatorOverlayUrl,
   getOperatorTransmissionState,
+  getTournamentOverlayUrl,
+  hasResolvedMatch,
+  reduceStreamFetchFailure,
   resolveBroadcastContext,
 } from "../lib/broadcastChannel.mjs";
 import {
@@ -227,6 +233,14 @@ test("visual key changes when kills change", () => {
   assert.notEqual(killRaceVisualKey(10, first), killRaceVisualKey(10, second));
 });
 
+test("visual key changes with match state and official series score", () => {
+  const ready = { ...match(1, null), status: "ready", maps_won_a: 0, maps_won_b: 0 };
+  const live = { ...ready, status: "in_progress" };
+  const scored = { ...live, maps_won_a: 1 };
+  assert.notEqual(killRaceVisualKey(10, ready), killRaceVisualKey(10, live));
+  assert.notEqual(killRaceVisualKey(10, live), killRaceVisualKey(10, scored));
+});
+
 test("match switch and tournament switch change the visual identity", () => {
   assert.notEqual(killRaceVisualKey(10, match(1, "live")), killRaceVisualKey(10, match(2, "live")));
   assert.notEqual(killRaceVisualKey(10, match(1, "live")), killRaceVisualKey(11, match(1, "live")));
@@ -234,8 +248,123 @@ test("match switch and tournament switch change the visual identity", () => {
 
 test("scorebug statuses render LIVE, PROVISIONAL and FINAL", () => {
   assert.equal(getKillRaceBroadcastStatus("live"), "LIVE");
+  assert.equal(getKillRaceBroadcastStatus("in_progress"), "LIVE");
   assert.equal(getKillRaceBroadcastStatus("provisional"), "PROVISIONAL");
   assert.equal(getKillRaceBroadcastStatus("confirmed"), "FINAL");
+  assert.equal(getKillRaceBroadcastStatus("pending"), "POR COMENZAR");
+  assert.equal(getKillRaceBroadcastStatus("unknown"), "POR COMENZAR");
+  assert.equal(getKillRaceBroadcastStatus("live", false), "RECONECTANDO");
+});
+
+test("missing player stats never invent individual kills", () => {
+  assert.equal(calculatePlayerTotalOrNull([]), null);
+  assert.equal(calculatePlayerTotalOrNull([{ kills: 0 }, { kills: 0 }]), 0);
+});
+
+test("P6 Caster exposes five stable LIVE, preview and fixed URL contracts", () => {
+  const layouts = ["scorebug", "intermission", "bracket", "mvp", "champion"];
+  const live = layouts.map((layout) => getFollowOperatorOverlayUrl(
+    "http://localhost:3000",
+    layout,
+    "main",
+    layout !== "intermission"
+  ));
+  assert.deepEqual(live, [
+    "http://localhost:3000/stream?channel=main&layout=scorebug&obs=1&bg=transparent",
+    "http://localhost:3000/stream?channel=main&layout=intermission&obs=1",
+    "http://localhost:3000/stream?channel=main&layout=bracket&obs=1&bg=transparent",
+    "http://localhost:3000/stream?channel=main&layout=mvp&obs=1&bg=transparent",
+    "http://localhost:3000/stream?channel=main&layout=champion&obs=1&bg=transparent",
+  ]);
+  for (const layout of layouts) {
+    const preview = getTournamentOverlayUrl("http://localhost:3000", 24, layout);
+    assert.match(preview, /tournamentId=24/);
+    assert.doesNotMatch(preview, /channel=/);
+  }
+  const fixed = getTournamentOverlayUrl("http://localhost:3000", 24, "scorebug", 101);
+  assert.match(fixed, /tournamentId=24/);
+  assert.match(fixed, /matchId=101/);
+  assert.doesNotMatch(fixed, /channel=/);
+});
+
+test("P6 Caster groups all five Kill Race layouts and scorebug CSS has one base", () => {
+  const casterSource = readFileSync(new URL("../app/components/CasterHub.tsx", import.meta.url), "utf8");
+  const scorebugSource = readFileSync(new URL("../app/components/KillRaceScorebug.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.equal((casterSource.match(/\{KILL_RACE_OVERLAYS\.map\(\(overlay\) =>/g) ?? []).length, 2);
+  assert.match(casterSource, /CANAL MAIN · EN VIVO/);
+  assert.match(casterSource, /PREVIEW · TORNEO SELECCIONADO/);
+  assert.equal((css.match(/^\.kr-scorebug \{/gm) ?? []).length, 1);
+  assert.match(css, /\.kr-scorebug-player-list span \{[^}]*text-overflow: ellipsis/);
+  assert.match(scorebugSource, /\.slice\(0, 2\)/);
+  assert.doesNotMatch(scorebugSource, /ELIMINACIONES/i);
+});
+
+test("P6 visual close: Caster launchers use a compact responsive grid without changing URLs", () => {
+  const casterSource = readFileSync(new URL("../app/components/CasterHub.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.equal((casterSource.match(/className="bf-caster-overlay-source-grid"/g) ?? []).length, 2);
+  assert.equal((casterSource.match(/overlay\.layout === "champion" \? " is-champion-source"/g) ?? []).length, 2);
+  assert.match(css, /\.bf-caster-overlay-source-grid \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/s);
+  assert.match(css, /\.is-champion-source \{[^}]*grid-column: 1 \/ -1/s);
+  assert.match(css, /@container \(max-width: 680px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(css, /\.bf-caster-overlays \.bf-caster-overlay code \{[^}]*max-width: 100%/s);
+  assert.match(css, /\.bf-caster-overlay code \{[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/s);
+  assert.match(css, /\.bf-caster-overlay-source-grid \.bf-caster-overlay \{[^}]*min-width: 0[^}]*height: 100%/s);
+  assert.match(css, /\.bf-caster-overlays \.bf-caster-overlay-actions \{[^}]*align-self: end[^}]*margin-top: auto/s);
+});
+
+const staleStreamSnapshot = {
+  tournament: { id: 23, name: "Torneo eliminado" },
+  matchCompletionPolicy: { state: "active" },
+  teams: [{ id: 1, name: "Stale team" }],
+  matches: [match(97, "provisional", 12)],
+  standings: [{ team_id: 1, kills: 12 }],
+  results: [{ id: 1, kills: 12 }],
+  afterGameNumber: 1,
+  connected: true,
+  hasLoadedOnce: true,
+  channel: { activeTournamentId: 23, broadcastMatchId: 97 },
+  resolvedMatchId: 97,
+  emptyReason: null,
+};
+
+test("404 clears the stale stream snapshot and exposes an invalid reference", () => {
+  const next = reduceStreamFetchFailure(staleStreamSnapshot, { status: 404 });
+  assert.equal(next.tournament, null);
+  assert.deepEqual(next.teams, []);
+  assert.deepEqual(next.matches, []);
+  assert.deepEqual(next.results, []);
+  assert.equal(next.emptyReason, "TORNEO NO DISPONIBLE");
+  assert.equal(next.connected, true);
+});
+
+test("transient failure preserves the last snapshot and marks reconnecting", () => {
+  const next = reduceStreamFetchFailure(staleStreamSnapshot, new TypeError("Failed to fetch"));
+  assert.equal(next.tournament, staleStreamSnapshot.tournament);
+  assert.equal(next.matches, staleStreamSnapshot.matches);
+  assert.equal(next.connected, false);
+  assert.equal(next.emptyReason, null);
+
+  const empty = reduceStreamFetchFailure(
+    clearStreamSnapshot(staleStreamSnapshot, { emptyReason: "SIN SERIE AL AIRE" }),
+    new TypeError("Failed to fetch")
+  );
+  assert.equal(empty.emptyReason, "RECONECTANDO");
+});
+
+test("an explicit tournament never consumes the main channel match", () => {
+  assert.deepEqual(resolveBroadcastContext({
+    explicitTournamentId: 23,
+    explicitMatchId: null,
+    channel: { activeTournamentId: 24, broadcastMatchId: 101 },
+  }), { tournamentId: 23, matchId: null, source: "explicit" });
+});
+
+test("a match outside the resolved tournament is rejected without fallback", () => {
+  assert.equal(hasResolvedMatch([match(1, null)], 99), false);
+  assert.equal(resolveKillRaceScorebugMatch([match(1, null)], 99, 1), null);
 });
 
 const member = (id, nickname) => ({ id, team_id: 1, player_id: id, player: { id, nickname } });
@@ -390,7 +519,21 @@ function sourceRoundsFor(matches, teams) {
 
 function bracketFixture(teamCount) {
   const teams = Array.from({ length: teamCount }, (_, index) => bracketTeam(index + 1));
-  const matches = teamCount <= 4
+  const matches = teamCount === 12
+    ? [
+        bracketMatch(1, 1, 1, 12, 7, "a"),
+        bracketMatch(2, 1, 2, 11, 7, "b"),
+        bracketMatch(3, 1, 3, 10, 8, "a"),
+        bracketMatch(4, 1, 4, 9, 8, "b"),
+        bracketMatch(5, 1, 5, 8, 9, "a"),
+        bracketMatch(6, 1, 6, 7, 9, "b"),
+        bracketMatch(7, 2, null, null, 10, "a"),
+        bracketMatch(8, 2, null, null, 10, "b"),
+        bracketMatch(9, 2, null, null, 11, "a"),
+        bracketMatch(10, 3, null, null, 11, "b"),
+        bracketMatch(11, 4, null, null),
+      ]
+    : teamCount <= 4
     ? [
         bracketMatch(1, 1, 1, 4, 3, "a"),
         bracketMatch(2, 1, 2, 3, 3, "b"),
@@ -425,6 +568,19 @@ test("P4: 6 teams preserve the 4/2/1 structure and BYEs", () => {
 
 test("P4: 8 teams produce rounds 4/2/1", () => {
   assert.deepEqual(buildBracketModel(8).rounds.map((round) => round.seeds.length), [4, 2, 1]);
+});
+
+test("P6 visual close: 12 teams preserve the real 6/3/1/1 data contract", () => {
+  const fixture = bracketFixture(12);
+  const model = buildKillRaceBracketBroadcast(fixture);
+  const clone = buildKillRaceBracketBroadcast(structuredClone(fixture));
+
+  assert.deepEqual(model.rounds.map((round) => round.seeds.length), [6, 3, 1, 1]);
+  assert.equal(model.totalSeries, 11);
+  assert.equal(model.rounds[0].seeds[0].leftTeam.name, "Team 1");
+  assert.equal(model.rounds[0].seeds[0].rightTeam.name, "Team 12");
+  assert.equal(clone.visualKey, model.visualKey);
+  assert.deepEqual(clone.rounds, model.rounds);
 });
 
 test("P4: broadcastMatchId marks exactly one series", () => {
@@ -521,6 +677,57 @@ test("P4: 4, 6 and 8 teams do not request overflow at broadcast viewports", () =
     const eight = getKillRaceBracketLayout({ roundCount: 3, maxMatchesInRound: 4, viewportWidth: viewport[0], viewportHeight: viewport[1] });
     assert.equal(four.requestsOverflow || six.requestsOverflow || eight.requestsOverflow, false);
   }
+});
+
+test("P6 visual close: dense height includes real cards and a perceptible minimum gap", () => {
+  const layout = getKillRaceBracketLayout({
+    roundCount: 4,
+    maxMatchesInRound: 6,
+    viewportWidth: 1366,
+    viewportHeight: 768,
+  });
+
+  assert.equal(layout.density, "fallback");
+  assert.ok(layout.matchGap >= 10);
+  assert.equal(
+    layout.requiredHeight,
+    6 * layout.matchHeight + 5 * layout.matchGap + 76
+  );
+  assert.ok(layout.scale >= layout.minimumScale);
+});
+
+test("P6 visual close: 12-team bracket fits both OBS validation viewports", () => {
+  for (const [viewportWidth, viewportHeight] of [[1920, 1080], [1366, 768]]) {
+    const layout = getKillRaceBracketLayout({
+      roundCount: 4,
+      maxMatchesInRound: 6,
+      viewportWidth,
+      viewportHeight,
+    });
+    assert.equal(layout.requestsOverflow, false);
+    assert.ok(layout.scaledWidth <= layout.availableWidth + 1);
+    assert.ok(layout.scaledHeight <= layout.availableHeight + 1);
+    assert.ok(layout.scale >= layout.minimumScale);
+  }
+});
+
+test("P6 visual close: 4, 6 and 8-team density metrics remain unchanged", () => {
+  const showcase1080 = getKillRaceBracketLayout({ roundCount: 2, maxMatchesInRound: 2, viewportWidth: 1920, viewportHeight: 1080 });
+  const showcase768 = getKillRaceBracketLayout({ roundCount: 2, maxMatchesInRound: 2, viewportWidth: 1366, viewportHeight: 768 });
+  const standard1080 = getKillRaceBracketLayout({ roundCount: 3, maxMatchesInRound: 4, viewportWidth: 1920, viewportHeight: 1080 });
+  const standard768 = getKillRaceBracketLayout({ roundCount: 3, maxMatchesInRound: 4, viewportWidth: 1366, viewportHeight: 768 });
+
+  assert.deepEqual(
+    [showcase1080.baseHeight, showcase1080.scale, showcase768.baseHeight, showcase768.scale],
+    [536, 1.2, 536, 1.108]
+  );
+  assert.deepEqual(
+    [standard1080.baseHeight, standard1080.scale, standard768.baseHeight, standard768.scale],
+    [632, 1, 632, 0.9]
+  );
+  assert.deepEqual(buildBracketModel(4).rounds.map((round) => round.seeds.length), [2, 1]);
+  assert.deepEqual(buildBracketModel(6).rounds.map((round) => round.seeds.length), [4, 2, 1]);
+  assert.deepEqual(buildBracketModel(8).rounds.map((round) => round.seeds.length), [4, 2, 1]);
 });
 
 test("P4: visualKey reacts to winner, score and broadcastMatchId", () => {

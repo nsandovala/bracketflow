@@ -80,11 +80,17 @@ export function getKillRaceBracketLayout(input: {
   minimumScale: number;
   cardWidth: number;
   roundGap: number;
+  matchHeight: number;
+  matchGap: number;
+  requiredHeight: number;
+  availableWidth: number;
+  availableHeight: number;
   baseWidth: number;
   baseHeight: number;
   scaledWidth: number;
   scaledHeight: number;
   requestsOverflow: boolean;
 };
+export const KILL_RACE_DENSE_MATCH_GAP: number;
 import type { IRoundProps } from "react-brackets";
 import type { Match, Team, Tournament } from "./api";
