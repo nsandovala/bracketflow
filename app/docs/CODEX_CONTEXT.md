@@ -14,6 +14,10 @@ No convertir Standings en una copia del bracket ni trasladar controles de Operat
 
 ## Reglas Kill Race vigentes
 
+- `is_tournament_finalized()` es la política competitiva central: devuelve verdadero para `status` `completed`/`archived`, `bracket_status == completed` o `config.championTeamId > 0` legacy. `Tournament.status` y `bracket_status` conservan lifecycles independientes.
+- Un bracket Kill Race completado y un torneo archivado son read-only: sus históricos siguen siendo legibles, pero no admiten nuevas mutaciones competitivas.
+- Una serie con `winner_id` es inmutable. Los caminos provisional y confirmed rechazan mapas tardíos antes de tocar mapas, kills o `player_stats`; nunca se permite `winner_id != null` junto con `status == in_progress`.
+
 - El ranking de kills es `RANKING DE RENDIMIENTO`, no clasificación oficial.
 - Solo mapas `confirmed` alimentan kills, promedios y rankings de jugadores.
 - Los provisionales pueden aparecer como `En revisión`, pero no modifican score oficial, W–L, avance ni campeón.
@@ -62,4 +66,8 @@ No convertir Standings en una copia del bracket ni trasladar controles de Operat
 - QA P6 final: lint OK, frontend 230/230, build productivo OK y backend 138/138; persisten cuatro `SAWarning` SQLAlchemy preexistentes.
 - Smoke humano final realizado: Bracket Broadcast funciona sin overflow ni errores de datos. En brackets grandes, la densidad de cards todavía requiere mejor separación, jerarquía, bordes/acentos y lectura de equipos; esta deuda visual está explícitamente aceptada y diferida al futuro refactor visual de Bracket/Web/Broadcast.
 - No reabrir P6 por la deuda visual del bracket denso. El próximo trabajo debe tratarla únicamente dentro del refactor visual futuro correspondiente.
-- Continúan pendientes el bracket web, Fit/Reset y el refactor global de UI de Operator/Standings; no mezclarlos con P6.
+- P7 — Kill Race Release Gate v1 está **IMPLEMENTADO — PENDIENTE DE APROBACIÓN HUMANA FINAL** en `feat/kill-race-release-gate-v1`; no declararlo Release Ready sin el gate humano.
+- P7 centraliza finalización competitiva, bloquea resultados post-winner en provisional/confirmación, protege el estado imposible `winner_id + in_progress` y vacía sincrónicamente datos derivados al cambiar de torneo, invalidando además cualquier refresh anterior en vuelo.
+- El lifecycle integration de cuatro equipos confirma semifinales, pobla y decide la final, deja `tournament.status == bracket_generated`, lleva `bracket_status` a `completed`, verifica finalización central y demuestra inmutabilidad sin cambios en mapas oficiales ni stats.
+- QA P7: lint OK, frontend 232/232, build productivo OK y backend 142/142; permanecen sólo cuatro `SAWarning` SQLAlchemy preexistentes.
+- Continúan pendientes el bracket web, Fit/Reset y el refactor global de UI de Operator/Standings; no mezclarlos con P6/P7.

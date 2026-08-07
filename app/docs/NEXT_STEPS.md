@@ -2,12 +2,59 @@
 
 ## Estado actual
 
-- Rama: `feat/kill-race-scorebug-obs-final-v1`.
-- Base: `83e2cb3` — `docs(agents): close P5 and hand off P6`.
+- Rama: `feat/kill-race-release-gate-v1`.
+- Base: `e00f8a3` — `docs(agents): close P6 and hand off P7`.
+- P7 — Kill Race Release Gate v1: **IMPLEMENTADO — PENDIENTE DE APROBACIÓN HUMANA FINAL**.
+- Veredicto automatizado: candidato a QA humano del release gate; todavía no declarar `RELEASE READY`.
 - P6 — Kill Race Scorebug + Composición OBS Final v1: **CERRADO CON DEUDA VISUAL ACEPTADA**.
 - Estado visual: smoke humano completado; bracket funcional sin overflow ni errores de datos. El grid compacto de Caster Hub queda funcionalmente aprobado.
 - No se hizo commit, push, cambio de dependencias, migración ni regeneración de `backend/bracketflow.db`.
 - `.claude/` no fue inspeccionado ni modificado.
+
+## Arquitectura e invariantes P7
+
+- `is_tournament_finalized()` es el único criterio competitivo central y preserva todas las condiciones válidas: `status == completed`, `status == archived`, `bracket_status == completed` o `config.championTeamId > 0` legacy.
+- `Tournament.status` y `bracket_status` no se sincronizan artificialmente. Una final Kill Race puede mantener `status == bracket_generated`; el bracket completado basta para volver el torneo inmutable.
+- `upsert_kill_race_result()` y `confirm_kill_race_result()` ejecutan la misma guarda antes de modificar mapas o stats. Un torneo finalizado o una serie con `winner_id` falla explícitamente; los endpoints existentes traducen `ValueError` a HTTP 409.
+- La defensa local sólo asigna `match.status = in_progress` cuando `winner_id is None`; nunca elimina ni reabre al ganador.
+- `archived` significa histórico read-only: no borra torneo, matches, mapas ni stats, pero impide nuevas mutaciones competitivas.
+- `selectTournament()` invalida primero cualquier request anterior, limpia sincrónicamente `selectedTournament`, equipos, matches, leaderboard, resultados, players, selección y drafts, entra en loading y sólo después carga el nuevo torneo. Un refresh viejo no puede repoblar estado bajo el ID nuevo.
+
+## Lifecycle integration P7
+
+El test de dominio crea cuatro equipos 2v2, genera y bloquea el bracket, decide ambas semifinales 2–0, comprueba que los ganadores poblaron la final, decide la final 2–0 y verifica:
+
+1. `winner_id` final y estados de cada serie correctos;
+2. `tournament.status == bracket_generated` sin sincronización artificial;
+3. `bracket_status == completed` e `is_tournament_finalized() == true`;
+4. provisional tardío y confirmación tardía rechazados;
+5. mapas, kills oficiales, ganadores de mapa y `player_stats` idénticos antes/después del rechazo.
+
+## Archivos P7
+
+Nuevos:
+
+- `frontend/lib/worldSeriesPracticeState.mjs`.
+- `frontend/lib/worldSeriesPracticeState.d.mts`.
+
+Modificados:
+
+- `backend/app/crud.py`.
+- `backend/tests/test_kill_race_results.py`.
+- `frontend/app/lib/useWorldSeriesPractice.ts`.
+- `frontend/tests/killRaceBroadcast.test.mjs`.
+- `docs/CODEX_CONTEXT.md`.
+- `docs/NEXT_STEPS.md`.
+
+## Tests y QA P7
+
+- Backend: bracket completado finaliza sin cambiar `Tournament.status`; BO3 decidido rechaza mapa 3 y confirmación tardía; `archived` rechaza upsert/confirm y conserva lectura; estado `winner_id + in_progress` ausente; lifecycle completo de cuatro equipos e inmutabilidad de datos oficiales.
+- Frontend: transición pura vacía sincrónicamente los cinco arrays derivados antes de resolver el refresh; el hook invalida el request anterior antes de publicar el nuevo ID y aplica todo el reset.
+- Baseline P7: frontend 230/230, backend 138/138, lint y build OK.
+- QA final con `scripts/qa.ps1`: lint OK, frontend **232/232**, build productivo/TypeScript OK, backend **142/142**.
+- Warnings: sólo cuatro `SAWarning` SQLAlchemy preexistentes en el reemplazo de identidades de `MatchMapPlayerStat`; no se ampliaron en P7.
+- Smoke funcional automatizado cubierto por las pruebas: torneo abierto acepta provisional/confirmación, ganador avanza, mapa extra falla, bracket finaliza, torneo finalizado/archivado rechaza mutaciones, histórico permanece legible y cambio de torneo no expone arrays previos.
+- Pendiente: aprobación humana final del release gate. P7 no está cerrado ni Kill Race declarado Release Ready.
 
 ## Arquitectura final P6
 
