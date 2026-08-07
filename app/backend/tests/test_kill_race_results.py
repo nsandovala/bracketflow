@@ -6,9 +6,14 @@ from sqlalchemy.pool import StaticPool
 
 from app import models, schemas
 from app.crud import (
+    archive_tournament,
     confirm_kill_race_result,
     delete_tournament,
+    generate_bracket,
     get_match,
+    get_matches_by_tournament,
+    is_tournament_finalized,
+    lock_bracket,
     read_tournament_config,
     update_tournament_broadcast_match,
     get_broadcast_channel,
@@ -96,6 +101,86 @@ def valid_payload(kill_race, left_total=12):
     )
 
 
+def match_payload(db, match, map_number, status="provisional"):
+    left = db.get(models.Team, match.team_a_id)
+    right = db.get(models.Team, match.team_b_id)
+    left_players = [member.player for member in left.members]
+    right_players = [member.player for member in right.members]
+    return schemas.KillRaceResultInput(
+        map_number=map_number,
+        status=status,
+        left={
+            "side": "left",
+            "team_id": left.id,
+            "team_name": left.name,
+            "players": [
+                {"player_id": left_players[0].id, "player_name": left_players[0].nickname, "kills": 7},
+                {"player_id": left_players[1].id, "player_name": left_players[1].nickname, "kills": 5},
+            ],
+            "total_kills": 12,
+        },
+        right={
+            "side": "right",
+            "team_id": right.id,
+            "team_name": right.name,
+            "players": [
+                {"player_id": right_players[0].id, "player_name": right_players[0].nickname, "kills": 6},
+                {"player_id": right_players[1].id, "player_name": right_players[1].nickname, "kills": 3},
+            ],
+            "total_kills": 9,
+        },
+    )
+
+
+def confirm_left_sweep(db, tournament, match):
+    for map_number in (1, 2):
+        current = get_match(db, match.id)
+        upsert_kill_race_result(db, tournament, current, match_payload(db, current, map_number))
+        confirm_kill_race_result(db, tournament, get_match(db, match.id), map_number)
+    return get_match(db, match.id)
+
+
+def create_four_team_bracket(db):
+    tournament = models.Tournament(
+        name="P7 lifecycle",
+        game="Warzone",
+        format="roulette_2v2",
+        team_size=2,
+        scoring_profile="kill_race",
+        config='{"engine_key":"kill_race_bracket","bestOf":3}',
+        status="active",
+        roster_status="locked",
+        bracket_status="respin_open",
+    )
+    db.add(tournament)
+    db.flush()
+    for team_index in range(4):
+        players = [
+            models.Player(
+                nickname=f"T{team_index + 1}P{player_index + 1}",
+                tournament_id=tournament.id,
+            )
+            for player_index in range(2)
+        ]
+        db.add_all(players)
+        db.flush()
+        team = models.Team(
+            name=f"Team {team_index + 1}",
+            tournament_id=tournament.id,
+            source="manual",
+        )
+        db.add(team)
+        db.flush()
+        db.add_all(
+            models.TeamMember(team_id=team.id, player_id=player.id)
+            for player in players
+        )
+    db.commit()
+    generate_bracket(db, tournament)
+    lock_bracket(db, tournament)
+    return tournament
+
+
 def test_valid_txt_parser_and_totals(kill_race):
     result = preview(kill_race, """MATCH: 1
 LEFT: Vito / Jasfa
@@ -161,6 +246,146 @@ def test_series_score_is_separate_from_current_game_kills(db, kill_race):
     confirmed = confirm_kill_race_result(db, tournament, get_match(db, match.id), 1)
     assert (confirmed.maps_won_a, confirmed.maps_won_b) == (1, 0)
     assert (confirmed.maps[0].kills_a, confirmed.maps[0].kills_b) == (12, 9)
+
+
+def test_completed_kill_race_bracket_is_finalized_without_syncing_tournament_status(
+    kill_race,
+):
+    tournament, *_ = kill_race
+    tournament.status = "bracket_generated"
+    tournament.bracket_status = "completed"
+
+    assert is_tournament_finalized(tournament)
+    assert tournament.status == "bracket_generated"
+
+
+def test_decided_bo3_rejects_map_three_and_never_reopens_or_changes_official_data(
+    db, kill_race
+):
+    tournament, match, *_ = kill_race
+    next_match = models.Match(
+        round=2,
+        status="pending",
+        best_of=3,
+        tournament_id=tournament.id,
+    )
+    db.add(next_match)
+    db.flush()
+    match.next_match_id = next_match.id
+    match.next_slot = "a"
+    db.commit()
+    decided = confirm_left_sweep(db, tournament, match)
+    original_maps = [
+        (item.map_number, item.kills_a, item.kills_b, item.result_status)
+        for item in decided.maps
+    ]
+    original_stats = db.query(models.MatchMapPlayerStat).count()
+
+    with pytest.raises(ValueError, match="serie ya esta decidida"):
+        upsert_kill_race_result(
+            db,
+            tournament,
+            get_match(db, match.id),
+            match_payload(db, get_match(db, match.id), 3),
+        )
+    with pytest.raises(ValueError, match="serie ya esta decidida"):
+        confirm_kill_race_result(db, tournament, get_match(db, match.id), 1)
+
+    preserved = get_match(db, match.id)
+    assert preserved.status == "completed"
+    assert preserved.winner_id == preserved.team_a_id
+    assert [
+        (item.map_number, item.kills_a, item.kills_b, item.result_status)
+        for item in preserved.maps
+    ] == original_maps
+    assert db.query(models.MatchMapPlayerStat).count() == original_stats
+    assert all(
+        candidate.winner_id is None or candidate.status != "in_progress"
+        for candidate in db.query(models.Match).all()
+    )
+
+
+def test_archived_tournament_rejects_kill_race_mutations_but_remains_readable(
+    db, kill_race
+):
+    tournament, match, *_ = kill_race
+    upsert_kill_race_result(db, tournament, match, valid_payload(kill_race))
+    archive_tournament(db, tournament)
+
+    assert is_tournament_finalized(tournament)
+    assert get_match(db, match.id).maps[0].result_status == "provisional"
+    with pytest.raises(ValueError, match="Torneo finalizado"):
+        confirm_kill_race_result(db, tournament, get_match(db, match.id), 1)
+    with pytest.raises(ValueError, match="Torneo finalizado"):
+        upsert_kill_race_result(
+            db,
+            tournament,
+            get_match(db, match.id),
+            match_payload(db, get_match(db, match.id), 2),
+        )
+
+    historical = get_match(db, match.id)
+    assert historical.maps[0].result_status == "provisional"
+    assert historical.winner_id is None
+
+
+def test_four_team_kill_race_lifecycle_finishes_and_becomes_immutable(db):
+    tournament = create_four_team_bracket(db)
+    semifinals = [
+        match
+        for match in get_matches_by_tournament(db, tournament.id)
+        if match.round == 1
+    ]
+    assert len(semifinals) == 2
+
+    semifinal_winners = []
+    for semifinal in semifinals:
+        decided = confirm_left_sweep(db, tournament, semifinal)
+        assert decided.status == "completed"
+        assert decided.winner_id == decided.team_a_id
+        semifinal_winners.append(decided.winner_id)
+
+    final = next(
+        match
+        for match in get_matches_by_tournament(db, tournament.id)
+        if match.round == 2
+    )
+    assert {final.team_a_id, final.team_b_id} == set(semifinal_winners)
+    assert final.status == "ready"
+
+    completed_final = confirm_left_sweep(db, tournament, final)
+    db.refresh(tournament)
+    assert completed_final.winner_id == completed_final.team_a_id
+    assert completed_final.status == "completed"
+    assert tournament.status == "bracket_generated"
+    assert tournament.bracket_status == "completed"
+    assert is_tournament_finalized(tournament)
+
+    official_before = [
+        (row.match_id, row.map_number, row.kills_a, row.kills_b, row.map_winner_id)
+        for row in db.query(models.MatchMap)
+        .order_by(models.MatchMap.match_id, models.MatchMap.map_number)
+        .all()
+    ]
+    player_stats_before = db.query(models.MatchMapPlayerStat).count()
+    with pytest.raises(ValueError, match="Torneo finalizado"):
+        upsert_kill_race_result(
+            db,
+            tournament,
+            get_match(db, final.id),
+            match_payload(db, get_match(db, final.id), 3),
+        )
+    with pytest.raises(ValueError, match="Torneo finalizado"):
+        confirm_kill_race_result(db, tournament, get_match(db, final.id), 2)
+
+    official_after = [
+        (row.match_id, row.map_number, row.kills_a, row.kills_b, row.map_winner_id)
+        for row in db.query(models.MatchMap)
+        .order_by(models.MatchMap.match_id, models.MatchMap.map_number)
+        .all()
+    ]
+    assert official_after == official_before
+    assert db.query(models.MatchMapPlayerStat).count() == player_stats_before
 
 
 def test_broadcast_match_update_preserves_existing_config(db, kill_race):

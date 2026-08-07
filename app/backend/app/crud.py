@@ -84,12 +84,15 @@ def write_tournament_config(tournament: models.Tournament, config: dict) -> None
 
 
 def is_tournament_finalized(tournament: models.Tournament) -> bool:
-    """Torneo cerrado: campeon ya decidido. No admite mutaciones operativas.
+    """Torneo competitivamente cerrado; conserva lectura, bloquea mutaciones.
 
-    Se considera finalizado si status == "completed" o si config.championTeamId
-    existe y es > 0 (persistido por evaluate_match_point / cierre de bracket).
+    ``status`` y ``bracket_status`` representan ciclos distintos. Cualquiera
+    puede cerrar la competencia, mientras ``championTeamId`` preserva el cierre
+    legacy de Match Point.
     """
-    if tournament.status == "completed":
+    if tournament.status in {"completed", "archived"}:
+        return True
+    if tournament.bracket_status == BRACKET_COMPLETED:
         return True
     champion_team_id = read_tournament_config(tournament).get("championTeamId")
     return isinstance(champion_team_id, int) and champion_team_id > 0
@@ -2151,6 +2154,7 @@ def upsert_kill_race_result(
 ) -> schemas.Match:
     if get_engine_key(tournament) not in KILL_RACE_ENGINE_KEYS:
         raise ValueError("This endpoint is only available for Kill Race tournaments")
+    _ensure_kill_race_result_mutable(tournament, match)
     if match.team_a_id is None or match.team_b_id is None:
         raise ValueError("El match todavía no tiene dos equipos listos.")
     if payload.map_number > match.best_of:
@@ -2199,7 +2203,8 @@ def upsert_kill_race_result(
                     kills=player.kills,
                 )
             )
-    match.status = "in_progress"
+    if match.winner_id is None:
+        match.status = "in_progress"
     db.commit()
     refreshed = get_match(db, match.id)
     if refreshed is None:
@@ -2213,6 +2218,7 @@ def confirm_kill_race_result(
     match: models.Match,
     map_number: int,
 ) -> schemas.Match:
+    _ensure_kill_race_result_mutable(tournament, match)
     db_map = (
         db.query(models.MatchMap)
         .filter(
@@ -2247,13 +2253,23 @@ def confirm_kill_race_result(
                 _refresh_match_status(next_match)
         elif tournament.bracket_status in {BRACKET_LOCKED, BRACKET_RUNNING}:
             tournament.bracket_status = BRACKET_COMPLETED
-    else:
+    elif match.winner_id is None:
         match.status = "in_progress"
     db.commit()
     refreshed = get_match(db, match.id)
     if refreshed is None:
         raise ValueError("Match not found after confirmation")
     return build_match_schema(refreshed)
+
+
+def _ensure_kill_race_result_mutable(
+    tournament: models.Tournament,
+    match: models.Match,
+) -> None:
+    if is_tournament_finalized(tournament):
+        raise ValueError("Torneo finalizado: no se permiten nuevas operaciones.")
+    if match.winner_id is not None:
+        raise ValueError("La serie ya esta decidida: no admite nuevos resultados.")
 
 
 def _cleanup_bracket_matches(db: Session, tournament_id: int) -> None:

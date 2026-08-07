@@ -42,6 +42,7 @@ import {
   buildKillRaceBracketBroadcast,
   getKillRaceBracketLayout,
 } from "../lib/killRaceBracketBroadcast.mjs";
+import { createTournamentSwitchState } from "../lib/worldSeriesPracticeState.mjs";
 
 const match = (id, status, killsA = 0) => ({
   id,
@@ -50,6 +51,64 @@ const match = (id, status, killsA = 0) => ({
   team_b_id: 2,
   status: "ready",
   maps: status ? [{ map_number: 1, result_status: status, kills_a: killsA, kills_b: 9 }] : [],
+});
+
+test("tournament switch clears every tournament-derived array before refresh resolves", async () => {
+  const previous = {
+    selectedTournamentId: 10,
+    selectedTournament: { id: 10 },
+    teams: [{ id: 1 }],
+    matches: [{ id: 2 }],
+    leaderboard: [{ team_id: 1 }],
+    tournamentResults: [{ id: 3 }],
+    players: [{ id: 4 }],
+  };
+  let visible = previous;
+  let resolveRefresh;
+  const refresh = new Promise((resolve) => {
+    resolveRefresh = resolve;
+  }).then((next) => {
+    visible = next;
+  });
+
+  visible = createTournamentSwitchState(20);
+
+  assert.equal(visible.selectedTournamentId, 20);
+  assert.equal(visible.selectedTournament, null);
+  assert.equal(visible.loading, true);
+  for (const key of ["teams", "matches", "leaderboard", "tournamentResults", "players"]) {
+    assert.deepEqual(visible[key], []);
+  }
+  resolveRefresh({ selectedTournamentId: 20, teams: [{ id: 20 }] });
+  await refresh;
+  assert.deepEqual(visible.teams, [{ id: 20 }]);
+});
+
+test("Operator invalidates an old tournament request before applying the synchronous reset", () => {
+  const source = readFileSync(
+    new URL("../app/lib/useWorldSeriesPractice.ts", import.meta.url),
+    "utf8"
+  );
+  const selection = source.slice(
+    source.indexOf("function selectTournament"),
+    source.indexOf("function updateResultDraft")
+  );
+
+  assert.ok(selection.indexOf("refreshRequestRef.current += 1") >= 0);
+  assert.ok(
+    selection.indexOf("refreshRequestRef.current += 1") <
+      selection.indexOf("setSelectedTournamentId")
+  );
+  for (const setter of [
+    "setSelectedTournament",
+    "setTeams",
+    "setMatches",
+    "setLeaderboard",
+    "setTournamentResults",
+    "setPlayers",
+  ]) {
+    assert.match(selection, new RegExp(`${setter}\\(reset\\.`));
+  }
 });
 
 test("explicit scorebug match has priority over operator broadcast match", () => {

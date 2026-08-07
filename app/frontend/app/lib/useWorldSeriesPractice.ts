@@ -59,6 +59,7 @@ import {
   normalizeStandingsPollMs,
   runSequentialPollCycle,
 } from "../../lib/killRaceStandings.mjs";
+import { createTournamentSwitchState } from "../../lib/worldSeriesPracticeState.mjs";
 
 export const ACTIVE_WORLD_SERIES_TOURNAMENT_KEY = "bf:world-series-practice:tournament-id";
 export const STANDINGS_POLL_INTERVAL_MS = 1800;
@@ -405,11 +406,23 @@ export function useWorldSeriesPractice(
       return;
     }
 
+    let active = true;
     const timeoutId = window.setTimeout(() => {
-      void refreshSelectedTournament(selectedTournamentId);
+      void refreshSelectedTournament(selectedTournamentId)
+        .catch((error) => {
+          if (active) {
+            setMessage(error instanceof Error ? error.message : "No se pudo cargar el torneo.");
+          }
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
     }, 0);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
   }, [refreshSelectedTournament, selectedTournamentId]);
 
   useEffect(() => {
@@ -465,14 +478,25 @@ export function useWorldSeriesPractice(
   }, []);
 
   function selectTournament(tournamentId: number) {
+    const reset = createTournamentSwitchState(tournamentId);
+    refreshRequestRef.current += 1;
+    standingsRefreshPromiseRef.current = null;
     practiceDataSignatureRef.current = "";
+    selectedMatchIdRef.current = null;
     persistTournamentId(tournamentId);
-    setSelectedTournamentId(tournamentId);
-    setMatchCompletionPolicy(null);
-    setSelectedMatchId(null);
-    setResultDrafts({});
-    setKillRaceMapDrafts({});
-    setMessage(null);
+    setLoading(reset.loading);
+    setSelectedTournamentId(reset.selectedTournamentId);
+    setSelectedTournament(reset.selectedTournament);
+    setMatchCompletionPolicy(reset.matchCompletionPolicy);
+    setTeams(reset.teams);
+    setMatches(reset.matches);
+    setLeaderboard(reset.leaderboard);
+    setTournamentResults(reset.tournamentResults);
+    setPlayers(reset.players);
+    setSelectedMatchId(reset.selectedMatchId);
+    setResultDrafts(reset.resultDrafts);
+    setKillRaceMapDrafts(reset.killRaceMapDrafts);
+    setMessage(reset.message);
   }
 
   function updateResultDraft(matchId: number, teamId: number, patch: Partial<ResultDraft>) {
